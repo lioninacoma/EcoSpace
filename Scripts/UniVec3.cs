@@ -42,6 +42,7 @@ namespace Universe
 
 		// ----- Constructors -----------------------------------------------
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public UniVec3(Long3 units, Double3 offset, double scale)
 		{
 			Units  = units;
@@ -51,10 +52,12 @@ namespace Universe
 		}
 
 		/// <summary>Create from a small local offset only (Units = 0).</summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public UniVec3(Double3 offset, double scale)
 			: this(Long3.Zero, offset, scale) { }
 
 		/// <summary>Create from raw double-precision world coordinates.</summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static UniVec3 FromDouble(double x, double y, double z, double scale)
 		{
 			// Convert doubles to unit + fractional offset
@@ -80,6 +83,7 @@ namespace Universe
 			}
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private void NormalizeSlow()
 		{
 			double s = Scale;
@@ -111,6 +115,7 @@ namespace Universe
 		/// let the constructor's Normalize() call do the integer split. This matches the Unity
 		/// implementation and avoids an extra divide-then-multiply rounding trip through FromDouble().
 		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public UniVec3 Convert(double newScale)
 		{
 			if (Math.Abs(Scale - newScale) < EPSILON) return this;
@@ -135,6 +140,7 @@ namespace Universe
 		/// Returns the world position as raw double-precision coordinates.
 		/// Precise for distances that fit in double (~1e15 m at meter scale).
 		/// </summary>
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public (double x, double y, double z) ToDouble()
 		{
 			var v = ToDouble3();
@@ -159,14 +165,17 @@ namespace Universe
 
 		// ----- Magnitude --------------------------------------------------
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public double MagnitudeSq()
 		{
 			var (x, y, z) = ToDouble();
 			return x * x + y * y + z * z;
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public double Magnitude() => Math.Sqrt(MagnitudeSq());
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public UniVec3 Normalized()
 		{
 			double mag = Magnitude();
@@ -177,6 +186,7 @@ namespace Universe
 
 		// ----- Static operations ------------------------------------------
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static UniVec3 Lerp(UniVec3 a, UniVec3 b, double t)
 		{
 			if (Math.Abs(a.Scale - b.Scale) > EPSILON)
@@ -195,8 +205,10 @@ namespace Universe
 			return new UniVec3(uInt, offset, a.Scale);
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static double Distance(UniVec3 a, UniVec3 b) => (a - b).Magnitude();
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static UniVec3 Min(UniVec3 a, UniVec3 b)
 		{
 			EnsureSameScale(ref b, a.Scale);
@@ -205,6 +217,7 @@ namespace Universe
 			return FromDouble(Math.Min(ax, bx), Math.Min(ay, by), Math.Min(az, bz), a.Scale);
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static UniVec3 Max(UniVec3 a, UniVec3 b)
 		{
 			EnsureSameScale(ref b, a.Scale);
@@ -215,26 +228,32 @@ namespace Universe
 
 		// ----- Operators --------------------------------------------------
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static UniVec3 operator +(UniVec3 a, UniVec3 b)
 		{
 			EnsureSameScale(ref b, a.Scale);
 			return new UniVec3(a.Units + b.Units, a.Offset + b.Offset, a.Scale);
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static UniVec3 operator -(UniVec3 a, UniVec3 b)
 		{
 			EnsureSameScale(ref b, a.Scale);
 			return new UniVec3(a.Units - b.Units, a.Offset - b.Offset, a.Scale);
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static UniVec3 operator -(UniVec3 a)    => new(-a.Units, -a.Offset, a.Scale);
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static UniVec3 operator +(UniVec3 a, Double3 b) =>
 			new(a.Units, a.Offset + b, a.Scale);
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static UniVec3 operator -(UniVec3 a, Double3 b) =>
 			new(a.Units, a.Offset - b, a.Scale);
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static UniVec3 operator *(UniVec3 a, double s)
 		{
 			// Scale both parts; double intermediates avoid precision loss
@@ -244,6 +263,7 @@ namespace Universe
 			return FromDouble(wx, wy, wz, a.Scale);
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public static UniVec3 operator /(UniVec3 a, double s)
 		{
 			if (Math.Abs(s) < EPSILON) s = Math.Sign(s) * EPSILON;

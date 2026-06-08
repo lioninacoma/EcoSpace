@@ -65,19 +65,22 @@ namespace Universe
             new(Math.Max(a.X, b.X), Math.Max(a.Y, b.Y), Math.Max(a.Z, b.Z));
 
         /// <summary>Squared distance (stays in integer domain, no sqrt loss).</summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static long DistanceSq(Long3 a, Long3 b)
         {
-            long dx = a.X - b.X, dy = a.Y - b.Y, dz = a.Z - b.Z;
-            return dx * dx + dy * dy + dz * dz;
+            Long3 d = a - b;
+            return d.MagnitudeSq();
         }
 
 		// ----- Magnitude --------------------------------------------------
 
-		public double MagnitudeSq()
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+		public long MagnitudeSq()
 		{
 			return X * X + Y * Y + Z * Z;
 		}
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
 		public double Magnitude() => Math.Sqrt(MagnitudeSq());
 
         // ----- Split double → units + fraction ---------------------------
@@ -86,6 +89,7 @@ namespace Universe
         /// Splits a double-precision value into integer unit + fractional remainder.
         /// Used when converting raw doubles into the chunked representation.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static (Long3 units, Double3 frac) FromDouble3(double x, double y, double z)
         {
             SplitDouble(x, out long ux, out double fx);
@@ -98,6 +102,7 @@ namespace Universe
         /// Splits a double-precision value into integer unit + fractional remainder.
         /// Used when converting raw doubles into the chunked representation.
         /// </summary>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Long3 Floor3(double x, double y, double z)
         {
             SplitDouble(x, out long ux, out _);
