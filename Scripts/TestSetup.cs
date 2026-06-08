@@ -40,16 +40,14 @@ namespace Universe
 
         // ----- Orbital parameters -------------------------------------------
         // All SOI values in metres (universal, scale-independent).
-
-        private const double PlanetA_Z   = 1.496e11;           // 1.00 AU in metres
-        private const double PlanetB_Z   = PlanetA_Z + 2 * PlanetSOI; // 2 SOI radii apart
-        private const double StarSOI     = 1.5e15;              // ~10 000 AU
-        private const double PlanetSOI   = 1.0e9;               // ~1 000 000 km
+        private const double PlanetA_Z = 1.496e11;           // 1.00 AU in metres (Earth)
+        private const double PlanetB_Z = 2.279e11;           // 1.52 AU in metres (Mars)
+        private const double StarSOI = 1.5e15;               // ~10 000 AU
+        private const double PlanetSOI = 1.0e9;              // ~1 000 000 km
 
         // Ship starts 7 000 km = 7e6 m from Planet A's centre, on the Planet-B-facing side.
-        // Planet space scale = 1e-4 m/unit  →  7e6 / 1e-4 = 7e10 units
         // Positive Z in Planet-A-local space points away from the star (+Z = toward Planet B).
-        private const double ShipOrbitPlanetUnits = 7e10;
+        private const double ShipOrbitMeters = 7e6;
 
         // Ship thrust: positive = toward Planet B (+Z in Star space).
         // 5e8 m/tick is unrealistically fast but lets the demo finish quickly.
@@ -70,20 +68,20 @@ namespace Universe
         {
             if (_arrived) return;
 
-            var ship    = GameObjects[_ship];
+            var ship = GameObjects[_ship];
             var planetB = GameObjects[_planetB];
 
             // Thrust: ShipSpeedMetersPerTick in +Z metres. TranslatePos(Double3) interprets
             // the delta in metres and Normalize() handles the unit conversion internally.
-            TranslatePos(_ship, new Double3(0, 0, -ShipSpeedMetersPerTick));
+            TranslatePos(_ship, new Double3(0, 0, ShipSpeedMetersPerTick));
 
             // Resolve ship's absolute Star-space position via parent chain
             UniVec3 shipInStar = ship.LocalPos;
-            int     p          = ship.ParentIndex;
+            int p = ship.ParentIndex;
             while (p >= 0 && GameObjects[p].CurrentSpace != UniObject.Space.Galaxy)
             {
                 shipInStar = ChildPosToParentSpace(shipInStar, GameObjects[p]);
-                p          = GameObjects[p].ParentIndex;
+                p = GameObjects[p].ParentIndex;
             }
             double distToB = UniVec3.Distance(shipInStar, planetB.LocalPos);
 
@@ -103,17 +101,17 @@ namespace Universe
 
         private void SetupScene()
         {
-            _root    = AddGameObject(-1,     new Double3(0, 0, 0),         double.MaxValue);
-            _galaxy  = AddGameObject(_root,  new Double3(0, 0, 0),         5e3);
-            _star    = AddGameObject(_galaxy,new Double3(0, 0, 0),         StarSOI);
-            _planetA = AddGameObject(_star,  new Double3(0, 0, PlanetA_Z), PlanetSOI);
-            _planetB = AddGameObject(_star,  new Double3(0, 0, PlanetB_Z), PlanetSOI);
+            _root = AddGameObject(-1, new Double3(0, 0, 0), double.MaxValue);
+            _galaxy = AddGameObject(_root, new Double3(0, 0, 0), 5e3);
+            _star = AddGameObject(_galaxy, new Double3(0, 0, 0), StarSOI);
+            _planetA = AddGameObject(_star, new Double3(0, 0, PlanetA_Z), PlanetSOI);
+            _planetB = AddGameObject(_star, new Double3(0, 0, PlanetB_Z), PlanetSOI);
 
             // Ship starts on the +Z side of Planet A (toward Planet B).
             // In Planet A's local space, +Z points away from the star, toward Planet B.
             // After SOI exit the ship's Star-space Z will be PlanetA_Z + 7e6 m,
             // which is on the Planet B side.
-            _ship    = AddGameObject(_planetA, new Double3(0, 0, ShipOrbitPlanetUnits), soiMeters: 0);
+            _ship = AddGameObject(_planetA, new Double3(0, 0, ShipOrbitMeters), soiMeters: 0);
         }
 
         // ----- Debug --------------------------------------------------------
