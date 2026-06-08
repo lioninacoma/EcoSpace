@@ -1,5 +1,4 @@
 using Godot;
-using System;
 
 namespace Universe
 {
@@ -86,8 +85,7 @@ namespace Universe
             double distToB = UniVec3.Distance(shipInStar, planetB.LocalPos);
 
             GD.Print($"[Ship] space={ship.CurrentSpace,-10}  parentIdx={ship.ParentIndex,2}  " +
-                     $"shipStarZ={shipInStar.ToDouble3().Z:e5}  " +
-                     $"planetBZ={planetB.LocalPos.ToDouble3().Z:e5}  " +
+                     $"shipPos={ship.LocalPos:e5}  " +
                      $"distToB={distToB:e5} m");
 
             if (ship.ParentIndex == _planetB)

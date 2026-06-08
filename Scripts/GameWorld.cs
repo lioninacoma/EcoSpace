@@ -1,5 +1,4 @@
 using Godot;
-using System;
 using System.Collections.Generic;
 
 namespace Universe
@@ -52,7 +51,7 @@ namespace Universe
 		private void TrySpaceTransition(UniObject obj, int excludeIndex = -1)
 		{
 			if (TryExitParentSOI(obj, out int exitedIndex)) { TrySpaceTransition(obj, exitedIndex); return; }
-			if (TryEnterChildSOI(obj, excludeIndex))        { TrySpaceTransition(obj); }
+			if (TryEnterChildSOI(obj, excludeIndex)) { TrySpaceTransition(obj); }
 		}
 
 		// --- Exit: obj leaves its parent's SOI → move up one level --------
@@ -74,12 +73,12 @@ namespace Universe
 			if (parent.ParentIndex >= 0)
 				GameObjects[parent.ParentIndex].ChildIndices.Add(obj.Index);
 
-			obj.LocalPos     = ChildPosToParentSpace(obj.LocalPos, parent);
-			obj.ParentIndex  = parent.ParentIndex;
+			obj.LocalPos = ChildPosToParentSpace(obj.LocalPos, parent);
+			obj.ParentIndex = parent.ParentIndex;
 			obj.CurrentSpace = parent.CurrentSpace;
 
 			GD.Print($"[Transition ↑] Exited SOI of {parent.CurrentSpace}, " +
-			         $"now in {obj.CurrentSpace}");
+					 $"now in {obj.CurrentSpace}");
 			return true;
 		}
 
@@ -100,13 +99,13 @@ namespace Universe
 
 			foreach (int siblingIndex in parent.ChildIndices)
 			{
-				if (siblingIndex == obj.Index)    continue;
+				if (siblingIndex == obj.Index) continue;
 				if (siblingIndex == excludeIndex) continue;
 
 				var candidate = GameObjects[siblingIndex];
 
-				UniVec3 relPos     = obj.LocalPos - candidate.LocalPos;
-				double  distMeters = relPos.Magnitude();
+				UniVec3 relPos = obj.LocalPos - candidate.LocalPos;
+				double distMeters = relPos.Magnitude();
 
 				if (distMeters >= candidate.SOIMeters) continue;
 
@@ -115,14 +114,14 @@ namespace Universe
 				candidate.ChildIndices.Add(obj.Index);
 
 				UniObject.Space childSpace = UniObject.ChildSpace(candidate.CurrentSpace);
-				double          childScale = UniObject.Scale(childSpace);
+				double childScale = UniObject.Scale(childSpace);
 
-				obj.LocalPos     = relPos.Convert(childScale);
-				obj.ParentIndex  = siblingIndex;
+				obj.LocalPos = relPos.Convert(childScale);
+				obj.ParentIndex = siblingIndex;
 				obj.CurrentSpace = childSpace;
 
 				GD.Print($"[Transition ↓] Entered SOI of {candidate.CurrentSpace} " +
-				         $"(index {siblingIndex}), now in {obj.CurrentSpace}");
+						 $"(index {siblingIndex}), now in {obj.CurrentSpace}");
 				return true;
 			}
 
@@ -148,15 +147,15 @@ namespace Universe
 		{
 			if ((uint)index >= (uint)GameObjects.Count) return;
 
-			var obj           = GameObjects[index];
-			var localPos      = obj.LocalPos;
+			var obj = GameObjects[index];
+			var localPos = obj.LocalPos;
 			int currentParent = obj.ParentIndex;
 			GD.Print(localPos);
 
 			while (currentParent >= 0)
 			{
-				var parent    = GameObjects[currentParent];
-				localPos      = ChildPosToParentSpace(localPos, parent);
+				var parent = GameObjects[currentParent];
+				localPos = ChildPosToParentSpace(localPos, parent);
 				GD.Print(localPos);
 				currentParent = parent.ParentIndex;
 			}
@@ -180,13 +179,13 @@ namespace Universe
 			else return -1;
 
 			int index = GameObjects.Count;
-			var obj   = new UniObject
+			var obj = new UniObject
 			{
-				Index        = index,
+				Index = index,
 				CurrentSpace = space,
-				ParentIndex  = parentIndex,
-				LocalPos     = new UniVec3(localPos, UniObject.Scale(space)),
-				SOIMeters    = soiMeters,
+				ParentIndex = parentIndex,
+				LocalPos = new UniVec3(localPos, UniObject.Scale(space)),
+				SOIMeters = soiMeters,
 			};
 
 			GameObjects.Add(obj);
