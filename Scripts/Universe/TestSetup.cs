@@ -1,4 +1,5 @@
 using Godot;
+using Universe.Math;
 
 namespace Universe
 {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Universe.Math;
 
 namespace Universe
 {
@@ -55,7 +56,7 @@ namespace Universe
 		public static Space IndexToSpace(int index)
 		{
 			var spaces = Enum.GetValues(typeof(Space)).Cast<Space>().ToArray();
-			return spaces[Math.Min(Math.Max(index, 0), spaces.Length - 1)];
+			return spaces[System.Math.Min(System.Math.Max(index, 0), spaces.Length - 1)];
 		}
 
 		public static int SpaceToIndex(Space space)
