@@ -4,7 +4,7 @@ using Universe.Math;
 
 namespace Universe
 {
-	public partial class GameWorld : Node3D
+	public partial class GameWorld : Node2D
 	{
 		public List<UniObject> GameObjects;
 
@@ -44,18 +44,12 @@ namespace Universe
 		/// <summary>
 		/// Checks whether <paramref name="obj"/> has crossed any SOI boundary and
 		/// moves it to the correct space. Runs recursively until stable.
-		///
-		/// Two directions are checked each call:
-		///   1. Exit  – obj is outside its current parent's SOI → move up one level.
-		///   2. Entry – obj is inside a sibling's SOI           → move down one level.
 		/// </summary>
 		private void TrySpaceTransition(UniObject obj, int excludeIndex = -1)
 		{
 			if (TryExitParentSOI(obj, out int exitedIndex)) { TrySpaceTransition(obj, exitedIndex); return; }
 			if (TryEnterChildSOI(obj, excludeIndex)) { TrySpaceTransition(obj); }
 		}
-
-		// --- Exit: obj leaves its parent's SOI → move up one level --------
 
 		private bool TryExitParentSOI(UniObject obj, out int exitedIndex)
 		{
@@ -85,13 +79,6 @@ namespace Universe
 
 		// --- Entry: obj enters a sibling's SOI → move down one level ------
 
-		/// <summary>
-		/// Iterates only over the siblings of <paramref name="obj"/> by reading
-		/// the parent's <see cref="UniObject.ChildIndices"/> directly.
-		/// O(siblings) instead of O(all GameObjects).
-		/// <paramref name="excludeIndex"/> skips the object just exited to prevent
-		/// immediately re-entering it in the same transition step.
-		/// </summary>
 		private bool TryEnterChildSOI(UniObject obj, int excludeIndex = -1)
 		{
 			if (obj.ParentIndex < 0) return false;  // root-level objects have no siblings

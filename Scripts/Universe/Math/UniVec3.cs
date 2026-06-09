@@ -29,7 +29,7 @@ namespace Universe
 		/// Design notes:
 		///   • Normalization keeps Offset in [0, Scale) automatically after every operation.
 		///   • Operations between two UniVec3 with different Scale values auto-convert via Convert().
-		///   • Godot uses double internally; ToLocaldouble() gives a camera-relative double Double3
+		///   • Godot uses double internally; ToLocalDouble() gives a camera-relative double Double3
 		///     for rendering (doubleing-origin pattern).
 		/// </summary>
 		[Serializable]
@@ -171,7 +171,7 @@ namespace Universe
 			}
 
 			[MethodImpl(MethodImplOptions.AggressiveInlining)]
-			public double Magnitude() => Mathf.Sqrt(MagnitudeSq());
+			public double Magnitude() => System.Math.Sqrt(MagnitudeSq());
 
 			[MethodImpl(MethodImplOptions.AggressiveInlining)]
 			public UniVec3 Normalized()

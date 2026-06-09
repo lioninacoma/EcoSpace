@@ -215,7 +215,7 @@ namespace Universe
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public double Magnitude() => Mathf.Sqrt(MagnitudeSq());
+            public double Magnitude() => System.Math.Sqrt(MagnitudeSq());
 
             // ── Lerp ─────────────────────────────────────────────────────────
 
