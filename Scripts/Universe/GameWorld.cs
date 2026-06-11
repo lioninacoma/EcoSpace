@@ -4,7 +4,7 @@ using Universe.Math;
 
 namespace Universe
 {
-	public partial class GameWorld : Node2D
+	public partial class GameWorld : Node3D
 	{
 		public List<UniObject> GameObjects;
 
