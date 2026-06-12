@@ -74,28 +74,28 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| STAB-01 | TBD | Pending |
-| FLT-01 | TBD | Pending |
-| FLT-02 | TBD | Pending |
-| FLT-03 | TBD | Pending |
-| WORLD-01 | TBD | Pending |
-| RND-01 | TBD | Pending |
-| RND-02 | TBD | Pending |
-| RND-03 | TBD | Pending |
-| RND-04 | TBD | Pending |
-| RND-05 | TBD | Pending |
-| HUD-01 | TBD | Pending |
-| HUD-02 | TBD | Pending |
-| HUD-03 | TBD | Pending |
-| HUD-04 | TBD | Pending |
-| TRV-01 | TBD | Pending |
-| TRV-02 | TBD | Pending |
+| STAB-01 | Phase 1 | Pending |
+| FLT-01 | Phase 1 | Pending |
+| FLT-02 | Phase 1 | Pending |
+| FLT-03 | Phase 1 | Pending |
+| WORLD-01 | Phase 1 | Pending |
+| RND-01 | Phase 1 | Pending |
+| RND-02 | Phase 1 | Pending |
+| RND-03 | Phase 1 | Pending |
+| RND-04 | Phase 1 | Pending |
+| RND-05 | Phase 2 | Pending |
+| HUD-01 | Phase 1 | Pending |
+| HUD-02 | Phase 1 | Pending |
+| HUD-03 | Phase 1 | Pending |
+| HUD-04 | Phase 1 | Pending |
+| TRV-01 | Phase 1 | Pending |
+| TRV-02 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 16 total
-- Mapped to phases: 0 (filled during roadmap creation)
-- Unmapped: 16 ⚠️
+- Mapped to phases: 16
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-12*
-*Last updated: 2026-06-12 after initial definition*
+*Last updated: 2026-06-12 after roadmap creation*
