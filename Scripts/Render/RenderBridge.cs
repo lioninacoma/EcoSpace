@@ -120,8 +120,10 @@ namespace Universe
 			// Track which indices are rendered this frame to hide bodies that left
 			var activeIndices = new HashSet<int>();
 
-			// Render the parent body itself (e.g. the planet we orbit) ship-relative
-			RenderBodyAt(parentIdx, parent, ship, factor);
+			// Render the parent body itself (e.g. the planet we orbit) ship-relative.
+			// The parent lives at the ORIGIN of the ship's frame, so its position relative
+			// to the ship is simply the negation of the ship's own offset in that frame.
+			RenderBodyAt(parentIdx, parent, ship, factor, isParent: true);
 			activeIndices.Add(parentIdx);
 
 			// Render siblings: all children of parent except the ship itself
@@ -132,7 +134,7 @@ namespace Universe
 				var body = (uint)childIdx < (uint)gameObjects.Count ? gameObjects[childIdx] : null;
 				if (body == null) continue;
 
-				RenderBodyAt(childIdx, body, ship, factor);
+				RenderBodyAt(childIdx, body, ship, factor, isParent: false);
 				activeIndices.Add(childIdx);
 			}
 
@@ -147,21 +149,43 @@ namespace Universe
 
 		/// <summary>
 		/// Ensures a MeshInstance3D exists for <paramref name="bodyIdx"/>, then positions it
-		/// ship-relative in render space. Uses ToLocalDoubleUnits (observer-unit basis) multiplied
-		/// by the per-space <paramref name="factor"/> so positions stay within camera far range.
+		/// ship-relative in render space. Uses observer-unit basis positions multiplied by the
+		/// per-space <paramref name="factor"/> so positions stay within camera far range.
 		/// Anchors on ship.LocalPos (Pitfall 4 — never parent body, or render jitters).
+		///
+		/// <paramref name="isParent"/>: when true the body is the parent of the ship's frame.
+		/// Its LocalPos is in the GRANDPARENT frame and cannot be diffed against ship.LocalPos
+		/// (which is in the PARENT frame). Instead, the parent sits at the ORIGIN of the ship's
+		/// frame, so ship-relative position = -(ship's own offset in that frame).
+		/// For siblings (isParent=false) both body and ship share the same parent frame, so
+		/// ToLocalDoubleUnits is correct.
+		/// All paths yield observer-unit positions on ship.LocalPos.Scale basis before × factor.
 		/// </summary>
 		private void RenderBodyAt(
 			int bodyIdx,
 			UniObject body,
 			UniObject ship,
-			float factor)
+			float factor,
+			bool isParent)
 		{
 			var mesh = GetOrCreateMesh(bodyIdx, ship, factor);
 
-			// Floating-origin: express delta in observer-unit space, then multiply by per-space factor.
-			// transform: meters → ÷ ship.LocalPos.Scale → observer units → × factor → render units.
-			Double3 relUnits = body.LocalPos.ToLocalDoubleUnits(ship.LocalPos);
+			Double3 relUnits;
+			if (isParent)
+			{
+				// Parent body sits at the origin of the ship's frame; its position relative
+				// to the ship is the negation of the ship's offset within that frame.
+				// ship.LocalPos.ToDouble3Units() is already on the ship-scale (observer) basis.
+				relUnits = ship.LocalPos.ToDouble3Units() * -1.0;
+			}
+			else
+			{
+				// Sibling: both body and ship share the same parent frame → direct delta.
+				// Floating-origin: meters → ÷ ship.LocalPos.Scale → observer units.
+				relUnits = body.LocalPos.ToLocalDoubleUnits(ship.LocalPos);
+			}
+
+			// × factor → render units (consistent basis for positions and radii).
 			mesh.Position = new Vector3(
 				(float)(relUnits.X * factor),
 				(float)(relUnits.Y * factor),

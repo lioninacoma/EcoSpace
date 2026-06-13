@@ -138,6 +138,12 @@ namespace Universe
 				);
 			}
 
+			[MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public Double3 ToDouble3Units()
+            {
+                return (Double3)Units + Offset / Scale;
+            }
+
 			/// <summary>
 			/// Returns the world position as raw double-precision coordinates.
 			/// Precise for distances that fit in double (~1e15 m at meter scale).
@@ -171,8 +177,8 @@ namespace Universe
 			[MethodImpl(MethodImplOptions.AggressiveInlining)]
 			public Double3 ToLocalDoubleUnits(in UniVec3 observer)
 			{
-				Double3 deltaMeters = (this - observer).ToDouble3();   // exact meters, scale-agnostic
-				return deltaMeters * (1.0 / observer.Scale);           // re-express in observer cell units
+				UniVec3 delta = this - observer;
+				return delta.ToDouble3() * (1.0 / observer.Scale);   // observer-scale unit basis
 			}
 
 			// ----- Magnitude --------------------------------------------------
