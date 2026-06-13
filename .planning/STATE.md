@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: 01-03 COMPLETE (human-verified after 3 play-test rounds); next is 01-04 Minimal HUD
-last_updated: "2026-06-13T14:00:00.000Z"
-last_activity: 2026-06-13 -- Plan 01-03 FlightController approved and finalized
+last_updated: "2026-06-13T00:00:00.000Z"
+last_activity: 2026-06-13 -- 01-02 revision: planet-space DirectionalLight3D terminator (RND-02/D-16); ambient floor 0.08→0.03
 progress:
   total_phases: 3
   completed_phases: 0
@@ -69,6 +69,7 @@ Recent decisions affecting current work:
 - 01-01: RenderBridge snapshots ChildIndices before foreach to prevent mutation exception
 - 01-01: HUD computes speed from prev-frame position delta — read-only consumer pattern
 - 01-02: Ambient-floor-only lighting ACCEPTED for MVP; cross-space directional terminator deferred (no day/night terminator while orbiting in planet space)
+- 01-02 REVISION (RND-02/D-16): Re-evaluated planet-space lighting — added DirectionalLight3D oriented along true cross-frame sun direction (ship→planet→star hierarchy, Star-space meters); ambient floor reduced 0.08→0.03 for visible terminator; visible sun mesh in Planet space deferred to Phase 3 tiered renderer (sun at 1 AU = ~1.5e7 render units, ~15x beyond far plane)
 - 01-03: Mouse mode = T-key toggle Confined/Captured; steering accumulation in _Input (not _UnhandledInput) so HUD Controls cannot swallow MouseMotion
 - 01-03: Distance-scaled speed envelope: contextMax = Lerp(contextMax, parentSurfaceDist*SpeedPerMeter, easing*dt); distance = ship.LocalPos.Magnitude() - parent.RadiusMeters
 - 01-03: DESIGN REFINEMENT D-03: throttle range [-1,1] (W=forward, S=reverse, X eases to 0) — approved in play-test; reverse thrust without turning was required in practice
