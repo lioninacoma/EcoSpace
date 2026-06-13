@@ -13,6 +13,7 @@ namespace Universe
         private float _threshold = 60.0f;
         private Color _white = Colors.White;
         private Color _black = Colors.Black;
+        private int _quantizeLevels = 4;
 
         // --- Properties mit direktem Shader-Update ---
 
@@ -82,6 +83,23 @@ namespace Universe
             }
         }
 
+        /// <summary>
+        /// Number of discrete quantize levels per RGB channel in the hue-preserving
+        /// ordered dither (D-13). Default 4 → ~64 colours (4^3). Increase for more
+        /// colour fidelity; decrease for a harsher retro palette look.
+        /// Guarded with Mathf.Max(1, ...) so levels never reach 0 (T-02-04).
+        /// </summary>
+        [Export]
+        public int QuantizeLevels
+        {
+            get => _quantizeLevels;
+            set
+            {
+                _quantizeLevels = Mathf.Max(1, value);
+                _material?.SetShaderParameter("quantize_levels", _quantizeLevels);
+            }
+        }
+
         public override void _Ready()
         {
             _material = new ShaderMaterial
@@ -103,6 +121,7 @@ namespace Universe
             _material.SetShaderParameter("threshold", _threshold);
             _material.SetShaderParameter("white", _white);
             _material.SetShaderParameter("black", _black);
+            _material.SetShaderParameter("quantize_levels", _quantizeLevels);
         }
     }
 }
