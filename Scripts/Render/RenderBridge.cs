@@ -92,20 +92,37 @@ namespace Universe
 
 		/// <summary>
 		/// Energy of the OmniLight3D created at the star's render position.
-		/// Tune so lit-side planets are well-lit and the terminator is distinct.
+		/// Set equal to PlanetSunLightEnergy so Star-space and Planet-space lit-side
+		/// brightness are comparable. No attenuation (StarLightAttenuation=0) means
+		/// this value is the full, unattenuated energy reaching the planet surface.
 		/// ShadowEnabled is always false (RND-04).
 		/// </summary>
-		[Export] public float StarLightEnergy { get; set; } = 2.0f;
+		[Export] public float StarLightEnergy { get; set; } = 1.8f;
 
 		/// <summary>
 		/// Range of the OmniLight3D in render units. Must cover the rendered scene.
 		/// Scene spans up to ~CameraFarPlane render units; default 1e5 covers
-		/// well within the 1e6 far plane. The light uses quadratic attenuation by
-		/// default — tune so the planet (hundreds of render units away) is adequately lit.
-		/// PITFALL: attenuation at long render-unit distances can make planets dim;
-		/// increase range or reduce attenuation if the terminator is too subtle.
+		/// well within the 1e6 far plane.
+		/// With StarLightAttenuation=0 the range acts only as a hard cutoff; all
+		/// objects within range receive the full StarLightEnergy regardless of distance.
 		/// </summary>
 		[Export] public float StarLightRange { get; set; } = 1e5f;
+
+		/// <summary>
+		/// Attenuation exponent of the OmniLight3D (Godot OmniLight3D.OmniAttenuation).
+		/// 0 = constant intensity up to StarLightRange (no distance falloff).
+		/// 1 = linear falloff. Default Godot value = 1.
+		///
+		/// Set to 0 so the planet receives full StarLightEnergy regardless of its
+		/// render-space distance from the star. At 1:1 scale the star renders at
+		/// ~1500 render units and the planet at ~0–250 render units from the ship;
+		/// any non-zero attenuation produces distance-dependent dimming that is hard
+		/// to match against the (attenuaton-free) Planet-space DirectionalLight3D.
+		/// With attenuation=0 the OmniLight is effectively directional in brightness
+		/// while remaining POSITIONAL in direction — the terminator still points from
+		/// the real star-mesh position.
+		/// </summary>
+		[Export] public float StarLightAttenuation { get; set; } = 0.0f;
 
 		// ----- Planet-space directional sun exports ----------------------------
 
@@ -171,12 +188,16 @@ namespace Universe
 			if (cam != null) cam.Far = CameraFarPlane;
 
 			// Create the star OmniLight3D once; it will be repositioned and shown/hidden per frame.
+			// OmniAttenuation=0 gives constant brightness up to OmniRange — no distance falloff —
+			// so lit-side energy is independent of render-unit distance and matches Planet-space
+			// DirectionalLight3D brightness (cross-space shading consistency, D-16 fix).
 			_starLight = new OmniLight3D
 			{
-				ShadowEnabled = false,    // RND-04: no cast shadows
-				OmniRange     = StarLightRange,
-				LightEnergy   = StarLightEnergy,
-				Visible       = false,
+				ShadowEnabled    = false,               // RND-04: no cast shadows
+				OmniRange        = StarLightRange,
+				OmniAttenuation  = StarLightAttenuation, // 0 = no falloff; terminator direction still from star position
+				LightEnergy      = StarLightEnergy,
+				Visible          = false,
 			};
 			AddChild(_starLight);
 
@@ -253,10 +274,12 @@ namespace Universe
 				kvp.Value.Visible = activeIndices.Contains(kvp.Key);
 			}
 
-			// Keep star light in sync: only visible when the star mesh is rendered
-			_starLight.Visible      = starRendered;
-			_starLight.OmniRange    = StarLightRange;
-			_starLight.LightEnergy  = StarLightEnergy;
+			// Keep star light in sync: only visible when the star mesh is rendered.
+			// OmniAttenuation re-applied each frame so runtime Export changes take effect.
+			_starLight.Visible          = starRendered;
+			_starLight.OmniRange        = StarLightRange;
+			_starLight.OmniAttenuation  = StarLightAttenuation;
+			_starLight.LightEnergy      = StarLightEnergy;
 
 			// Planet-space directional sun: active only when the star is NOT in the render set.
 			// Mutually exclusive with the OmniLight — one or the other is active, never both.
