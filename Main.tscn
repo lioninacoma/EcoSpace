@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://dfcuoiqq1lvar" path="res://Scripts/FPS.gd" id="3_r0du0"]
 [ext_resource type="Script" uid="uid://ci31tr454vcvs" path="res://Scripts/Render/RenderBridge.cs" id="4_rendbrg"]
 [ext_resource type="Script" uid="uid://15wnt1j1werr" path="res://Scripts/HUD/Hud.cs" id="5_hudhud"]
+[ext_resource type="Script" uid="uid://bflightctrl03" path="res://Scripts/Flight/FlightController.cs" id="6_flight"]
 
 [sub_resource type="Environment" id="Environment_r0du0"]
 background_mode = 1
@@ -55,6 +56,62 @@ offset_right = 290.0
 offset_bottom = 28.0
 text = "Speed: 0 m/s"
 
+[node name="Crosshair" type="Control" parent="CanvasLayer" unique_id=-1293967292]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -8.0
+offset_top = -8.0
+offset_right = 8.0
+offset_bottom = 8.0
+
+[node name="CrossH" type="ColorRect" parent="CanvasLayer/Crosshair" unique_id=-1293967291]
+modulate = Color(0.1, 1, 0.3, 1)
+layout_mode = 0
+offset_left = -8.0
+offset_top = -1.0
+offset_right = 8.0
+offset_bottom = 1.0
+
+[node name="CrossV" type="ColorRect" parent="CanvasLayer/Crosshair" unique_id=-1293967290]
+modulate = Color(0.1, 1, 0.3, 1)
+layout_mode = 0
+offset_left = -1.0
+offset_top = -8.0
+offset_right = 1.0
+offset_bottom = 8.0
+
+[node name="SteeringReticle" type="Control" parent="CanvasLayer" unique_id=-1293967289]
+layout_mode = 3
+anchors_preset = 0
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 376.0
+offset_top = 208.0
+offset_right = 392.0
+offset_bottom = 224.0
+
+[node name="RetH" type="ColorRect" parent="CanvasLayer/SteeringReticle" unique_id=-1293967288]
+modulate = Color(0.1, 1, 0.3, 1)
+layout_mode = 0
+offset_left = -8.0
+offset_top = -1.0
+offset_right = 8.0
+offset_bottom = 1.0
+
+[node name="RetV" type="ColorRect" parent="CanvasLayer/SteeringReticle" unique_id=-1293967287]
+modulate = Color(0.1, 1, 0.3, 1)
+layout_mode = 0
+offset_left = -1.0
+offset_top = -8.0
+offset_right = 1.0
+offset_bottom = 8.0
+
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1364607324]
 environment = SubResource("Environment_r0du0")
 far = 1000000.0
@@ -62,3 +119,8 @@ far = 1000000.0
 [node name="RenderBridge" type="Node3D" parent="." unique_id=-1293967293]
 script = ExtResource("4_rendbrg")
 WorldPath = NodePath("..")
+
+[node name="FlightController" type="Node" parent="." unique_id=-1293967286]
+script = ExtResource("6_flight")
+WorldPath = NodePath("..")
+CameraPath = NodePath("../Camera3D")
