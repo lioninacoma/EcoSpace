@@ -1,11 +1,12 @@
 using Godot;
 using System.Collections.Generic;
+using Universe;
 using Universe.Math;
 
-namespace Universe
+namespace Render
 {
 	/// <summary>
-	/// Floating-origin render bridge: each frame, computes ship-relative positions
+	/// Floating-origin world renderer: each frame, computes ship-relative positions
 	/// for all bodies in the current parent space and repositions their MeshInstance3D
 	/// nodes accordingly. This keeps the camera at the world origin (floating origin)
 	/// and avoids single-precision float jitter at large distances (RND-01/RND-02).
@@ -34,7 +35,7 @@ namespace Universe
 	///
 	/// Read-only consumer of GameWorld state — MUST NOT mutate UniVec3 or call TranslatePos.
 	/// </summary>
-	public partial class RenderBridge : Node3D
+	public partial class WorldRenderer : Node3D
 	{
 		// ----- Exports --------------------------------------------------------
 
@@ -46,7 +47,7 @@ namespace Universe
 
 		/// <summary>
 		/// Render units per observer-unit for Planet-space frames (applied after ToLocalDoubleUnits).
-		/// Universe/SOI math stays 1:1 meters; only RenderBridge applies this factor.
+		/// Universe/SOI math stays 1:1 meters; only WorldRenderer applies this factor.
 		/// Planet scale = 0.0001 m/unit → 1 observer-unit = 0.0001 m. Factor=1e-8 → 1 render unit = 1e12 m.
 		/// Radius transform: RadiusMeters (true m) / ship.LocalPos.Scale (→ observer units) × factor (→ render units).
 		/// </summary>

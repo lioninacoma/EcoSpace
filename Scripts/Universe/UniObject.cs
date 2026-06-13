@@ -77,14 +77,14 @@ namespace Universe
 		public string          Name;
 
 		/// <summary>
-		/// Authored base hue for dithered rendering. Consumed by RenderBridge when
+		/// Authored base hue for dithered rendering. Consumed by WorldRenderer when
 		/// building the body's <c>StandardMaterial3D.AlbedoColor</c> (Plan 01-02).
 		/// </summary>
 		public Godot.Color     BaseColor;
 
 		/// <summary>
 		/// True 1:1 physical radius in metres (Star-space-equivalent units).
-		/// Consumed by RenderBridge for mesh scaling (meters → observer units → × factor)
+		/// Consumed by WorldRenderer for mesh scaling (meters → observer units → × factor)
 		/// and by Plan 03 FLT-03 surface-distance speed scaling.
 		/// </summary>
 		public double          RadiusMeters;

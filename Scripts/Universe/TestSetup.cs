@@ -40,7 +40,7 @@ namespace Universe
 		private const double ShipOrbitMeters = 2.5e7;
 
 		// ----- Per-body presentation data (D-13 authored hues, D-15 true 1:1 radii) ------
-		// Radii in true metres (Star-space units); consumed by RenderBridge + Plan 03 FLT-03.
+		// Radii in true metres (Star-space units); consumed by WorldRenderer + Plan 03 FLT-03.
 		private const double PlanetA_RadiusMeters = 6.371e6;  // Earth equatorial radius
 		private const double PlanetB_RadiusMeters = 3.390e6;  // Mars mean radius
 		private const double Star_RadiusMeters    = 6.960e8;  // Solar radius
@@ -53,9 +53,9 @@ namespace Universe
 		// Solar yellow: very bright so it reads as emissive and blooms.
 		private static readonly Color Star_Color    = new Color(1.00f, 0.95f, 0.60f);
 
-		// ----- Public accessors for RenderBridge / FlightController / HUD ----
+		// ----- Public accessors for WorldRenderer / FlightController / HUD ----
 
-		/// <summary>Index of the player ship in GameObjects. Read by RenderBridge, FlightController, and Hud.</summary>
+		/// <summary>Index of the player ship in GameObjects. Read by WorldRenderer, FlightController, and Hud.</summary>
 		public int ShipIndex => _ship;
 
 		// ----- Godot callbacks ----------------------------------------------
