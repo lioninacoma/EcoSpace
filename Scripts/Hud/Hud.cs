@@ -1,7 +1,8 @@
 using Godot;
+using Universe;
 using Universe.Math;
 
-namespace Universe
+namespace Hud
 {
 	/// <summary>
 	/// Phosphor-green live-speed HUD label (HUD-01 partial).
