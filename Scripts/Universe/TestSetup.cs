@@ -53,17 +53,9 @@ namespace Universe
 		// Solar yellow: very bright so it reads as emissive and blooms.
 		private static readonly Color Star_Color    = new Color(1.00f, 0.95f, 0.60f);
 
-		// ----- Skeleton thrust parameters -----------------------------------
+		// ----- Public accessors for RenderBridge / FlightController / HUD ----
 
-		/// <summary>
-		/// Placeholder thrust speed in m/s for the walking skeleton.
-		/// Exposed as export for in-editor tuning. True context-scaled speed arrives in Plan 02.
-		/// </summary>
-		[Export] public double SkeletonSpeed { get; set; } = 1e8;   // 1e8 m/s skeleton placeholder
-
-		// ----- Public accessors for RenderBridge / HUD ----------------------
-
-		/// <summary>Index of the player ship in GameObjects. Read by RenderBridge and Hud.</summary>
+		/// <summary>Index of the player ship in GameObjects. Read by RenderBridge, FlightController, and Hud.</summary>
 		public int ShipIndex => _ship;
 
 		// ----- Godot callbacks ----------------------------------------------
@@ -77,19 +69,10 @@ namespace Universe
 
 		public override void _Process(double delta)
 		{
+			// FlightController owns ship motion (Plan 03). TestSetup no longer drives
+			// placeholder thrust here — the skeleton's SkeletonSpeed / thrust_forward
+			// / thrust_back inputs have been replaced by FlightController.
 			base._Process(delta);
-
-			// Read thrust input from InputMap actions (project.godot defines these)
-			float thrustAxis = Input.GetActionStrength("thrust_forward") -
-							   Input.GetActionStrength("thrust_back");
-
-			if (thrustAxis != 0f)
-			{
-				// Placeholder forward motion in ship-local +Z.
-				// True attitude-oriented motion (Basis multiply) arrives in Plan 02.
-				double thrust = thrustAxis * SkeletonSpeed * delta;
-				TranslatePos(_ship, new Double3(0, 0, thrust));
-			}
 		}
 
 		// ----- Scene setup --------------------------------------------------

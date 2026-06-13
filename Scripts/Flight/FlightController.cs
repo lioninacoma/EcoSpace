@@ -1,0 +1,414 @@
+using Godot;
+using System.Collections.Generic;
+using Universe.Math;
+
+namespace Universe
+{
+	/// <summary>
+	/// Arcade flight controller implementing the locked flight model (FLT-01/02/03):
+	///
+	/// Steering (D-01/D-05): A software cursor accumulates mouse relative motion and
+	/// is clamped to MaxCursorRadius. The ship rotates toward the cursor at a rate
+	/// proportional to cursor distance from center. Cursor centered → rotation stops
+	/// (hold-attitude, D-02). This uses accumulated relative deltas, NOT absolute
+	/// mouse position queries (avoids Pitfall 8: captured-mouse recenter).
+	///
+	/// Attitude (D-02): Basis multiply + Orthonormalized() each frame prevents
+	/// skew/drift accumulation over thousands of frames (T-03-01 mitigation).
+	///
+	/// Roll (D-04): Q/E on roll_left/roll_right InputMap actions.
+	///
+	/// Throttle (D-03): Persistent [0,1] throttle raised/lowered by throttle_up/down;
+	/// zeroed by full_stop. Persists hands-off (cockpit style, not hold-to-thrust).
+	///
+	/// Speed envelope (FLT-03/D-06/D-07/D-08): contextMax is derived from
+	/// nearest-surface distance (Distance - RadiusMeters) eased frame-to-frame
+	/// via Mathf.Lerp so SOI boundary crossings produce no speed snap (D-07).
+	/// actualSpeed = throttle01 * contextMax (one control, auto-scaled, D-08).
+	/// Speed clamped to [MinSpeed, MaxSpeed] before the lerp target (T-03-02 mitigation).
+	///
+	/// Motion: computes forward = -_shipBasis.Z, calls world.TranslatePos.
+	///
+	/// Reticle updates: sets positions on child Control nodes Crosshair and
+	/// SteeringReticle (added in Main.tscn, Task 3).
+	///
+	/// Read accessors for the HUD: CurrentSpeed, Throttle01, SteerCursor, ShipBasis.
+	/// </summary>
+	public partial class FlightController : Node
+	{
+		// ── Constants ──────────────────────────────────────────────────────────
+
+		/// <summary>Speed of light in m/s — absolute upper bound for sanity.</summary>
+		private const double SpeedOfLight = 3e8;
+
+		// ── Exports (tuning knobs) ──────────────────────────────────────────────
+
+		/// <summary>NodePath to the GameWorld / TestSetup node.</summary>
+		[Export] public NodePath WorldPath { get; set; }
+
+		/// <summary>NodePath to the Camera3D whose basis tracks ship attitude.</summary>
+		[Export] public NodePath CameraPath { get; set; }
+
+		private float _sensitivity = 0.3f;
+		/// <summary>Mouse sensitivity: scales raw relative motion into software cursor pixels.</summary>
+		[Export]
+		public float Sensitivity
+		{
+			get => _sensitivity;
+			set => _sensitivity = Mathf.Max(0.001f, value);
+		}
+
+		private float _maxCursorRadius = 120f;
+		/// <summary>
+		/// Maximum radius of the software steering cursor in pixels.
+		/// Cursor is clamped to this radius each input event (T-03-03 mitigation).
+		/// </summary>
+		[Export]
+		public float MaxCursorRadius
+		{
+			get => _maxCursorRadius;
+			set => _maxCursorRadius = Mathf.Max(1f, value);
+		}
+
+		private float _deadzoneFraction = 0.1f;
+		/// <summary>
+		/// Fraction of MaxCursorRadius that is the deadzone.
+		/// Cursor within deadzone → zero rotation (D-02 hold-attitude).
+		/// </summary>
+		[Export]
+		public float DeadzoneFraction
+		{
+			get => _deadzoneFraction;
+			set => _deadzoneFraction = Mathf.Clamp(value, 0f, 0.99f);
+		}
+
+		private float _turnRate = 1.2f;
+		/// <summary>Max turn rate in radians per second at full cursor deflection.</summary>
+		[Export]
+		public float TurnRate
+		{
+			get => _turnRate;
+			set => _turnRate = Mathf.Max(0f, value);
+		}
+
+		private float _rollRate = 1.0f;
+		/// <summary>Roll rate in radians per second at full key press.</summary>
+		[Export]
+		public float RollRate
+		{
+			get => _rollRate;
+			set => _rollRate = Mathf.Max(0f, value);
+		}
+
+		private float _throttleStep = 0.05f;
+		/// <summary>Throttle increment per key press (fraction of [0,1]).</summary>
+		[Export]
+		public float ThrottleStep
+		{
+			get => _throttleStep;
+			set => _throttleStep = Mathf.Clamp(value, 0f, 1f);
+		}
+
+		private double _speedPerMeter = 0.5;
+		/// <summary>
+		/// Context-max speed multiplier per metre of nearest-surface distance (D-06).
+		/// contextMax = clamp(nearest * SpeedPerMeter, MinSpeed, MaxSpeed).
+		/// </summary>
+		[Export]
+		public double SpeedPerMeter
+		{
+			get => _speedPerMeter;
+			set => _speedPerMeter = System.Math.Max(0.0, value);
+		}
+
+		private double _minSpeed = 10.0;
+		/// <summary>Minimum context-max speed in m/s (never stops the throttle from doing something).</summary>
+		[Export]
+		public double MinSpeed
+		{
+			get => _minSpeed;
+			set => _minSpeed = System.Math.Max(0.0, value);
+		}
+
+		private double _maxSpeed = 1e11;
+		/// <summary>
+		/// Maximum context-max speed in m/s.
+		/// Capped at SpeedOfLight for sanity (T-03-02 mitigation).
+		/// </summary>
+		[Export]
+		public double MaxSpeed
+		{
+			get => _maxSpeed;
+			set => _maxSpeed = Mathf.Clamp(value, 0.0, SpeedOfLight);
+		}
+
+		private double _speedEasing = 1.0;
+		/// <summary>
+		/// Easing rate for the contextMax lerp (D-07). Higher = faster transition.
+		/// Absorbs SOI-boundary discontinuities so there is no visible speed snap (Pitfall 9).
+		/// </summary>
+		[Export]
+		public double SpeedEasing
+		{
+			get => _speedEasing;
+			set => _speedEasing = System.Math.Max(0.0, value);
+		}
+
+		// ── Private flight state ────────────────────────────────────────────────
+
+		/// <summary>Accumulated software steering cursor in pixels (D-01).</summary>
+		private Vector2 _cursor = Vector2.Zero;
+
+		/// <summary>Persistent ship attitude basis (D-02 hold-attitude).</summary>
+		private Basis _shipBasis = Basis.Identity;
+
+		/// <summary>Persistent throttle in [0,1] (D-03).</summary>
+		private double _throttle01 = 0.0;
+
+		/// <summary>
+		/// Eased context-max speed in m/s (D-07).
+		/// Starts at MinSpeed so first frame is not a jump from zero.
+		/// </summary>
+		private double _contextMax;
+
+		// ── Private references ───────────────────────────────────────────────────
+
+		private TestSetup _world;
+		private Camera3D _camera;
+
+		// Reticle Control nodes (optional — set if nodes exist in the scene).
+		private Control _steeringReticle;
+		private Vector2 _viewportCenter;
+
+		// ── Read-only accessors for HUD ─────────────────────────────────────────
+
+		/// <summary>Current actual speed in m/s (throttle01 × contextMax).</summary>
+		public double CurrentSpeed { get; private set; }
+
+		/// <summary>Current throttle fraction [0,1].</summary>
+		public double Throttle01 => _throttle01;
+
+		/// <summary>Current steering cursor offset in pixels from screen center.</summary>
+		public Vector2 SteerCursor => _cursor;
+
+		/// <summary>Current ship attitude basis.</summary>
+		public Basis ShipBasis => _shipBasis;
+
+		// ── Godot callbacks ──────────────────────────────────────────────────────
+
+		public override void _Ready()
+		{
+			// Resolve world reference
+			if (WorldPath != null && !WorldPath.IsEmpty)
+				_world = GetNode<TestSetup>(WorldPath);
+			else
+				_world = GetTree().Root.FindChild("Main", true, false) as TestSetup;
+
+			// Resolve camera
+			if (CameraPath != null && !CameraPath.IsEmpty)
+				_camera = GetNode<Camera3D>(CameraPath);
+			else
+				_camera = GetTree().Root.FindChild("Camera3D", true, false) as Camera3D;
+
+			// Resolve optional reticle node (added in Task 3)
+			_steeringReticle = GetTree().Root.FindChild("SteeringReticle", true, false) as Control;
+
+			// Compute viewport center for reticle positioning
+			var viewport = GetViewport();
+			if (viewport != null)
+			{
+				var size = viewport.GetVisibleRect().Size;
+				_viewportCenter = size / 2f;
+			}
+			else
+			{
+				_viewportCenter = new Vector2(384f, 216f); // 768×432 / 2
+			}
+
+			// Initialise contextMax so the first frame doesn't lerp from zero
+			_contextMax = _minSpeed;
+
+			// Confine the OS cursor so it stays in the window; steering uses the
+			// software cursor, NOT the OS cursor position (Pitfall 8).
+			Input.MouseMode = Input.MouseModeEnum.Confined;
+		}
+
+		public override void _UnhandledInput(InputEvent @event)
+		{
+			if (@event is InputEventMouseMotion motion)
+			{
+				// Accumulate relative delta into software cursor (D-01, Pitfall 8).
+				_cursor += motion.Relative * _sensitivity;
+
+				// Clamp to MaxCursorRadius — prevents overflow accumulation (T-03-03).
+				_cursor = _cursor.LimitLength(_maxCursorRadius);
+			}
+		}
+
+		public override void _Process(double delta)
+		{
+			if (_world == null) return;
+			if (delta <= 0.0) return;
+
+			HandleThrottleInput();
+			UpdateAttitude(delta);
+			UpdateSpeedEnvelope(delta);
+			ApplyMotion(delta);
+			UpdateReticlePosition();
+		}
+
+		// ── Input handling ───────────────────────────────────────────────────────
+
+		/// <summary>
+		/// Reads throttle_up / throttle_down / full_stop actions and updates _throttle01.
+		/// Throttle persists hands-off (D-03); full_stop zeroes it.
+		/// Throttle clamped to [0,1] (T-03-04 mitigation).
+		/// </summary>
+		private void HandleThrottleInput()
+		{
+			if (Input.IsActionJustPressed("throttle_up"))
+				_throttle01 = Mathf.Clamp(_throttle01 + _throttleStep, 0.0, 1.0);
+
+			if (Input.IsActionJustPressed("throttle_down"))
+				_throttle01 = Mathf.Clamp(_throttle01 - _throttleStep, 0.0, 1.0);
+
+			if (Input.IsActionJustPressed("full_stop"))
+				_throttle01 = 0.0;
+		}
+
+		// ── Attitude update ──────────────────────────────────────────────────────
+
+		/// <summary>
+		/// Updates _shipBasis from mouse cursor (pitch/yaw) and Q/E keys (roll).
+		/// Uses Basis multiply for drift-free composition (D-02, Pattern 3).
+		/// Calls Orthonormalized() every frame to prevent skew accumulation (T-03-01).
+		/// </summary>
+		private void UpdateAttitude(double delta)
+		{
+			// Compute normalised steer from cursor: -1..1 each axis
+			Vector2 steer = _cursor / _maxCursorRadius;
+
+			// Deadzone: inside deadzone → zero rotation → hold-attitude (D-02)
+			if (steer.Length() < _deadzoneFraction)
+				steer = Vector2.Zero;
+
+			float dt = (float)delta;
+
+			float yaw   = -steer.X * _turnRate * dt;
+			float pitch = -steer.Y * _turnRate * dt;
+			float roll  = (Input.GetActionStrength("roll_left") - Input.GetActionStrength("roll_right"))
+			              * _rollRate * dt;
+
+			// Compose LOCAL rotation onto the persistent _shipBasis (D-02 — no auto-level).
+			// Order: pitch around local right, then yaw around local up, then roll around local forward.
+			if (yaw != 0f || pitch != 0f || roll != 0f)
+			{
+				var pitchBasis = new Basis(Vector3.Right,    pitch);
+				var yawBasis   = new Basis(Vector3.Up,       yaw);
+				var rollBasis  = new Basis(Vector3.Back,     roll);  // +Z = back; roll around local forward = -Z
+				_shipBasis = _shipBasis * pitchBasis * yawBasis * rollBasis;
+			}
+
+			// Orthonormalize every frame to prevent skew accumulation regardless of rotation (T-03-01).
+			_shipBasis = _shipBasis.Orthonormalized();
+
+			// Align the camera to the ship attitude (player sees from the ship's viewpoint).
+			if (_camera != null)
+				_camera.Basis = _shipBasis;
+		}
+
+		// ── Speed envelope ───────────────────────────────────────────────────────
+
+		/// <summary>
+		/// Computes distance-scaled contextMax from nearest-surface distance and eases
+		/// it frame-to-frame to hide SOI-boundary snaps (D-06/D-07/Pitfall 9).
+		/// actualSpeed = throttle01 × contextMax (D-08).
+		/// </summary>
+		private void UpdateSpeedEnvelope(double delta)
+		{
+			var gameObjects = _world?.GameObjects;
+			if (gameObjects == null) return;
+
+			int shipIndex = _world.ShipIndex;
+			var ship = (uint)shipIndex < (uint)gameObjects.Count ? gameObjects[shipIndex] : null;
+			if (ship == null) return;
+
+			int parentIdx = ship.ParentIndex;
+			var parent = (uint)parentIdx < (uint)gameObjects.Count ? gameObjects[parentIdx] : null;
+			if (parent == null)
+			{
+				CurrentSpeed = _throttle01 * _contextMax;
+				return;
+			}
+
+			// Scan ship's current-space siblings for nearest surface distance (D-06).
+			// Snapshot ChildIndices to avoid mutation issues during scan (read-only scan here,
+			// but snapshot guards against any concurrent modification).
+			int[] siblings = [.. parent.ChildIndices];
+			double nearest = double.MaxValue;
+
+			foreach (int idx in siblings)
+			{
+				if (idx == shipIndex) continue;
+
+				var body = (uint)idx < (uint)gameObjects.Count ? gameObjects[idx] : null;
+				if (body == null) continue;
+
+				// Surface distance = centre distance - radius, clamped at 0 (never negative).
+				double centreDist = UniVec3.Distance(ship.LocalPos, body.LocalPos);
+				double surfaceDist = System.Math.Max(0.0, centreDist - body.RadiusMeters);
+				nearest = System.Math.Min(nearest, surfaceDist);
+			}
+
+			// If no siblings found, use a large fallback so open-space speed ramps up.
+			if (nearest == double.MaxValue)
+				nearest = _maxSpeed / System.Math.Max(_speedPerMeter, 1.0);
+
+			// Compute target context max; clamp to [MinSpeed, MaxSpeed] (T-03-02).
+			double targetMax = Mathf.Clamp(nearest * _speedPerMeter, _minSpeed, _maxSpeed);
+
+			// Ease toward target max to hide SOI-boundary discontinuities (D-07, Pitfall 9).
+			_contextMax = Mathf.Lerp(_contextMax, targetMax, Mathf.Clamp(_speedEasing * delta, 0.0, 1.0));
+
+			// Actual speed = throttle fraction × context max (D-08).
+			CurrentSpeed = _throttle01 * _contextMax;
+		}
+
+		// ── Motion application ───────────────────────────────────────────────────
+
+		/// <summary>
+		/// Computes the forward Double3 delta from attitude + speed and calls TranslatePos.
+		/// forward = -_shipBasis.Z (Godot −Z is forward, RESEARCH Pattern 3).
+		/// </summary>
+		private void ApplyMotion(double delta)
+		{
+			if (CurrentSpeed == 0.0) return;
+
+			// Forward in ship-local space: -Z axis of the basis
+			Vector3 forward = -_shipBasis.Z;
+
+			// Build Double3 delta (meters). Speed is already clamped via MaxSpeed/MinSpeed.
+			var motionDelta = new Double3(
+				forward.X * CurrentSpeed * delta,
+				forward.Y * CurrentSpeed * delta,
+				forward.Z * CurrentSpeed * delta);
+
+			_world.TranslatePos(_world.ShipIndex, motionDelta);
+		}
+
+		// ── Reticle positioning ───────────────────────────────────────────────────
+
+		/// <summary>
+		/// Updates the moving steering reticle's screen position based on _cursor.
+		/// The reticle tracks cursor offset from viewport center (D-05).
+		/// </summary>
+		private void UpdateReticlePosition()
+		{
+			if (_steeringReticle == null) return;
+
+			// Position the reticle at viewport center + cursor offset.
+			// Reticle pivot is at its own center (AnchorPreset = Center).
+			_steeringReticle.Position = _viewportCenter + _cursor;
+		}
+	}
+}
