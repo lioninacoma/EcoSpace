@@ -171,6 +171,13 @@ namespace Universe
 		/// </summary>
 		private double _contextMax;
 
+		/// <summary>
+		/// Frame-to-frame eased actual speed in m/s (Bug 4 fix).
+		/// Lerps toward _throttle01 * _contextMax each frame so throttle
+		/// changes (including full-stop) smooth out rather than snap instantly.
+		/// </summary>
+		private double _easedSpeed;
+
 		// ── Private references ───────────────────────────────────────────────────
 
 		private TestSetup _world;
@@ -225,19 +232,42 @@ namespace Universe
 				_viewportCenter = new Vector2(384f, 216f); // 768×432 / 2
 			}
 
-			// Initialise contextMax so the first frame doesn't lerp from zero
+			// Initialise contextMax and easedSpeed so the first frame doesn't lerp from zero.
 			_contextMax = _minSpeed;
+			_easedSpeed = 0.0;
 
-			// Confine the OS cursor so it stays in the window; steering uses the
-			// software cursor, NOT the OS cursor position (Pitfall 8).
-			Input.MouseMode = Input.MouseModeEnum.Confined;
+			// Start in Captured mode: mouse is invisible and relative motion drives steering.
+			// The player can toggle to Visible mode (free cursor) with the T key.
+			Input.MouseMode = Input.MouseModeEnum.Captured;
 		}
 
 		public override void _UnhandledInput(InputEvent @event)
 		{
+			// Toggle between Captured (steering active) and Visible (free cursor) with T key.
+			// When Captured: OS cursor is hidden/locked, relative mouse motion drives steering.
+			// When Visible:  OS cursor is free; no steering input accumulates.
+			if (@event is InputEventKey key && key.PhysicalKeycode == Key.T && key.Pressed && !key.Echo)
+			{
+				if (Input.MouseMode == Input.MouseModeEnum.Captured)
+				{
+					Input.MouseMode = Input.MouseModeEnum.Visible;
+					// Zero the software cursor so ship holds attitude on release
+					_cursor = Vector2.Zero;
+				}
+				else
+				{
+					Input.MouseMode = Input.MouseModeEnum.Captured;
+				}
+				return;
+			}
+
+			// Only accumulate steering when captured (mouse locked to window).
+			if (Input.MouseMode != Input.MouseModeEnum.Captured) return;
+
 			if (@event is InputEventMouseMotion motion)
 			{
 				// Accumulate relative delta into software cursor (D-01, Pitfall 8).
+				// In Captured mode Godot always reports correct non-zero Relative deltas.
 				_cursor += motion.Relative * _sensitivity;
 
 				// Clamp to MaxCursorRadius — prevents overflow accumulation (T-03-03).
@@ -322,7 +352,15 @@ namespace Universe
 		/// <summary>
 		/// Computes distance-scaled contextMax from nearest-surface distance and eases
 		/// it frame-to-frame to hide SOI-boundary snaps (D-06/D-07/Pitfall 9).
-		/// actualSpeed = throttle01 × contextMax (D-08).
+		/// actualSpeed = throttle01 × contextMax (D-08), itself eased so throttle
+		/// changes do not snap speed instantly (Bug 4 fix).
+		///
+		/// Surface-distance scan (Bug 3 fix):
+		///   Always include the PARENT body — when in Planet space the parent IS the
+		///   planet and the siblings list is empty, so without this check the fallback
+		///   would give huge speed near the planet surface (inverted envelope).
+		///   Ship's distance from its parent body = ship.LocalPos.Magnitude() because
+		///   the parent is the origin of the ship's coordinate frame.
 		/// </summary>
 		private void UpdateSpeedEnvelope(double delta)
 		{
@@ -337,41 +375,62 @@ namespace Universe
 			var parent = (uint)parentIdx < (uint)gameObjects.Count ? gameObjects[parentIdx] : null;
 			if (parent == null)
 			{
-				CurrentSpeed = _throttle01 * _contextMax;
+				// At root — no bodies; skip envelope update, keep previous _easedSpeed
+				CurrentSpeed = _easedSpeed;
 				return;
 			}
 
-			// Scan ship's current-space siblings for nearest surface distance (D-06).
-			// Snapshot ChildIndices to avoid mutation issues during scan (read-only scan here,
-			// but snapshot guards against any concurrent modification).
-			int[] siblings = [.. parent.ChildIndices];
 			double nearest = double.MaxValue;
+
+			// ── ALWAYS include the parent body itself (Bug 3 fix) ──────────────
+			// The parent is the origin of the ship's coordinate frame, so the ship's
+			// distance from it is just the magnitude of ship.LocalPos (in meters).
+			// Using UniVec3.Distance(ship, parent) would mix coordinate frames.
+			if (parent.RadiusMeters > 0.0)
+			{
+				double distToParentCentre = ship.LocalPos.Magnitude();
+				double distToParentSurface = System.Math.Max(0.0, distToParentCentre - parent.RadiusMeters);
+				nearest = System.Math.Min(nearest, distToParentSurface);
+			}
+
+			// ── Scan same-space siblings ────────────────────────────────────────
+			// Snapshot ChildIndices to avoid mutation issues during scan.
+			int[] siblings = [.. parent.ChildIndices];
 
 			foreach (int idx in siblings)
 			{
 				if (idx == shipIndex) continue;
 
 				var body = (uint)idx < (uint)gameObjects.Count ? gameObjects[idx] : null;
-				if (body == null) continue;
+				if (body == null || body.RadiusMeters <= 0.0) continue;
 
-				// Surface distance = centre distance - radius, clamped at 0 (never negative).
+				// Both ship and sibling share the same parent frame — LocalPos values
+				// are in the same coordinate space, so Distance is safe here.
 				double centreDist = UniVec3.Distance(ship.LocalPos, body.LocalPos);
 				double surfaceDist = System.Math.Max(0.0, centreDist - body.RadiusMeters);
 				nearest = System.Math.Min(nearest, surfaceDist);
 			}
 
-			// If no siblings found, use a large fallback so open-space speed ramps up.
+			// If still no bodies found, open space: allow max speed.
 			if (nearest == double.MaxValue)
 				nearest = _maxSpeed / System.Math.Max(_speedPerMeter, 1.0);
 
 			// Compute target context max; clamp to [MinSpeed, MaxSpeed] (T-03-02).
 			double targetMax = Mathf.Clamp(nearest * _speedPerMeter, _minSpeed, _maxSpeed);
 
-			// Ease toward target max to hide SOI-boundary discontinuities (D-07, Pitfall 9).
+			// Ease contextMax toward target to hide SOI-boundary discontinuities (D-07, Pitfall 9).
 			_contextMax = Mathf.Lerp(_contextMax, targetMax, Mathf.Clamp(_speedEasing * delta, 0.0, 1.0));
 
-			// Actual speed = throttle fraction × context max (D-08).
-			CurrentSpeed = _throttle01 * _contextMax;
+			// Target speed = throttle fraction × context max (D-08).
+			double targetSpeed = _throttle01 * _contextMax;
+
+			// ── Ease actual speed frame-to-frame (Bug 4 fix) ──────────────────
+			// Without this, changing throttle (including full_stop → 0) snaps speed
+			// instantly. We lerp _easedSpeed toward targetSpeed so all transitions —
+			// including throttle reversal and full-stop — smooth out visibly.
+			_easedSpeed = Mathf.Lerp(_easedSpeed, targetSpeed, Mathf.Clamp(_speedEasing * delta, 0.0, 1.0));
+
+			CurrentSpeed = _easedSpeed;
 		}
 
 		// ── Motion application ───────────────────────────────────────────────────
@@ -379,12 +438,17 @@ namespace Universe
 		/// <summary>
 		/// Computes the forward Double3 delta from attitude + speed and calls TranslatePos.
 		/// forward = -_shipBasis.Z (Godot −Z is forward, RESEARCH Pattern 3).
+		/// Uses _easedSpeed (= CurrentSpeed) so motion smoothly follows throttle changes.
 		/// </summary>
 		private void ApplyMotion(double delta)
 		{
-			if (CurrentSpeed == 0.0) return;
+			// Skip trivially tiny speeds to avoid unnecessary TranslatePos calls,
+			// but use epsilon guard rather than exact-zero so easing can fully settle.
+			if (System.Math.Abs(CurrentSpeed) < 1e-3) return;
 
-			// Forward in ship-local space: -Z axis of the basis
+			// Forward in ship-local space: -Z axis of the basis (Godot convention).
+			// W (throttle_up) increases _throttle01 → positive CurrentSpeed → motion
+			// in -Z direction → ship moves toward whatever the camera is facing.
 			Vector3 forward = -_shipBasis.Z;
 
 			// Build Double3 delta (meters). Speed is already clamped via MaxSpeed/MinSpeed.
