@@ -18,8 +18,9 @@ namespace Universe
 	///
 	/// Roll (D-04): Q/E on roll_left/roll_right InputMap actions.
 	///
-	/// Throttle (D-03): Persistent [0,1] throttle raised/lowered by throttle_up/down;
+	/// Throttle (D-03): Persistent [-1,1] throttle raised/lowered by throttle_up/down;
 	/// zeroed by full_stop. Persists hands-off (cockpit style, not hold-to-thrust).
+	/// Negative throttle produces reverse thrust (ship moves along +shipBasis.Z).
 	///
 	/// Speed envelope (FLT-03/D-06/D-07/D-08): contextMax is derived from
 	/// nearest-surface distance (Distance - RadiusMeters) eased frame-to-frame
@@ -101,7 +102,7 @@ namespace Universe
 		}
 
 		private float _throttleStep = 0.05f;
-		/// <summary>Throttle increment per key press (fraction of [0,1]).</summary>
+		/// <summary>Throttle increment per key press (fraction of [-1,1] range).</summary>
 		[Export]
 		public float ThrottleStep
 		{
@@ -162,7 +163,7 @@ namespace Universe
 		/// <summary>Persistent ship attitude basis (D-02 hold-attitude).</summary>
 		private Basis _shipBasis = Basis.Identity;
 
-		/// <summary>Persistent throttle in [0,1] (D-03).</summary>
+		/// <summary>Persistent throttle in [-1,1] (D-03). Negative = reverse thrust.</summary>
 		private double _throttle01 = 0.0;
 
 		/// <summary>
@@ -192,7 +193,7 @@ namespace Universe
 		/// <summary>Current actual speed in m/s (throttle01 × contextMax).</summary>
 		public double CurrentSpeed { get; private set; }
 
-		/// <summary>Current throttle fraction [0,1].</summary>
+		/// <summary>Current throttle fraction [-1,1]. Negative = reverse thrust.</summary>
 		public double Throttle01 => _throttle01;
 
 		/// <summary>Current steering cursor offset in pixels from screen center.</summary>
@@ -241,6 +242,27 @@ namespace Universe
 			Input.MouseMode = Input.MouseModeEnum.Captured;
 		}
 
+		public override void _Input(InputEvent @event)
+		{
+			// Mouse motion accumulation MUST run in _Input, not _UnhandledInput.
+			// Control nodes with mouse_filter=Stop (the default) consume InputEventMouseMotion
+			// before _UnhandledInput is called, so steering never reaches _UnhandledInput.
+			// _Input runs before GUI event dispatch and is never blocked by Control nodes.
+			//
+			// Only accumulate steering when captured (mouse locked to window).
+			if (Input.MouseMode != Input.MouseModeEnum.Captured) return;
+
+			if (@event is InputEventMouseMotion motion)
+			{
+				// Accumulate relative delta into software cursor (D-01, Pitfall 8).
+				// In Captured mode Godot always reports correct non-zero Relative deltas.
+				_cursor += motion.Relative * _sensitivity;
+
+				// Clamp to MaxCursorRadius — prevents overflow accumulation (T-03-03).
+				_cursor = _cursor.LimitLength(_maxCursorRadius);
+			}
+		}
+
 		public override void _UnhandledInput(InputEvent @event)
 		{
 			// Toggle between Captured (steering active) and Visible (free cursor) with T key.
@@ -258,20 +280,6 @@ namespace Universe
 				{
 					Input.MouseMode = Input.MouseModeEnum.Captured;
 				}
-				return;
-			}
-
-			// Only accumulate steering when captured (mouse locked to window).
-			if (Input.MouseMode != Input.MouseModeEnum.Captured) return;
-
-			if (@event is InputEventMouseMotion motion)
-			{
-				// Accumulate relative delta into software cursor (D-01, Pitfall 8).
-				// In Captured mode Godot always reports correct non-zero Relative deltas.
-				_cursor += motion.Relative * _sensitivity;
-
-				// Clamp to MaxCursorRadius — prevents overflow accumulation (T-03-03).
-				_cursor = _cursor.LimitLength(_maxCursorRadius);
 			}
 		}
 
@@ -292,15 +300,16 @@ namespace Universe
 		/// <summary>
 		/// Reads throttle_up / throttle_down / full_stop actions and updates _throttle01.
 		/// Throttle persists hands-off (D-03); full_stop zeroes it.
-		/// Throttle clamped to [0,1] (T-03-04 mitigation).
+		/// Throttle range is [-1, 1]: positive = forward, negative = reverse thrust (D-03 refinement).
+		/// Clamped to [-1,1] (T-03-04 mitigation extended for reverse).
 		/// </summary>
 		private void HandleThrottleInput()
 		{
 			if (Input.IsActionJustPressed("throttle_up"))
-				_throttle01 = Mathf.Clamp(_throttle01 + _throttleStep, 0.0, 1.0);
+				_throttle01 = Mathf.Clamp(_throttle01 + _throttleStep, -1.0, 1.0);
 
 			if (Input.IsActionJustPressed("throttle_down"))
-				_throttle01 = Mathf.Clamp(_throttle01 - _throttleStep, 0.0, 1.0);
+				_throttle01 = Mathf.Clamp(_throttle01 - _throttleStep, -1.0, 1.0);
 
 			if (Input.IsActionJustPressed("full_stop"))
 				_throttle01 = 0.0;
@@ -436,8 +445,9 @@ namespace Universe
 		// ── Motion application ───────────────────────────────────────────────────
 
 		/// <summary>
-		/// Computes the forward Double3 delta from attitude + speed and calls TranslatePos.
+		/// Computes the motion Double3 delta from attitude + speed and calls TranslatePos.
 		/// forward = -_shipBasis.Z (Godot −Z is forward, RESEARCH Pattern 3).
+		/// Negative _easedSpeed (reverse throttle) → positive +Z motion → ship flies backward.
 		/// Uses _easedSpeed (= CurrentSpeed) so motion smoothly follows throttle changes.
 		/// </summary>
 		private void ApplyMotion(double delta)
@@ -447,8 +457,8 @@ namespace Universe
 			if (System.Math.Abs(CurrentSpeed) < 1e-3) return;
 
 			// Forward in ship-local space: -Z axis of the basis (Godot convention).
-			// W (throttle_up) increases _throttle01 → positive CurrentSpeed → motion
-			// in -Z direction → ship moves toward whatever the camera is facing.
+			// W (throttle_up) increases _throttle01 → positive CurrentSpeed → motion in -Z → forward.
+			// S (throttle_down) below 0 → negative CurrentSpeed → motion in +Z → reverse.
 			Vector3 forward = -_shipBasis.Z;
 
 			// Build Double3 delta (meters). Speed is already clamped via MaxSpeed/MinSpeed.
