@@ -5,7 +5,7 @@ milestone_name: milestone
 status: executing
 stopped_at: 01-03 COMPLETE (human-verified after 3 play-test rounds); next is 01-04 Minimal HUD
 last_updated: "2026-06-13T00:00:00.000Z"
-last_activity: 2026-06-13 -- pre-01-04 fix: RenderBridge stale-radius bug (5dd542d); body radii now per-frame; bodies correctly tiny specks in Star space after SOI transition
+last_activity: 2026-06-13 -- pre-01-04 fix: Star-space planet shading (2b29b66); OmniAttenuation=0 + StarLightEnergy=1.8 for cross-space brightness consistency
 progress:
   total_phases: 3
   completed_phases: 0
@@ -75,6 +75,7 @@ Recent decisions affecting current work:
 - 01-03: DESIGN REFINEMENT D-03: throttle range [-1,1] (W=forward, S=reverse, X eases to 0) — approved in play-test; reverse thrust without turning was required in practice
 - 01-03: SteeringReticle mouse_filter=Ignore (2) required; default Stop swallows MouseMotion before _Input accumulation
 - 01-render (pre-01-04 fix): RenderBridge stale-radius bug fixed (commit 5dd542d) — body radii now recompute per frame (r = RadiusMeters / ship.LocalPos.Scale * factor applied as mesh.Scale) so bodies are correctly sized across SOI transitions; at true 1:1 scale distant bodies are correctly tiny specks; findability of tiny specks deferred to 01-04 HUD marker + Phase 3 tiered renderer
+- 01-render (pre-01-04 fix, commit 2b29b66): Star-space planet under-shading fixed — OmniLight3D.OmniAttenuation set to 0 (constant brightness up to OmniRange, no distance falloff) and StarLightEnergy lowered 2.0→1.8 to match PlanetSunLightEnergy; OmniLight remains positional so terminator direction still derives from the star-mesh render position; StarLightAttenuation exposed as [Export] for runtime tuning; lit-side brightness in Star space now matches Planet space
 
 ### Pending Todos
 
