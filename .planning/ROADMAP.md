@@ -14,7 +14,7 @@ Three phases build the playable game layer on top of EcoSpace's existing multi-s
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: In-System Flight MVP** - Fix pre-flight crash, floating-origin rendering, arcade flight, HUD — player can fly a star system and approach dithered bodies
-- [ ] **Phase 2: Dynamic Skybox** - Shader-type sky with SOI-aware updates; out-of-space objects projected onto a stable spherical skybox
+- [ ] **Phase 2: Dynamic Skybox** - Shader-type sky updated on scale-tier transitions; only the next tier out (other systems' stars, then only galaxies) is projected onto a stable spherical skybox, with a visually continuous skybox↔mesh handoff
 - [ ] **Phase 3: Cross-Galaxy Travel** - Extend hand-authored data to galaxy/universe scale; full SOI chain validated at intergalactic distances
 
 ## Phase Details
@@ -24,7 +24,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Goal**: Player can fly around a single star system, approach dithered planets and stars, and read their speed and context on a minimal HUD
 **Mode:** mvp
 **Depends on**: Nothing (first phase); consumes existing engine (GameWorld, UniVec3, SOI, dithering shader)
-**Requirements**: STAB-01, WORLD-01, RND-01, RND-02, RND-03, RND-04, FLT-01, FLT-02, FLT-03, HUD-01, HUD-02, HUD-03, HUD-04, TRV-01
+**Requirements**: STAB-01, WORLD-01, RND-01, RND-02, RND-03, RND-04, RND-06, FLT-01, FLT-02, FLT-03, HUD-01, HUD-02, HUD-03, HUD-04, TRV-01
 **Success Criteria** (what must be TRUE):
 
   1. Player can pitch, yaw, and roll the ship with mouse input and arcade auto-stabilization; the ship does not drift or spin uncontrolled
@@ -45,15 +45,16 @@ Plans:
 
 ### Phase 2: Dynamic Skybox
 
-**Goal**: A stable spherical skybox represents all stars and galaxies outside the current SOI, updates on SOI transitions, and never drifts with camera rotation
+**Goal**: A stable spherical skybox represents only the next scale tier out as distant light points — other systems' stars (and galaxies) while in-system, and *only* other galaxies while in Galaxy space — updates when the player crosses a scale boundary, never drifts with camera rotation, and hands off seamlessly to/from meshes. Render scope is the current scale **tier**, not the immediate SOI parent: in Galaxy space the current galaxy's stars/suns become meshes
 **Mode:** mvp
 **Depends on**: Phase 1
-**Requirements**: RND-05
+**Requirements**: RND-05, RND-07
 **Success Criteria** (what must be TRUE):
 
-  1. The skybox visibly changes (star/galaxy representations reposition) when the player transitions across an SOI boundary
+  1. The skybox visibly changes (its light points reposition / re-tier) when the player crosses a scale boundary
   2. The skybox does not rotate or drift as the player rotates the ship — it remains fixed to world space
-  3. Out-of-SOI bodies (stars, galaxies) are not rendered as geometry; they appear only on the skybox
+  3. Only the next tier out is on the skybox; bodies of the current tier are meshes (in Galaxy space the galaxy's stars are meshes, not skybox points), and bodies beyond the next tier are neither
+  4. The skybox↔mesh handoff is visually continuous (RND-07): a star promoted from a skybox point to a mesh, or demoted back, on a scale transition shows no perceptible pop in position, brightness, or color
 
 **Plans**: TBD
 

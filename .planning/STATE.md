@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "01-01 complete; Task 4 checkpoint:human-verify (launch game and verify walking skeleton)"
-last_updated: "2026-06-13T02:49:14.564Z"
-last_activity: "2026-06-13 -- Phase 01 Plan 01 complete; checkpoint:human-verify pending"
+stopped_at: "01-02 tasks 1-3 done; Task 4 checkpoint:human-verify pending (visual verify + lighting decision)"
+last_updated: "2026-06-13T13:09:36.126Z"
+last_activity: "2026-06-13 -- Phase 01 Plan 02 tasks 1-3 done; Task 4 checkpoint:human-verify pending"
 progress:
   total_phases: 3
   completed_phases: 0
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 ## Current Position
 
 Phase: 01 (in-system-flight-mvp) — EXECUTING
-Plan: 2 of 4 (Plan 01 complete; awaiting human-verify checkpoint)
+Plan: 2 of 4 (01-01 complete & approved; 01-02 tasks 1-3 done, awaiting task-4 human-verify checkpoint)
 Status: Executing Phase 01
-Last activity: 2026-06-13 -- Phase 01 Plan 01 complete; checkpoint:human-verify pending
+Last activity: 2026-06-13 -- Phase 01 Plan 02 tasks 1-3 done; Task 4 checkpoint:human-verify pending
 
 Progress: [██░░░░░░░░] 25%
 
@@ -90,6 +90,7 @@ None yet.
 | Date | Slug | Summary |
 |------|------|---------|
 | 2026-06-13 | clarify-system-mesh-vs-skybox-rendering | Docs: tiered mesh/skybox model — in-system → planets + sun(s) as meshes; in-galaxy → that galaxy's stars as meshes; skybox = next tier out; added RND-07 (continuous skybox↔mesh handoff) |
+| 2026-06-13 | align-roadmap-state-to-tier-model | Docs: propagated the tier model into ROADMAP Phase 2 (goal/criteria/overview + RND-07); added RND-06 to Phase 1 reqs (ROADMAP + 01-CONTEXT); fixed STATE current-position (01-02 tasks 1-3 done, task-4 human-verify pending) |
 
 ## Session Continuity
 

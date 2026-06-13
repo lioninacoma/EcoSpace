@@ -62,7 +62,7 @@ Build the **playable flight layer** on top of the existing universe engine so a 
 **Downstream agents MUST read these before planning or implementing.**
 
 ### Phase requirements & scope
-- `.planning/ROADMAP.md` §"Phase 1: In-System Flight MVP" — goal, success criteria, requirement list (STAB-01, WORLD-01, RND-01..04, FLT-01..03, HUD-01..04, TRV-01).
+- `.planning/ROADMAP.md` §"Phase 1: In-System Flight MVP" — goal, success criteria, requirement list (STAB-01, WORLD-01, RND-01..04, RND-06, FLT-01..03, HUD-01..04, TRV-01).
 - `.planning/REQUIREMENTS.md` §Stability/Flight/World/Rendering/HUD/Travel — full text of each requirement ID owned by this phase.
 - `.planning/PROJECT.md` §Context, §Key Decisions — floating-origin, arcade-flight, auto-scaling-speed, 8-bit palette decisions and rationale.
 
