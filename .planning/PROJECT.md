@@ -29,9 +29,10 @@ The player can fly seamlessly through a massive 1:1-scale universe — from a pl
 - [ ] Context-auto-scaling speed (crawl near bodies, accelerate enormously in empty space) — no manual mode switching
 - [ ] Player held at origin (floating origin) so distances stay relative to the player
 - [ ] Planets rendered as sphere meshes with dithering and an 8-bit color palette
-- [ ] Stars rendered as bright, light-emitting spheres (no cast shadows)
-- [ ] Only objects inside the current parent space rendered dynamically
-- [ ] Dynamic spherical skybox representing all stars/galaxies outside the current space, updated on scale transitions
+- [ ] The current system's star(s)/sun(s) rendered as bright, light-emitting spheres (no cast shadows), lighting the system's planets — multi-star systems render every sun
+- [ ] Tiered mesh rendering — inside a system (Star + Planet space) the system's planets + sun(s) are meshes; in Galaxy space the current galaxy's stars/suns are meshes; bodies beyond the current tier are not
+- [ ] Dynamic spherical skybox representing only the next tier out as distant light points — other systems' stars (and galaxies) while in-system, and only other galaxies while in-galaxy — updated when crossing a scale boundary
+- [ ] Visually continuous skybox↔mesh handoff — a star switching between a skybox point and a mesh on a scale transition (e.g. Star→Galaxy) is barely perceptible
 - [ ] Minimal retro HUD (e.g. speed, current target/scale)
 - [ ] In-system flight: fly around a single star system and approach dithered bodies (first sequenced goal)
 - [ ] Cross-galaxy travel: fly between galaxies with correct SOI transitions and skybox updates (second sequenced goal)
@@ -54,7 +55,7 @@ The player can fly seamlessly through a massive 1:1-scale universe — from a pl
 - **The hard part is solved.** The multi-scale coordinate system and SOI transitions — the thing that makes a 1:1 universe renderable — exist and are tested via `TestSetup`. This project builds the *playable game layer* (flight, controls, rendering of bodies, skybox, HUD) on top of that foundation.
 - **Rendering target.** 8-bit indexed-color look with dithering for shading, plus CRT-style scanline effects. A `crt.gdshader` already exists but is currently unused; `dithering.gdshader` is wired up.
 - **Floating origin.** The player ship should remain at the coordinate origin, with the world translated around it, to keep rendered distances small and precise.
-- **Skybox model.** Objects outside the current SOI/parent space are not rendered as geometry; they are projected onto a dynamic spherical skybox. On scale transitions (e.g. entering galaxy scale), these representations must be repositioned to reflect the new frame.
+- **Skybox model (tiered).** Each scale tier renders its own bodies as meshes and defers the next tier out to the skybox. *Inside a star system* (Star and Planet space) the system's planet(s) and star(s)/sun(s) — including multi-star systems — are meshes, while other systems' stars and other galaxies are skybox light points. *In Galaxy space* the stars/suns of the current galaxy become meshes, and only other galaxies remain on the skybox. The skybox is repositioned when the player crosses a scale boundary. The skybox↔mesh handoff must be visually continuous: a star promoted from a skybox point to a mesh (e.g. on Star→Galaxy transition), or demoted back, should be barely perceptible — no pop in position, brightness, or color.
 - **Reference feel.** Wing Commander for cockpit/flight feel and HUD; Elite/Frontier for the sense of a vast traversable cosmos.
 
 ## Constraints
@@ -75,6 +76,7 @@ The player can fly seamlessly through a massive 1:1-scale universe — from a pl
 | Minimal HUD in v1, full cockpit later | Prove flight + rendering before investing in cockpit art | — Pending |
 | Hand-authored test data in v1, procedural later | Validate mechanics cheaply before building a generator | — Pending |
 | Build on existing SOI/`UniVec3` engine | The precision/space foundation is already solved and tested | ✓ Good |
+| 1:1 distances in calculation + render in unit-space (RND-06) | Universe math stays true 1:1 meters; rendering uses uniform unit-space scaling (per-space factor, far ≤ 1e6) — preserves 1:1 proportions while keeping the far plane sane. Supersedes the earlier "honest 1:1 render distances" framing. | ✓ Good |
 | Sequence v1: in-system flight + rendering, then cross-galaxy travel | Get look-and-feel right at one scale before proving multi-scale traversal | — Pending |
 
 ## Evolution
@@ -95,4 +97,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-12 after initialization*
+*Last updated: 2026-06-13 — clarified the tiered skybox model: in-system → planets + sun(s) as meshes; in-galaxy → that galaxy's stars as meshes; skybox carries only the next tier out, with a visually continuous skybox↔mesh handoff*

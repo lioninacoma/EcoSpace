@@ -85,8 +85,14 @@ None yet.
 |----------|------|--------|-------------|
 | *(none)* | | | |
 
+## Quick Tasks Completed
+
+| Date | Slug | Summary |
+|------|------|---------|
+| 2026-06-13 | clarify-system-mesh-vs-skybox-rendering | Docs: tiered mesh/skybox model — in-system → planets + sun(s) as meshes; in-galaxy → that galaxy's stars as meshes; skybox = next tier out; added RND-07 (continuous skybox↔mesh handoff) |
+
 ## Session Continuity
 
-Last session: 2026-06-13T01:44:38Z
-Stopped at: 01-01 complete; Task 4 checkpoint:human-verify (launch game and verify walking skeleton)
-Resume file: .planning/phases/01-in-system-flight-mvp/01-01-SUMMARY.md
+Last session: 2026-06-13 (resumed)
+Stopped at: 01-02 tasks 1-3 done; Task 4 checkpoint:human-verify pending (visual verify + lighting decision)
+Resume file: .planning/phases/01-in-system-flight-mvp/.continue-here.md

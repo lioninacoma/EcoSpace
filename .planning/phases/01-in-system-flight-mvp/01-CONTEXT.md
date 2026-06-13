@@ -9,13 +9,13 @@
 Build the **playable flight layer** on top of the existing universe engine so a player can fly a single star system, approach dithered planets/stars, and read a minimal retro HUD. Concretely, Phase 1 delivers:
 
 1. **Stability fix (STAB-01):** Convert `GameWorld.TrySpaceTransition` from recursion to an iterative, null-safe loop so the ship can cross multiple SOI boundaries in one frame without crashing or corrupting the hierarchy.
-2. **Floating-origin rendering (RND-01/02):** Hold the player ship at the coordinate origin, translate the world around it, sync in-space objects' `UniVec3` positions to Godot `Node3D` transforms each frame. Render only objects in the current parent space as geometry.
+2. **Floating-origin rendering (RND-01/02):** Hold the player ship at the coordinate origin, translate the world around it, sync in-space objects' `UniVec3` positions to Godot `Node3D` transforms each frame. Render the current star system's bodies — its planet(s) and star(s)/sun(s) — as geometry whenever the player is within the system (both Star space and Planet space, so the sun stays a mesh while flying near a planet); out-of-system bodies are not rendered as meshes.
 3. **Body rendering (RND-03/04):** Planets and stars as dithered sphere meshes with an 8-bit palette look; stars emissive and lighting nearby planets.
 4. **Arcade flight (FLT-01/02/03):** Mouse virtual-joystick control, persistent throttle, context-auto-scaling speed.
 5. **Minimal HUD (HUD-01..04):** Speed w/ adaptive units, context label, crosshair, cycle-able target readout.
 6. **Hand-authored world (WORLD-01) + in-system travel goal (TRV-01).**
 
-**Out of scope (later phases):** dynamic skybox / out-of-space projection (RND-05, Phase 2); cross-galaxy travel (TRV-02, Phase 3); procedural generation, cockpit art, economy, combat, CRT scanline overlay (v2 PRES-01), boost/afterburner (v2 FLT-04), audio (v2).
+**Out of scope (later phases):** dynamic skybox / out-of-space projection (RND-05, Phase 2); galaxy-space star meshes + visually continuous skybox↔mesh handoff (RND-07, Phase 2); cross-galaxy travel (TRV-02, Phase 3); procedural generation, cockpit art, economy, combat, CRT scanline overlay (v2 PRES-01), boost/afterburner (v2 FLT-04), audio (v2).
 
 </domain>
 
@@ -45,6 +45,7 @@ Build the **playable flight layer** on top of the existing universe engine so a 
 - **D-13: Per-body distinct colors + global dither quantize.** Each body gets an authored base color (e.g. Earth-blue, Mars-rust, yellow star); the existing `dithering.gdshader` post-process quantizes the whole frame to the 8-bit/dithered look. Bodies stay distinguishable by hue.
 - **D-14: Stars = emissive sphere + glow/bloom.** Unshaded bright sphere with a Godot glow/bloom halo that blooms on approach. No cast shadows (RND-04).
 - **D-15: True 1:1 body radii.** Planets/stars at real radii — they are tiny specks at distance and grow dramatically only on close approach. Honors the 1:1 universe. (See risk in Specific Ideas re: findability.)
+  - **Distance reframe (→ RND-06):** the earlier "honest 1:1 *render distances*" framing is superseded. 1:1 is preserved in both calculation and rendering, but rendering happens in uniformly scaled **unit-space** (observer-scale unit basis × per-space render factor, far ≤ 1e6) — uniform scaling *is* the 1:1 model, not a violation. True 1:1 *radii* (this D-15) are unchanged.
 - **D-16: Star lights planets via a point light** (OmniLight at the star position) for a correct day/night terminator. Range must be tuned for 1:1 distances; replaces the placeholder `DirectionalLight3D` as the star's light source.
 
 ### Claude's Discretion
@@ -97,7 +98,7 @@ Build the **playable flight layer** on top of the existing universe engine so a 
 ### Integration Points
 - **Flight controller** → calls `TranslatePos(_ship, delta)` with a velocity derived from throttle × context-max-speed, oriented by the ship's attitude.
 - **Floating origin** → ship at world origin; every other in-space object's `Node3D` transform = its `UniVec3` relative to the ship, recomputed each frame.
-- **Body renderer** → spawns/updates one `MeshInstance3D` per in-current-space body (RND-02), sized by 1:1 radius, colored per-body; star gets emissive material + OmniLight.
+- **Body renderer** → spawns/updates one `MeshInstance3D` per body of the current star system (RND-02) — every planet plus the system's sun(s), visible in both Star and Planet space — sized by 1:1 radius, colored per-body; each star gets emissive material + OmniLight.
 - **HUD** → reads ship throttle/speed, `CurrentSpace`, nearest-body distance, and the active target each frame; renders on the existing `CanvasLayer`.
 
 </code_context>
