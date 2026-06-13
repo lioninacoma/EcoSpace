@@ -105,5 +105,21 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 ## Session Continuity
 
 Last session: 2026-06-13
-Stopped at: 01-03 COMPLETE — all 4 tasks done, human-verified after 3 play-test rounds; ready for 01-04
-Resume: /gsd-execute-phase 01 (executes 01-04 Minimal HUD)
+Stopped at: Repo refactor complete (01-mvp namespace realignment) — AWAITING HUMAN VERIFY before 01-04
+Resume: /gsd-execute-phase 01 (executes 01-04 Minimal HUD) after approving refactor
+
+## Refactor Notes
+
+**2026-06-13 — Repo refactor: folder-aligned namespaces**
+
+Applied behaviour-preserving structural refactor (5 commits + 1 doc commit):
+- `namespace Universe` / `Scripts/Universe/UniRenderer.cs` → `namespace Render` / `Scripts/Render/PostProcessRenderer.cs` (class renamed PostProcessRenderer)
+- `namespace Universe` / `Scripts/Render/RenderBridge.cs` → `namespace Render` / `Scripts/Render/WorldRenderer.cs` (class renamed WorldRenderer; using Universe; added)
+- `namespace Universe` / `Scripts/Flight/FlightController.cs` → `namespace Flight` (using Universe; added; file/class unchanged)
+- `Scripts/HUD/` → `Scripts/Hud/` (case rename); `Scripts/HUD/Hud.cs` → `namespace Hud` (using Universe; using Universe.Math; added)
+- `Scripts/FPS.gd` → `Scripts/Hud/Fps.gd` (GDScript; no namespace)
+- Deleted unreferenced shaders: crt.gdshader, tilemap_shader.gdshader (+ .uid sidecars)
+- Main.tscn ext_resource paths updated (uids unchanged)
+- CLAUDE.md factual updates: component table, namespace convention, layers, entry points, arch constraints
+- Scripts/Universe/Math/ UNTOUCHED (namespace Universe.Math preserved)
+- dotnet build: 0 errors, 0 warnings
