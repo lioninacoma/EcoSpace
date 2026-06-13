@@ -1,6 +1,4 @@
 using Godot;
-using Universe;
-using Universe.Math;
 
 namespace Hud
 {

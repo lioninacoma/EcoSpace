@@ -1,7 +1,5 @@
 using Godot;
 using System.Collections.Generic;
-using Universe;
-using Universe.Math;
 
 namespace Render
 {
