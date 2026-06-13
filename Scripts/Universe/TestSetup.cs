@@ -39,6 +39,20 @@ namespace Universe
 		// are unaffected. True orbital distances arrive in Plan 01-02 (RND-03/04).
 		private const double ShipOrbitMeters = 2.5e7;
 
+		// ----- Per-body presentation data (D-13 authored hues, D-15 true 1:1 radii) ------
+		// Radii in true metres (Star-space units); consumed by RenderBridge + Plan 03 FLT-03.
+		private const double PlanetA_RadiusMeters = 6.371e6;  // Earth equatorial radius
+		private const double PlanetB_RadiusMeters = 3.390e6;  // Mars mean radius
+		private const double Star_RadiusMeters    = 6.960e8;  // Solar radius
+
+		// Authored hues: distinct luminance AND hue so they survive the dither (Pitfall 6).
+		// Earth-blue: bright enough to not collapse to black in quantize.
+		private static readonly Color PlanetA_Color = new Color(0.25f, 0.50f, 0.95f);
+		// Mars-rust: warm orange-red, clearly different from blue and yellow.
+		private static readonly Color PlanetB_Color = new Color(0.80f, 0.35f, 0.20f);
+		// Solar yellow: very bright so it reads as emissive and blooms.
+		private static readonly Color Star_Color    = new Color(1.00f, 0.95f, 0.60f);
+
 		// ----- Skeleton thrust parameters -----------------------------------
 
 		/// <summary>
@@ -84,10 +98,24 @@ namespace Universe
 		{
 			_root    = AddGameObject(-1,       new Double3(0, 0, 0),         double.MaxValue);
 			_galaxy  = AddGameObject(_root,    new Double3(0, 0, 0),         5e3);
+
 			_star    = AddGameObject(_galaxy,  new Double3(0, 0, 0),         StarSOI);
+			GameObjects[_star].Name         = "STAR";
+			GameObjects[_star].BaseColor    = Star_Color;
+			GameObjects[_star].RadiusMeters = Star_RadiusMeters;
+
 			_planetA = AddGameObject(_star,    new Double3(0, 0, PlanetA_Z), PlanetSOI);
+			GameObjects[_planetA].Name         = "PLANET A";
+			GameObjects[_planetA].BaseColor    = PlanetA_Color;
+			GameObjects[_planetA].RadiusMeters = PlanetA_RadiusMeters;
+
 			_planetB = AddGameObject(_star,    new Double3(0, 0, PlanetB_Z), PlanetSOI);
+			GameObjects[_planetB].Name         = "PLANET B";
+			GameObjects[_planetB].BaseColor    = PlanetB_Color;
+			GameObjects[_planetB].RadiusMeters = PlanetB_RadiusMeters;
+
 			_ship    = AddGameObject(_planetA, new Double3(0, 0, ShipOrbitMeters), 0);
+			GameObjects[_ship].Name = "SHIP";
 		}
 
 		// ----- Debug --------------------------------------------------------

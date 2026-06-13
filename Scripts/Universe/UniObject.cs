@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Godot;
 using Universe.Math;
 
 namespace Universe
@@ -70,6 +71,23 @@ namespace Universe
 		public int             ParentIndex;
 		public double          SOIMeters;
 		public UniVec3         LocalPos;
+
+		// ── Presentation data ─────────────────────────────────────────────
+		/// <summary>Human-readable name displayed by the HUD and target readout.</summary>
+		public string          Name;
+
+		/// <summary>
+		/// Authored base hue for dithered rendering. Consumed by RenderBridge when
+		/// building the body's <c>StandardMaterial3D.AlbedoColor</c> (Plan 01-02).
+		/// </summary>
+		public Godot.Color     BaseColor;
+
+		/// <summary>
+		/// True 1:1 physical radius in metres (Star-space-equivalent units).
+		/// Consumed by RenderBridge for mesh scaling (meters → observer units → × factor)
+		/// and by Plan 03 FLT-03 surface-distance speed scaling.
+		/// </summary>
+		public double          RadiusMeters;
 
 		/// <summary>
 		/// Indices into GameWorld.GameObjects of all direct children of this object.
