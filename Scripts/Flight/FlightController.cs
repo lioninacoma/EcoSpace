@@ -1,8 +1,9 @@
 using Godot;
 using System.Collections.Generic;
+using Universe;
 using Universe.Math;
 
-namespace Universe
+namespace Flight
 {
 	/// <summary>
 	/// Arcade flight controller implementing the locked flight model (FLT-01/02/03):
