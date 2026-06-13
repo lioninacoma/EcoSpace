@@ -401,14 +401,17 @@ namespace Universe
 		/// <summary>
 		/// Updates the moving steering reticle's screen position based on _cursor.
 		/// The reticle tracks cursor offset from viewport center (D-05).
+		/// Control.Position sets the top-left corner, so we subtract half the reticle
+		/// size (8px on each axis for a 16×16 control) to keep it centered on the cursor.
 		/// </summary>
 		private void UpdateReticlePosition()
 		{
 			if (_steeringReticle == null) return;
 
-			// Position the reticle at viewport center + cursor offset.
-			// Reticle pivot is at its own center (AnchorPreset = Center).
-			_steeringReticle.Position = _viewportCenter + _cursor;
+			// Reticle size is 16×16 px (arms span -8..+8 each axis).
+			// Position top-left at (viewportCenter + cursor - halfSize) to center the control.
+			var halfSize = _steeringReticle.Size / 2f;
+			_steeringReticle.Position = _viewportCenter + _cursor - halfSize;
 		}
 	}
 }
