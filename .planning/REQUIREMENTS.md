@@ -82,12 +82,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FLT-03 | Phase 1 | Pending |
 | WORLD-01 | Phase 1 | Pending |
 | RND-01 | Phase 1 | Pending |
-| RND-02 | Phase 1 | Pending |
+| RND-02 | Phase 1 (in-system meshes) · Phase 3 (galaxy-tier meshes) | Pending |
 | RND-03 | Phase 1 | Pending |
-| RND-04 | Phase 1 | Pending |
-| RND-05 | Phase 2 | Pending |
+| RND-04 | Phase 1 (system suns, incl. multi-star) · Phase 3 (galaxy stars as meshes) | Pending |
+| RND-05 | Phase 2 (in-system skybox) · Phase 3 (in-galaxy skybox = only galaxies) | Pending |
 | RND-06 | Phase 1 | Pending |
-| RND-07 | Phase 2 | Pending |
+| RND-07 | Phase 2 (handoff baseline) · Phase 3 (Star→Galaxy-scale handoff) | Pending |
 | HUD-01 | Phase 1 | Pending |
 | HUD-02 | Phase 1 | Pending |
 | HUD-03 | Phase 1 | Pending |
@@ -100,6 +100,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 - Mapped to phases: 18
 - Unmapped: 0 ✓
 
+> **Tiered rendering requirements are delivered incrementally.** RND-02, RND-04,
+> RND-05, and RND-07 each describe a single tier *rule* that applies at multiple
+> scales. The in-system portion lands in Phase 1/2; the galaxy-tier portion
+> (in-galaxy stars become meshes, the skybox carries only other galaxies, and the
+> Star→Galaxy skybox↔mesh handoff stays seamless) is completed in Phase 3. Each
+> requirement is counted once above even though its delivery spans phases — see
+> the Phase column for the per-phase split.
+
 ---
 *Requirements defined: 2026-06-12*
 *Last updated: 2026-06-13 — clarified the tiered mesh/skybox model (RND-02/04/05): in-system → planets + sun(s) as meshes; in-galaxy → that galaxy's stars as meshes; skybox carries only the next tier out (other systems' stars, then only galaxies). Added RND-07 (visually continuous skybox↔mesh handoff).*
+*Last updated: 2026-06-13 — marked RND-02/04/05/07 as phase-spanning in traceability (in-system portion early, galaxy-tier portion in Phase 3) so Phase 3 carries explicit rendering coverage rather than TRV-02 alone.*

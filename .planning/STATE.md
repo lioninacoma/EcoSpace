@@ -91,6 +91,7 @@ None yet.
 |------|------|---------|
 | 2026-06-13 | clarify-system-mesh-vs-skybox-rendering | Docs: tiered mesh/skybox model — in-system → planets + sun(s) as meshes; in-galaxy → that galaxy's stars as meshes; skybox = next tier out; added RND-07 (continuous skybox↔mesh handoff) |
 | 2026-06-13 | align-roadmap-state-to-tier-model | Docs: propagated the tier model into ROADMAP Phase 2 (goal/criteria/overview + RND-07); added RND-06 to Phase 1 reqs (ROADMAP + 01-CONTEXT); fixed STATE current-position (01-02 tasks 1-3 done, task-4 human-verify pending) |
+| 2026-06-13 | tiered-rendering-phase-coverage | Docs: marked RND-02/04/05/07 phase-spanning in traceability (in-system early, galaxy tier in Phase 3); gave ROADMAP Phase 3 explicit galaxy-tier rendering coverage + success criterion (closes audit finding #5) |
 
 ## Session Continuity
 
