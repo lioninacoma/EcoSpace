@@ -33,7 +33,11 @@ namespace Universe
 		private const double PlanetB_Z = 2.279e11;           // 1.52 AU in metres (Mars)
 		private const double StarSOI = 1.5e15;               // ~10 000 AU
 		private const double PlanetSOI = 1.0e9;              // ~1 000 000 km
-		private const double ShipOrbitMeters = 7e6;
+		// Skeleton VIEWING distance: chosen so planet renders as a clear disc in the 75° FOV,
+		// not a screen-filling surface. At 2.5e7 m the planet subtends ~29° (radius 637 render
+		// units, ship at 2500 render units) — well inside PlanetSOI (1e9 m) so SOI transitions
+		// are unaffected. True orbital distances arrive in Plan 01-02 (RND-03/04).
+		private const double ShipOrbitMeters = 2.5e7;
 
 		// ----- Skeleton thrust parameters -----------------------------------
 

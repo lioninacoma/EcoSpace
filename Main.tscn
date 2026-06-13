@@ -8,6 +8,7 @@
 
 [sub_resource type="Environment" id="Environment_r0du0"]
 background_mode = 1
+background_color = Color(0, 0, 0, 1)
 
 [node name="Main" type="Node3D" unique_id=543215257]
 script = ExtResource("1_glv2v")
