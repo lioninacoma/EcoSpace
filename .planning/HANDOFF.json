@@ -1,0 +1,51 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-13T02:58:47.715Z",
+  "phase": "01",
+  "phase_name": "in-system-flight-mvp",
+  "phase_dir": ".planning/phases/01-in-system-flight-mvp",
+  "plan": "01-02",
+  "task": 4,
+  "total_tasks": 4,
+  "status": "paused",
+  "wave": "2 of 4",
+  "completed_tasks": [
+    {"id": "01-01", "name": "Walking skeleton (verified + APPROVED by user)", "status": "done"},
+    {"id": "01-02-T1", "name": "Per-body Name/BaseColor/RadiusMeters + authored star system", "status": "done", "commit": "342e60a"},
+    {"id": "01-02-T2", "name": "Per-body color + 1:1 radius + emissive star + OmniLight + glow + ambient floor", "status": "done", "commit": "9808fb0"},
+    {"id": "01-02-T3", "name": "Hue-preserving per-channel ordered dither (quantize_levels)", "status": "done", "commit": "ef75906"},
+    {"id": "01-02-SUMMARY", "name": "01-02 SUMMARY (tasks 1-3)", "status": "done", "commit": "dfc05d0"}
+  ],
+  "remaining_tasks": [
+    {"id": "01-02-T4", "name": "Human-verify checkpoint: dithered 1:1 body look in Godot (AWAITING USER)", "status": "blocked_on_human"},
+    {"id": "01-02-finalize", "name": "After approval: roadmap update-plan-progress 01 01-02 complete + commit tracking", "status": "not_started"},
+    {"id": "01-03", "name": "Wave 3: FlightController arcade model (virtual joystick, throttle, speed envelope, crosshair/reticle)", "status": "not_started"},
+    {"id": "01-04", "name": "Wave 4: Full minimal HUD (adaptive units, context label, target readout, edge marker, phosphor-green)", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "01-02 human-verify checkpoint: user must run Main.tscn (F5) in Godot 4.6.2 and confirm hue-distinct bodies + blooming star + stable view", "type": "human_action", "workaround": "none — visual verification cannot be automated"}
+  ],
+  "human_actions_pending": [
+    {"action": "Run Main.tscn in Godot, verify 01-02 points 1-5, reply 'approved' or report issues", "context": "task-4 human-verify gate before plan completes", "blocking": true},
+    {"action": "LIGHTING DECISION: confirm whether the ambient floor (ambient_light_energy=0.08) is sufficient for the MVP, OR request cross-space directional lighting (real day/night terminator while orbiting a planet, where the star is not in the render set). Not yet implemented.", "context": "In Planet space the star is not rendered (RND-02), so no point light is in frame; ambient floor is the MVP stand-in. Affects whether extra work is needed before/with 01-03.", "blocking": true}
+  ],
+  "decisions": [
+    {"decision": "Render in scaled UNIT-space, not 1:1 meters: RenderBridge uses UniVec3.ToLocalDoubleUnits(ship) x per-space RenderFactor; camera far = 1e6 render units", "rationale": "1:1-meters rendering forced far=1e12 which broke Godot's light culler (prepare_camera) and destroyed depth precision. Uniform unit-space scaling is visually equivalent but keeps far sane. SUPERSEDES locked decision D-15 ('honest 1:1 render distances').", "phase": "01"},
+    {"decision": "ToLocalDoubleUnits uses the OBSERVER's scale as the single per-frame unit basis (not the body's scale)", "rationale": "Bodies in one frame can have different scales; observer-basis keeps positions AND radii on one consistent basis (radius transform uses ship scale).", "phase": "01"},
+    {"decision": "User added UniVec3.ToDouble3Units() = (Double3)Units + Offset/Scale for precision (avoids Units*Scale meters round-trip); kept", "rationale": "Precision-preserving absolute unit accessor.", "phase": "01"},
+    {"decision": "Parent body rendered at -ship.LocalPos (frame origin); siblings via ToLocalDoubleUnits", "rationale": "parent.LocalPos is in the GRANDPARENT frame and cannot be diffed against ship.LocalPos (PARENT frame); the parent sits at the origin of the ship's frame.", "phase": "01"},
+    {"decision": "Per-space RenderFactor exports (Planet/Star/Galaxy/Universe), Planet/Star = 1e-8; Galaxy/Universe placeholders (not exercised by MVP scene)", "rationale": "User chose 'units + per-space factor' normalization so one camera far works at every tier.", "phase": "01"},
+    {"decision": "Removed DirectionalLight3D; skeleton used unshaded material; 01-02 added per-body lit planet materials, unshaded emissive star, shadowless OmniLight3D, glow, and ambient floor (0.08)", "rationale": "Light culler fix + per the plan's D-16/D-14; ambient floor keeps planets visible in Planet space where the star is not rendered.", "phase": "01"},
+    {"decision": "Skeleton viewing distance ShipOrbitMeters 7e6 -> 2.5e7; black Environment background", "rationale": "At 7e6 m the planet filled the whole FOV (white screen); 2.5e7 makes it read as a disc.", "phase": "01"},
+    {"decision": "Worktrees auto-degraded to sequential (no origin/HEAD); plans run sequentially on main tree", "rationale": "worktree base-check shouldDegrade=true in this local-only repo.", "phase": "01"}
+  ],
+  "uncommitted_files": [
+    ".planning/config.json (modified — not part of phase work; leave or review)",
+    "project.godot (modified — not part of phase work; leave or review)",
+    ".planning/phases/01-in-system-flight-mvp/01-PATTERNS.md (untracked planning artifact)",
+    "Scripts/HUD/Hud.cs.uid (untracked Godot uid)",
+    "Scripts/Render/RenderBridge.cs.uid (untracked Godot uid)"
+  ],
+  "next_action": "Ask the user to run Main.tscn and reply with (a) approval/issues on the 01-02 checkpoint and (b) the lighting decision (ambient floor vs cross-space directional terminator). On 'approved': run `gsd-tools query roadmap.update-plan-progress 01 01-02 complete`, commit tracking, then start Wave 3 (plan 01-03) by spawning a gsd-executor (model sonnet, sequential).",
+  "context_notes": "Mid /gsd-execute-phase 1. Phase has 4 plans = 4 waves, fully sequential dependency chain, all autonomous:false (each ends in a human-verify checkpoint). Execution mode is SEQUENTIAL on the main tree (worktrees degraded). Wave 1 (01-01) took many iterations because the user redesigned the render architecture mid-plan (unit-space + per-space factor). When dispatching 01-03/01-04 executors, BRIEF them on the unit-space render architecture (it supersedes the original plan phrasing) and have them read 01-01-SUMMARY.md + 01-02-SUMMARY.md. Each executor: run auto tasks, stop at the human-verify checkpoint, write SUMMARY, do NOT mark complete or touch ROADMAP/STATE — the orchestrator finalizes after the user verifies."
+}
