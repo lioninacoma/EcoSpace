@@ -10,7 +10,7 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 
 ### Constraints
 
-- **Tech stack**: Godot 4.6.2 Mono, C# 12 / .NET 8.0 — existing engine; new work stays in this stack and the `Universe` namespace conventions
+- **Tech stack**: Godot 4.6.2 Mono, C# 12 / .NET 8.0 — existing engine; new work stays in this stack and the folder-aligned namespace conventions
 - **Architecture**: Must build on the existing `UniVec3` / SOI / `GameWorld` model — do not replace the precision/space system; flight and rendering consume it
 - **Performance**: Real-time first-person rendering; SIMD math paths and floating-origin must keep per-frame cost stable across scales
 - **Rendering**: Forward Plus renderer, DirectX 12 on Windows; 8-bit/dithered look achieved via post-process shaders
@@ -84,7 +84,7 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 ## Naming Patterns
 
 - PascalCase for class files: `UniObject.cs`, `GameWorld.cs`, `Double3.cs`
-- Namespace-aware organization: Math types in `Scripts/Universe/Math/` subdirectory
+- Namespace-aware organization: Math types in `Scripts/Math/` subdirectory (global namespace); Render/Flight/Hud in their own namespaces under `Scripts/Render/`, `Scripts/Flight/`, `Scripts/Hud/`
 - File names match primary type declaration
 - PascalCase: `UniObject`, `GameWorld`, `UniRenderer`, `TestSetup`
 - Struct names also PascalCase: `Double3`, `Long3`, `UniVec3`
@@ -105,7 +105,7 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 - EditorConfig configured at repository root (`.editorconfig`): UTF-8 charset enforcement
 - 4-space indentation (inferred from code samples)
 - Braces on same line (Allman style for methods, inline for properties and short blocks)
-- Namespace nesting uses nested namespace syntax: `namespace Universe { namespace Math { ... } }` in math files
+- Core sim types (GameWorld, UniObject, TestSetup) and Math types (Double3, Long3, UniVec3) are in the global namespace (no namespace wrapper); Render/Flight/Hud files use their respective namespace
 - Spaces around binary operators: `a + b`, `a - b`, `a * b`, `a / b`
 - Operators on inline methods use compact spacing: `public static Long3 operator +(Long3 a, Long3 b) => new(...)`
 - Method chaining allows trailing operators on same line
@@ -118,7 +118,7 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 ## Import Organization
 
 - Namespace-based organization, no explicit path aliases (`using` directives)
-- Nested namespaces use dot notation: `Universe.Math`
+- Global-namespace types (Double3, Long3, UniVec3, GameWorld, UniObject, TestSetup) need no `using` import; Render/Flight/Hud files in their own namespaces use `using Godot;` and standard library usings only
 
 ## Comments & Documentation
 
@@ -166,9 +166,9 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 - Math types use `public struct` and `public static` methods
 - Core game logic uses `public partial class` (Godot C# pattern) with `Node3D` base
 - No public fields except in simple data types (`UniObject` data class)
-- Namespaces match top-level folder under `Scripts/`: `Universe` (core sim), `Universe.Math` (math), `Render`, `Flight`, `Hud`
-- `Universe` namespace for core simulation: `GameWorld`, `UniObject`, `TestSetup`
-- `Universe.Math` nested namespace for math structures (untouched)
+- Core sim files at `Scripts/` root in the global namespace: `GameWorld`, `UniObject`, `TestSetup`
+- Math files at `Scripts/Math/` in the global namespace (no namespace wrapper): `Double3`, `Long3`, `UniVec3`
+- Folder-aligned namespaces for consumer layers: `Render` (Scripts/Render/), `Flight` (Scripts/Flight/), `Hud` (Scripts/Hud/)
 - `Render` namespace: `PostProcessRenderer` (ColorRect/shader host), `WorldRenderer` (Node3D/floating-origin mesh sync)
 - `Flight` namespace: `FlightController` (Node/arcade flight model)
 - `Hud` namespace: `Hud` (Control/speed label)
@@ -192,12 +192,12 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 
 | Component | Responsibility | File |
 |-----------|----------------|------|
-| TestSetup | Test scene setup and object simulation loop | `Scripts/Universe/TestSetup.cs` |
-| GameWorld | World management, SOI transitions, position updates | `Scripts/Universe/GameWorld.cs` |
-| UniObject | Game object identity, space, parent/child hierarchy | `Scripts/Universe/UniObject.cs` |
-| UniVec3 | Universal 3D position with unlimited range & precision | `Scripts/Universe/Math/UniVec3.cs` |
-| Double3 | SIMD-optimized double-precision 3D vector (32 bytes, AVX2) | `Scripts/Universe/Math/Double3.cs` |
-| Long3 | 64-bit integer 3D vector for unit coordinates | `Scripts/Universe/Math/Long3.cs` |
+| TestSetup | Test scene setup and object simulation loop | `Scripts/TestSetup.cs` |
+| GameWorld | World management, SOI transitions, position updates | `Scripts/GameWorld.cs` |
+| UniObject | Game object identity, space, parent/child hierarchy | `Scripts/UniObject.cs` |
+| UniVec3 | Universal 3D position with unlimited range & precision | `Scripts/Math/UniVec3.cs` |
+| Double3 | SIMD-optimized double-precision 3D vector (32 bytes, AVX2) | `Scripts/Math/Double3.cs` |
+| Long3 | 64-bit integer 3D vector for unit coordinates | `Scripts/Math/Long3.cs` |
 | PostProcessRenderer | Post-process dithering/CRT shader management and parameter binding | `Scripts/Render/PostProcessRenderer.cs` |
 | WorldRenderer | Floating-origin world→mesh sync, per-body lighting uniforms | `Scripts/Render/WorldRenderer.cs` |
 | FlightController | Arcade flight model, mouse steering, throttle, speed envelope | `Scripts/Flight/FlightController.cs` |
@@ -219,17 +219,17 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 - Depends on: TestSetup script attachment
 - Used by: Game loop; draws to screen
 - Purpose: World state management and physics-independent object transitions
-- Location: `Scripts/Universe/GameWorld.cs`
+- Location: `Scripts/GameWorld.cs`
 - Contains: GameObjects list, SOI logic, position translation, reparenting
 - Depends on: UniObject, UniVec3, Double3
 - Used by: TestSetup (_Process loop calls TranslatePos)
 - Purpose: Game object identity and hierarchy
-- Location: `Scripts/Universe/UniObject.cs`
+- Location: `Scripts/UniObject.cs`
 - Contains: Space enum, Type enum, scale lookup, parent/child relationships
 - Depends on: Math module for Scale() static values
 - Used by: GameWorld for all object state
 - Purpose: Unlimited-range position representation and SIMD-accelerated operations
-- Location: `Scripts/Universe/Math/`
+- Location: `Scripts/Math/`
 - Contains: UniVec3 (units + offset + scale), Double3 (SIMD), Long3 (integer grid)
 - Depends on: Godot.Mathf, System.Runtime.Intrinsics (SIMD)
 - Used by: UniVec3 implements position arithmetic; GameWorld uses it for translations
@@ -254,16 +254,16 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 ## Key Abstractions
 
 - Purpose: Store unlimited-range high-precision positions without floating-point drift
-- Examples: `Scripts/Universe/Math/UniVec3.cs:36-295`
+- Examples: `Scripts/Math/UniVec3.cs`
 - Pattern: Composite of Units (Long3) + Offset (Double3) + Scale (double)
 - Purpose: Define which game objects exist in which coordinate frame (Root → Universe → Galaxy → Star → Planet)
-- Examples: `Scripts/Universe/UniObject.cs:15-66` (Space enum and static conversion methods)
+- Examples: `Scripts/UniObject.cs` (Space enum and static conversion methods)
 - Pattern: Static lookup tables (Scale method, ChildSpace, ParentSpace) allow zero-allocation space arithmetic
 - Purpose: Lightweight struct holding index, space, parent, position, SOI radius, and children
-- Examples: `Scripts/Universe/UniObject.cs:8-79`
+- Examples: `Scripts/UniObject.cs`
 - Pattern: Array-of-structs in GameWorld.GameObjects list; pointer-free (uses integer indices)
 - Purpose: Fast vector operations with automatic fallback to scalar
-- Examples: `Scripts/Universe/Math/Double3.cs:100-250`
+- Examples: `Scripts/Math/Double3.cs`
 - Pattern: MethodImpl(AggressiveInlining) + Avx.IsSupported check in every operator
 
 ## Entry Points
@@ -271,10 +271,10 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 - Location: `Main.tscn`
 - Triggers: Godot engine loads scene and calls _Ready(), then _Process each frame
 - Responsibilities: Hosts TestSetup script on Main Node3D
-- Location: `Scripts/Universe/TestSetup.cs:43-82` (_Ready and _Process)
+- Location: `Scripts/TestSetup.cs` (_Ready and _Process)
 - Triggers: Godot framework
 - Responsibilities: Initializes scene hierarchy (planets, ship, star), updates ship position each frame, detects arrival
-- Location: `Scripts/Universe/GameWorld.cs:11-14` (_Ready)
+- Location: `Scripts/GameWorld.cs` (_Ready)
 - Triggers: Godot framework
 - Responsibilities: Initializes GameObjects empty list for TestSetup to populate
 - Location: `Scripts/Render/PostProcessRenderer.cs` (_Ready)
@@ -285,7 +285,7 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 
 - **Threading:** Single-threaded. Godot runs _Process in the main thread; no multithreading used.
 - **Global state:** GameWorld.GameObjects list is instance-level (per scene), not truly global. All state is owned by TestSetup instance.
-- **Circular imports:** None detected. Clear dependency graph: TestSetup → GameWorld, UniObject; Render/Flight/Hud namespaces depend on Universe (not vice versa); Math module has no dependency on higher layers.
+- **Circular imports:** None detected. Clear dependency graph: TestSetup → GameWorld, UniObject (all global namespace); Render/Flight/Hud namespaces consume global-namespace types directly (no using import needed); Math module has no dependency on higher layers.
 - **Precision model:** Double3 uses double (64-bit IEEE 754) within each 32-byte SIMD chunk. Long3 uses long (64-bit signed integer) for unit grid. Combined, UniVec3 provides arbitrary range (9.2e18 units per axis) with double precision within each cell.
 - **SOI recursion:** TrySpaceTransition recurses up to `max(depth of object, depth of deepest child) * 2` calls in worst case (one exit, one entry per level). Unbounded but stable in practice for small hierarchies.
 - **Shader hot-reloading:** Not supported. Shader is loaded once in _Ready; changes require scene reload.
