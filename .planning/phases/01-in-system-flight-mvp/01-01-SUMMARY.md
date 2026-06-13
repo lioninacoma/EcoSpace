@@ -196,6 +196,40 @@ completed: "2026-06-13"
 
 No new threat surface introduced beyond what the plan's threat model covers.
 
+## Post-Plan Viewing Distance + Background Fix (2026-06-13)
+
+**Context:** After Godot verification the player saw a completely white screen. The ship started
+at `ShipOrbitMeters = 7e6` m (7,000 km above the surface of a 6,371 km-radius planet), placing
+the camera effectively inside/just above the planet — it filled the entire 75° FOV. The 1-bit
+dither (`avg < threshold ? black : white`) turned the uniformly bright albedo surface solid
+white, leaving no contrast.
+
+**What the skeleton renders:** The skeleton renderer produces WHITE discs on a BLACK background
+via the existing 1-bit dithering shader. The planet's unshaded material albedo (≈0.75, 0.85, 0.75)
+maps to ~200/255 brightness — consistently above the Threshold=100 cutoff — so all lit geometry
+renders white. Gray-green / hue-preserving color is intentionally deferred to Plan 01-02 (D-13).
+This is correct and expected for a walking skeleton.
+
+**Changes made (commit 45e5e79):**
+
+1. `TestSetup.cs` — `ShipOrbitMeters` changed from `7e6` to `2.5e7` (25,000 km from the surface,
+   ~3.9 Earth radii from center). Sanity: 2.5e7 m → 2.5e11 planet-units → ×1e-8 factor = 2,500
+   render units distance; planet radius 637 render units → subtends ~29° in the 75° FOV — a
+   clear disc with black space around it. Still well inside `PlanetSOI = 1e9 m` so no SOI
+   transition occurs and all ship dynamics are unaffected. Updated comment documents this as a
+   skeleton VIEWING distance, not a simulated orbit.
+
+2. `Main.tscn` — `Environment` sub-resource: added `background_color = Color(0, 0, 0, 1)`.
+   `background_mode = 1` (custom color) was already set; the explicit black color ensures Godot
+   renders solid black instead of the engine's default gray, giving the white planet disc clean
+   contrast.
+
+**Build result:** 0 errors, 0 warnings (`dotnet build EcoSpace.csproj`).
+
+**Plan 01-02 note:** When Plan 01-02 introduces true per-body radii and hue-preserving 8-bit
+dithering, the viewing distance in `ShipOrbitMeters` should be revisited alongside the new
+material/shader work. The 2.5e7 m value is a skeleton-only placeholder.
+
 ## Self-Check: PASSED (post-checkpoint fix + unit-space render continuation + rendering correctness fixes included)
 
 Files exist:
