@@ -19,18 +19,34 @@ namespace Universe
 		/// <summary>NodePath to the GameWorld / TestSetup node in the scene.</summary>
 		[Export] public NodePath WorldPath { get; set; }
 
-		/// <summary>Far plane for the Camera3D (render units). 1e6 render units = 1e12 m at k=1e-6.</summary>
+		/// <summary>Far plane for the Camera3D (render units). 1e6 render units = 1 AU at default planet factor.</summary>
 		[Export] public float CameraFarPlane { get; set; } = 1e6f;
 
 		/// <summary>
-		/// Render units per meter (uniform scale applied to both body positions and radii).
-		/// Universe math (UniVec3, TranslatePos, SOI) operates in true 1:1 meters; only
-		/// RenderBridge applies this factor so the camera far plane stays reasonable (≤ 1e6
-		/// render units). A uniform scale is perspective-invariant — visually identical to 1:1.
-		/// Plan 01-02 MUST reuse this same RenderScale when applying true 1:1 body radii.
-		/// Default: 1e-6 → 1 render unit = 1,000,000 m; far=1e6 covers ~1e12 m (≥ 1 AU).
+		/// Render units per observer-unit for Planet-space frames (applied after ToLocalDoubleUnits).
+		/// Universe/SOI math stays 1:1 meters; only RenderBridge applies this factor.
+		/// Planet scale = 0.0001 m/unit → 1 observer-unit = 0.0001 m. Factor=1e-8 → 1 render unit = 1e12 m.
+		/// Plan 01-02 MUST reuse the meters→observer-units→×factor transform for per-body radii.
 		/// </summary>
-		[Export] public float RenderScale { get; set; } = 1e-6f;
+		[Export] public float PlanetRenderFactor { get; set; } = 1e-8f;
+
+		/// <summary>
+		/// Render units per observer-unit for Star-space frames (applied after ToLocalDoubleUnits).
+		/// Star scale = 1 m/unit → 1 observer-unit = 1 m. Factor=1e-8 → 1 render unit = 1e8 m.
+		/// </summary>
+		[Export] public float StarRenderFactor { get; set; } = 1e-8f;
+
+		/// <summary>
+		/// Render units per observer-unit for Galaxy-space frames.
+		/// Placeholder — Galaxy tier not exercised by MVP scene; tune when reached.
+		/// </summary>
+		[Export] public float GalaxyRenderFactor { get; set; } = 1e-8f;
+
+		/// <summary>
+		/// Render units per observer-unit for Universe-space frames.
+		/// Placeholder — Universe tier not exercised by MVP scene; tune when reached.
+		/// </summary>
+		[Export] public float UniverseRenderFactor { get; set; } = 1e-8f;
 
 		/// <summary>Default sphere mesh radius (true meters) for skeleton bodies.</summary>
 		[Export] public float DefaultBodyRadius { get; set; } = 6.371e6f;   // Earth-radius default
@@ -38,6 +54,21 @@ namespace Universe
 		// ----- Private state --------------------------------------------------
 
 		private TestSetup _world;
+
+		/// <summary>
+		/// Maps the observer (ship) space to the appropriate per-space render factor.
+		/// Factor is applied to observer-unit positions (after ToLocalDoubleUnits) to
+		/// produce render-space coordinates. Choosing the factor from the ship's space
+		/// ensures all bodies in the same frame use a consistent unit basis.
+		/// </summary>
+		private float RenderFactorFor(UniObject.Space space) => space switch
+		{
+			UniObject.Space.Planet   => PlanetRenderFactor,
+			UniObject.Space.Star     => StarRenderFactor,
+			UniObject.Space.Galaxy   => GalaxyRenderFactor,
+			UniObject.Space.Universe => UniverseRenderFactor,
+			_                        => StarRenderFactor,
+		};
 
 		/// <summary>Per-body mesh instances: keyed by GameObjects index.</summary>
 		private readonly Dictionary<int, MeshInstance3D> _meshes = [];
@@ -82,11 +113,15 @@ namespace Universe
 			var parent = (uint)parentIdx < (uint)gameObjects.Count ? gameObjects[parentIdx] : null;
 			if (parent == null) return;
 
+			// Compute render factor once per frame from the ship's current space.
+			// All bodies in this frame share the same observer-unit basis (ship.LocalPos.Scale).
+			float factor = RenderFactorFor(ship.CurrentSpace);
+
 			// Track which indices are rendered this frame to hide bodies that left
 			var activeIndices = new HashSet<int>();
 
 			// Render the parent body itself (e.g. the planet we orbit) ship-relative
-			RenderBodyAt(parentIdx, parent, ship, gameObjects);
+			RenderBodyAt(parentIdx, parent, ship, factor);
 			activeIndices.Add(parentIdx);
 
 			// Render siblings: all children of parent except the ship itself
@@ -97,7 +132,7 @@ namespace Universe
 				var body = (uint)childIdx < (uint)gameObjects.Count ? gameObjects[childIdx] : null;
 				if (body == null) continue;
 
-				RenderBodyAt(childIdx, body, ship, gameObjects);
+				RenderBodyAt(childIdx, body, ship, factor);
 				activeIndices.Add(childIdx);
 			}
 
@@ -111,40 +146,48 @@ namespace Universe
 		// ----- Private helpers -----------------------------------------------
 
 		/// <summary>
-		/// Ensures a MeshInstance3D exists for <paramref name="bodyIdx"/>, then
-		/// positions it ship-relative using the floating-origin ToLocalDouble.
+		/// Ensures a MeshInstance3D exists for <paramref name="bodyIdx"/>, then positions it
+		/// ship-relative in render space. Uses ToLocalDoubleUnits (observer-unit basis) multiplied
+		/// by the per-space <paramref name="factor"/> so positions stay within camera far range.
 		/// Anchors on ship.LocalPos (Pitfall 4 — never parent body, or render jitters).
 		/// </summary>
 		private void RenderBodyAt(
 			int bodyIdx,
 			UniObject body,
 			UniObject ship,
-			System.Collections.Generic.List<UniObject> gameObjects)
+			float factor)
 		{
-			var mesh = GetOrCreateMesh(bodyIdx, body);
+			var mesh = GetOrCreateMesh(bodyIdx, ship, factor);
 
-			// Floating-origin: compute render position relative to ship, then scale to render space.
-			// RenderScale (k=1e-6) is applied uniformly — perspective-invariant, keeps camera far ≤ 1e6.
-			Double3 rel = body.LocalPos.ToLocalDouble(ship.LocalPos) * RenderScale;
-			mesh.Position = new Vector3((float)rel.X, (float)rel.Y, (float)rel.Z);
+			// Floating-origin: express delta in observer-unit space, then multiply by per-space factor.
+			// transform: meters → ÷ ship.LocalPos.Scale → observer units → × factor → render units.
+			Double3 relUnits = body.LocalPos.ToLocalDoubleUnits(ship.LocalPos);
+			mesh.Position = new Vector3(
+				(float)(relUnits.X * factor),
+				(float)(relUnits.Y * factor),
+				(float)(relUnits.Z * factor));
 			mesh.Visible = true;
 		}
 
 		/// <summary>
 		/// Returns the MeshInstance3D for this body index, creating it lazily on
 		/// first encounter. Never spawns or frees per frame.
+		/// Radius transform: DefaultBodyRadius (meters) → ÷ ship.LocalPos.Scale (observer units) → × factor (render units).
+		/// Plan 01-02 MUST apply this same meters→observer-units→×factor transform for true per-body radii (RND-03/04).
 		/// </summary>
-		private MeshInstance3D GetOrCreateMesh(int bodyIdx, UniObject body)
+		private MeshInstance3D GetOrCreateMesh(int bodyIdx, UniObject ship, float factor)
 		{
 			if (_meshes.TryGetValue(bodyIdx, out var existing))
 				return existing;
 
-			// Radius stored in true meters; scaled to render space by RenderScale.
-			// Plan 01-02 replaces DefaultBodyRadius with per-body true radii using the same factor.
+			// Radius: true meters → observer units (÷ ship scale) → render units (× factor).
+			// DefaultBodyRadius stays in true meters; plan 01-02 replaces it with per-body RadiusMeters.
+			double radiusUnits = DefaultBodyRadius / ship.LocalPos.Scale;
+			float r = (float)(radiusUnits * factor);
 			var sphereMesh = new SphereMesh
 			{
-				Radius = DefaultBodyRadius * RenderScale,
-				Height = DefaultBodyRadius * 2f * RenderScale,
+				Radius = r,
+				Height = 2f * r,
 			};
 
 			// Skeleton placeholder material: unshaded so bodies stay visible with no

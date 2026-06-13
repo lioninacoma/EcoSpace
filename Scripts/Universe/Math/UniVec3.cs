@@ -161,6 +161,20 @@ namespace Universe
 				return delta.ToDouble3();
 			}
 
+			/// <summary>
+			/// Floating-origin render vector in UNIT space: position relative to an observer,
+			/// expressed in the OBSERVER's cell units (Units + Offset/Scale form). Using the
+			/// observer's scale as the single unit basis keeps all bodies in a frame consistent
+			/// even when they live in spaces with different Scale values. Universe/SOI math stays
+			/// 1:1 (meters); only rendering consumes unit space.
+			/// </summary>
+			[MethodImpl(MethodImplOptions.AggressiveInlining)]
+			public Double3 ToLocalDoubleUnits(in UniVec3 observer)
+			{
+				Double3 deltaMeters = (this - observer).ToDouble3();   // exact meters, scale-agnostic
+				return deltaMeters * (1.0 / observer.Scale);           // re-express in observer cell units
+			}
+
 			// ----- Magnitude --------------------------------------------------
 
 			[MethodImpl(MethodImplOptions.AggressiveInlining)]
