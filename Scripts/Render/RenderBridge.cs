@@ -11,31 +11,26 @@ namespace Universe
 	/// and avoids single-precision float jitter at large distances (RND-01/RND-02).
 	///
 	/// Per-body materials and 1:1 true radii added in Plan 01-02 (RND-03/04):
-	/// - Planet meshes: default-lit StandardMaterial3D with body.BaseColor, so the
-	///   star OmniLight (Star space) or DirectionalLight3D (Planet space) produces a
-	///   day/night terminator.
-	/// - Star mesh: unshaded emissive StandardMaterial3D (no lighting needed).
-	/// - OmniLight3D positioned at the star's ship-relative render transform each frame
-	///   (ShadowEnabled=false per RND-04). Its range is in render units and must cover
-	///   the full rendered scene; tune StarLightRange accordingly.
+	/// - Planet meshes: unshaded spatial ShaderMaterial (body_lit.gdshader) that
+	///   computes a Lambert day/night terminator in the fragment shader from an
+	///   explicit per-body star_dir uniform. Shading is IDENTICAL in every space the
+	///   ship occupies (Star space, Planet space, any future tier) because lighting is
+	///   purely shader-driven — no dependence on Godot OmniLight3D or DirectionalLight3D,
+	///   which would require different node types per space and produce a character
+	///   change on cross-space transitions (eliminated by 01-02 shader revision).
+	/// - Star mesh: unshaded emissive StandardMaterial3D (no lighting needed — it IS
+	///   the light source; bloom/glow via WorldEnvironment).
 	///
-	/// Planet-space directional terminator (01-02 revision, RND-02/D-16):
-	///   When the ship is in Planet space the star is NOT in the render set (only
-	///   parent.ChildIndices bodies are shown — RND-02), so the OmniLight3D is absent.
-	///   A DirectionalLight3D (_planetSunLight) is instead activated each frame,
-	///   oriented so photons travel FROM the sun TOWARD the planet (computed by walking
-	///   ship → planet → star in GameWorld hierarchy and combining LocalPos values in
-	///   Star-space meters, then pointing the light's -Z axis in -sun_direction).
-	///   This produces a correct day/night terminator on the planet surface whose
-	///   dark hemisphere reads as clearly unlit.
-	///
-	///   The sun is NOT rendered as a mesh in Planet space. At 1:1 scale the sun is
-	///   ~1.5e11 m away, which maps to ~1.5e7 render units — ~15× beyond the 1e6 far
-	///   plane. The visible sun mesh in Planet space is deferred to the Phase 3 tiered
-	///   renderer (skybox/billboard pass for bodies beyond the far plane).
-	///
-	///   A small ambient floor (Main.tscn) keeps the night hemisphere dark-but-visible
-	///   (not pure black), matching the retro aesthetic.
+	/// Per-body star_dir computation each frame:
+	///   The nearest star's render-space position is derived from the same cross-frame
+	///   hierarchy math used for body positioning (ship-relative floating-origin).
+	///   In Star space the star is in the render set and its renderPos is tracked
+	///   directly. In Planet space the star is NOT in the render set (RND-02 — only
+	///   the planet children are shown), so the star render position is derived by
+	///   walking planet→star hierarchy positions in Star-space metres, then applying
+	///   the render factor to get the star's render-space vector (direction is what
+	///   matters; the star is ~1.5e7 render units out, well beyond the far plane).
+	///   star_dir = normalize(starRenderPos - bodyRenderPos) set per body per frame.
 	///
 	/// Read-only consumer of GameWorld state — MUST NOT mutate UniVec3 or call TranslatePos.
 	/// </summary>
@@ -90,54 +85,32 @@ namespace Universe
 		/// </summary>
 		[Export] public float StarEmissionEnergy { get; set; } = 3.0f;
 
-		/// <summary>
-		/// Energy of the OmniLight3D created at the star's render position.
-		/// Set equal to PlanetSunLightEnergy so Star-space and Planet-space lit-side
-		/// brightness are comparable. No attenuation (StarLightAttenuation=0) means
-		/// this value is the full, unattenuated energy reaching the planet surface.
-		/// ShadowEnabled is always false (RND-04).
-		/// </summary>
-		[Export] public float StarLightEnergy { get; set; } = 1.8f;
+		// ----- Shader-based body lighting exports (replaces Godot light nodes) ----
 
 		/// <summary>
-		/// Range of the OmniLight3D in render units. Must cover the rendered scene.
-		/// Scene spans up to ~CameraFarPlane render units; default 1e5 covers
-		/// well within the 1e6 far plane.
-		/// With StarLightAttenuation=0 the range acts only as a hard cutoff; all
-		/// objects within range receive the full StarLightEnergy regardless of distance.
+		/// Sun brightness on the lit hemisphere of body_lit.gdshader.
+		/// Applied as the light_energy uniform on each planet/body ShaderMaterial.
+		/// Default 1.8 matches the former StarLightEnergy / PlanetSunLightEnergy —
+		/// both are now a single value because shading is space-independent.
+		/// Tune for desired lit-side vs night-side contrast.
 		/// </summary>
-		[Export] public float StarLightRange { get; set; } = 1e5f;
+		[Export] public float BodyLightEnergy { get; set; } = 1.8f;
 
 		/// <summary>
-		/// Attenuation exponent of the OmniLight3D (Godot OmniLight3D.OmniAttenuation).
-		/// 0 = constant intensity up to StarLightRange (no distance falloff).
-		/// 1 = linear falloff. Default Godot value = 1.
-		///
-		/// Set to 0 so the planet receives full StarLightEnergy regardless of its
-		/// render-space distance from the star. At 1:1 scale the star renders at
-		/// ~1500 render units and the planet at ~0–250 render units from the ship;
-		/// any non-zero attenuation produces distance-dependent dimming that is hard
-		/// to match against the (attenuaton-free) Planet-space DirectionalLight3D.
-		/// With attenuation=0 the OmniLight is effectively directional in brightness
-		/// while remaining POSITIONAL in direction — the terminator still points from
-		/// the real star-mesh position.
+		/// Ambient floor on the night hemisphere of body_lit.gdshader.
+		/// Applied as the ambient uniform on each planet/body ShaderMaterial.
+		/// Default 0.03 keeps the night side dark-but-visible (matches the prior
+		/// WorldEnvironment ambient_light_energy that lit the night hemisphere when
+		/// Godot light nodes were active). Increase slightly if the night side is too dark.
 		/// </summary>
-		[Export] public float StarLightAttenuation { get; set; } = 0.0f;
-
-		// ----- Planet-space directional sun exports ----------------------------
-
-		/// <summary>
-		/// Energy of the DirectionalLight3D activated when the ship is in Planet space.
-		/// The directional light is oriented along the true sun direction (computed
-		/// cross-frame from ship → planet → star hierarchy positions). No attenuation —
-		/// correct at 1:1 distances. ShadowEnabled=false (RND-04 cost rule).
-		/// Tune so the lit hemisphere is clearly bright against the dark night side.
-		/// </summary>
-		[Export] public float PlanetSunLightEnergy { get; set; } = 1.8f;
+		[Export] public float BodyAmbient { get; set; } = 0.03f;
 
 		// ----- Private state --------------------------------------------------
 
 		private TestSetup _world;
+
+		/// <summary>Loaded once in _Ready from res://Shaders/body_lit.gdshader.</summary>
+		private Shader _bodyLitShader;
 
 		/// <summary>
 		/// Maps the observer (ship) space to the appropriate per-space render factor.
@@ -158,21 +131,11 @@ namespace Universe
 		private readonly Dictionary<int, MeshInstance3D> _meshes = [];
 
 		/// <summary>
-		/// Single OmniLight3D for the star. Created once and repositioned each frame
-		/// to the star's ship-relative render position. Hidden when the star is not rendered.
-		/// ShadowEnabled=false (RND-04 — no cast shadows, avoids shadow-map cost).
+		/// Per-body shader materials for lit (non-star) bodies.
+		/// Keyed by GameObjects index. star_dir, light_energy, and ambient
+		/// are pushed each frame in SyncBodies.
 		/// </summary>
-		private OmniLight3D _starLight;
-
-		/// <summary>
-		/// DirectionalLight3D that stands in for the sun when the ship is in Planet space.
-		/// The star is not in the render set in Planet space (RND-02), so the OmniLight3D
-		/// is absent. This light is oriented along the true sun direction each frame
-		/// (derived from ship → planet → star cross-frame hierarchy math in Star-space meters).
-		/// No attenuation (directional), ShadowEnabled=false (RND-04).
-		/// Active only in Planet space; disabled in Star space where the OmniLight is used.
-		/// </summary>
-		private DirectionalLight3D _planetSunLight;
+		private readonly Dictionary<int, ShaderMaterial> _litMaterials = [];
 
 		// ----- Godot callbacks ------------------------------------------------
 
@@ -187,29 +150,9 @@ namespace Universe
 			var cam = GetTree().Root.FindChild("Camera3D", true, false) as Camera3D;
 			if (cam != null) cam.Far = CameraFarPlane;
 
-			// Create the star OmniLight3D once; it will be repositioned and shown/hidden per frame.
-			// OmniAttenuation=0 gives constant brightness up to OmniRange — no distance falloff —
-			// so lit-side energy is independent of render-unit distance and matches Planet-space
-			// DirectionalLight3D brightness (cross-space shading consistency, D-16 fix).
-			_starLight = new OmniLight3D
-			{
-				ShadowEnabled    = false,               // RND-04: no cast shadows
-				OmniRange        = StarLightRange,
-				OmniAttenuation  = StarLightAttenuation, // 0 = no falloff; terminator direction still from star position
-				LightEnergy      = StarLightEnergy,
-				Visible          = false,
-			};
-			AddChild(_starLight);
-
-			// Create the planet-space directional sun light once; activated only in Planet space.
-			// Orientation is recomputed every frame from the true cross-frame sun direction.
-			_planetSunLight = new DirectionalLight3D
-			{
-				ShadowEnabled = false,    // RND-04: no cast shadows
-				LightEnergy   = PlanetSunLightEnergy,
-				Visible       = false,
-			};
-			AddChild(_planetSunLight);
+			// Load the body lighting shader once. All lit-body ShaderMaterials share
+			// this shader object; per-body uniforms are set via ShaderMaterial.SetShaderParameter.
+			_bodyLitShader = GD.Load<Shader>("res://Shaders/body_lit.gdshader");
 		}
 
 		public override void _Process(double delta)
@@ -222,7 +165,9 @@ namespace Universe
 		// ----- Core floating-origin sync -------------------------------------
 
 		/// <summary>
-		/// Repositions all in-parent-space body meshes relative to the ship each frame.
+		/// Repositions all in-parent-space body meshes relative to the ship each frame
+		/// and pushes per-body star_dir uniforms to the body_lit ShaderMaterials so the
+		/// Lambert terminator always faces the nearest star in every space.
 		/// Only bodies in the ship's current parent space are shown (RND-02).
 		/// </summary>
 		public void SyncBodies()
@@ -242,18 +187,23 @@ namespace Universe
 			// All bodies in this frame share the same observer-unit basis (ship.LocalPos.Scale).
 			float factor = RenderFactorFor(ship.CurrentSpace);
 
-			// Track which indices are rendered this frame to hide bodies that left
+			// Track which indices are rendered this frame to hide bodies that left the set.
 			var activeIndices = new HashSet<int>();
 
-			// Star light hidden by default each frame; shown only when the star is rendered.
+			// Collect per-body render positions for this frame (used for star_dir computation).
+			var renderPositions = new Dictionary<int, Vector3>();
+
+			// Track whether the star is in the current render set.
 			bool starRendered = false;
+			int  starIdx      = -1;
 
 			// Render the parent body itself (e.g. the planet we orbit) ship-relative.
 			// The parent lives at the ORIGIN of the ship's frame, so its position relative
 			// to the ship is simply the negation of the ship's own offset in that frame.
-			RenderBodyAt(parentIdx, parent, ship, factor, isParent: true, out bool parentIsStar);
+			RenderBodyAt(parentIdx, parent, ship, factor, isParent: true, out bool parentIsStar, out Vector3 parentRenderPos);
 			activeIndices.Add(parentIdx);
-			if (parentIsStar) starRendered = true;
+			renderPositions[parentIdx] = parentRenderPos;
+			if (parentIsStar) { starRendered = true; starIdx = parentIdx; }
 
 			// Render siblings: all children of parent except the ship itself
 			foreach (int childIdx in parent.ChildIndices)
@@ -263,104 +213,95 @@ namespace Universe
 				var body = (uint)childIdx < (uint)gameObjects.Count ? gameObjects[childIdx] : null;
 				if (body == null) continue;
 
-				RenderBodyAt(childIdx, body, ship, factor, isParent: false, out bool siblingIsStar);
+				RenderBodyAt(childIdx, body, ship, factor, isParent: false, out bool siblingIsStar, out Vector3 siblingRenderPos);
 				activeIndices.Add(childIdx);
-				if (siblingIsStar) starRendered = true;
+				renderPositions[childIdx] = siblingRenderPos;
+				if (siblingIsStar) { starRendered = true; starIdx = childIdx; }
 			}
 
-			// Hide any previously-shown bodies no longer in the current space
+			// Hide any previously-shown bodies no longer in the current space.
 			foreach (var kvp in _meshes)
 			{
 				kvp.Value.Visible = activeIndices.Contains(kvp.Key);
 			}
 
-			// Keep star light in sync: only visible when the star mesh is rendered.
-			// OmniAttenuation re-applied each frame so runtime Export changes take effect.
-			_starLight.Visible          = starRendered;
-			_starLight.OmniRange        = StarLightRange;
-			_starLight.OmniAttenuation  = StarLightAttenuation;
-			_starLight.LightEnergy      = StarLightEnergy;
-
-			// Planet-space directional sun: active only when the star is NOT in the render set.
-			// Mutually exclusive with the OmniLight — one or the other is active, never both.
-			bool inPlanetSpace = ship.CurrentSpace == UniObject.Space.Planet;
-			if (inPlanetSpace && !starRendered)
-				SyncPlanetSunLight(ship, parent, gameObjects);
+			// Determine the star's render-space position for star_dir computation.
+			// If the star is in the render set, use its tracked renderPos directly.
+			// If the star is NOT in the render set (Planet space), compute the direction
+			// from ship→planet→star cross-frame hierarchy in Star-space metres.
+			Vector3 starRenderPos;
+			if (starRendered && starIdx >= 0)
+			{
+				starRenderPos = renderPositions[starIdx];
+			}
 			else
-				_planetSunLight.Visible = false;
+			{
+				// Planet space: star is the grandparent (planet's parent).
+				// Derive the star's render-space position even though it is beyond the far plane;
+				// only the direction matters for star_dir.
+				starRenderPos = ComputeStarRenderPosFromHierarchy(ship, parent, gameObjects, factor);
+			}
+
+			// Push star_dir, light_energy, and ambient to each lit (non-star) body's shader.
+			foreach (int bodyIdx in activeIndices)
+			{
+				if (!_litMaterials.TryGetValue(bodyIdx, out var mat)) continue;
+
+				Vector3 bodyRenderPos = renderPositions.TryGetValue(bodyIdx, out var p) ? p : Vector3.Zero;
+				Vector3 toStar = starRenderPos - bodyRenderPos;
+				float   mag    = toStar.Length();
+				Vector3 starDir = mag > 1e-6f ? toStar / mag : Vector3.Up;
+
+				mat.SetShaderParameter("star_dir",     starDir);
+				mat.SetShaderParameter("light_energy", BodyLightEnergy);
+				mat.SetShaderParameter("ambient",      BodyAmbient);
+			}
 		}
 
 		/// <summary>
-		/// Orients and activates the planet-space DirectionalLight3D each frame so it points
-		/// along the true sun direction. Called only when the ship is in Planet space and the
-		/// star is not in the current render set.
+		/// Derives the star's render-space position when the star is NOT in the current
+		/// render set (e.g. Planet space). Uses the same cross-frame hierarchy math as
+		/// the former SyncPlanetSunLight, expressed as a render-space Vector3 rather than
+		/// a Godot light orientation.
 		///
-		/// Direction math (all in Star-space meters, scale = 1 m/unit):
-		///   planet_in_star = planet.LocalPos.ToDouble3()
-		///   ship_in_star   = planet_in_star + ship.LocalPos.ToDouble3()
-		///                    (ship.LocalPos is in Planet space, scale=1e-4 m/unit;
-		///                     ToDouble3() returns meters = Units*1e-4 + Offset, then
-		///                     we add to the planet's Star-frame meters)
-		///   sun_direction_to_ship = normalize(ship_in_star - starPos)
-		///                         = normalize(ship_in_star)   (star is at origin)
+		/// Direction math (all in Star-space metres, scale = 1 m/unit):
+		///   planetInStar = planet.LocalPos.ToDouble3()        (Star-space metres)
+		///   shipInStar   = planetInStar + ship.LocalPos.ToDouble3()
+		///                  (ship.LocalPos is in Planet space, scale=1e-4 m/unit;
+		///                   ToDouble3() gives metres; adding to planet gives Star-frame metres)
+		///   starRenderPos ≈ -shipInStar * factor / ship.LocalPos.Scale
+		///                  (star is at origin of Star frame; ship is at shipInStar;
+		///                   so star relative to ship = -shipInStar in Star-space metres;
+		///                   convert to render units: ÷ ship.LocalPos.Scale → observer units, × factor)
 		///
-		/// The DirectionalLight3D emits photons along its local -Z axis. The photons must
-		/// travel FROM the sun (at +sun_direction) TOWARD the planet (at -sun_direction).
-		/// Photon travel direction = -sun_direction_to_ship.
-		/// LookAt(pos - sun_dir, up) orients -Z toward (pos - sun_dir) = -sun_dir,
-		/// making photons travel in the -sun_dir direction, illuminating the hemisphere
-		/// that faces the sun (normals pointing toward +sun_dir = toward the star).
-		///
-		/// The ship term (~2.5e7 m) is tiny compared to 1 AU (~1.496e11 m) but is included
-		/// for correctness; it prevents the terminator from drifting as the ship orbits.
+		/// The star is at ~1.5e11 m (1 AU) in Star-space metres, mapping to ~1.5e7 render
+		/// units — far beyond the 1e6 far plane. The DIRECTION is what matters; the vector
+		/// is far out but normalised correctly in SyncBodies.
 		/// </summary>
-		private void SyncPlanetSunLight(UniObject ship, UniObject planet, List<UniObject> gameObjects)
+		private Vector3 ComputeStarRenderPosFromHierarchy(
+			UniObject ship, UniObject planet, List<UniObject> gameObjects, float factor)
 		{
 			// Walk up from planet to find the star.
-			int starIdx = planet.ParentIndex;
-			var star = (uint)starIdx < (uint)gameObjects.Count ? gameObjects[starIdx] : null;
-
-			// Verify the grandparent is the star (named "STAR"); if hierarchy is unexpected, disable.
+			int grandparentIdx = planet.ParentIndex;
+			var star = (uint)grandparentIdx < (uint)gameObjects.Count ? gameObjects[grandparentIdx] : null;
 			if (star == null || !IsStarBody(star))
-			{
-				_planetSunLight.Visible = false;
-				return;
-			}
+				return Vector3.Up * 1e7f;   // fallback: point light straight up if hierarchy unexpected
 
-			// Planet position in Star frame (scale = 1 m/unit → ToDouble3() gives meters directly).
+			// Planet position in Star frame (ToDouble3() on a Star-space UniVec3 gives metres directly).
 			Double3 planetInStar = planet.LocalPos.ToDouble3();
 
-			// Ship position in Planet frame (scale = 1e-4 m/unit → ToDouble3() gives meters).
-			// Adding to planetInStar gives the ship's position in Star-frame meters.
+			// Ship position in Planet frame converted to Star-space metres.
+			// ship.LocalPos.ToDouble3() gives Planet-space metres (scale=1e-4 m/unit × units + offset).
+			// Adding planetInStar gives the ship's absolute position in Star-space metres.
 			Double3 shipInStar = planetInStar + ship.LocalPos.ToDouble3();
 
-			// Direction from star (origin) toward ship. Normalize in double precision.
-			double mag = shipInStar.Magnitude();
-			if (mag < 1.0)
-			{
-				// Degenerate: ship at star origin — disable light rather than NaN.
-				_planetSunLight.Visible = false;
-				return;
-			}
-
-			Double3 dir = shipInStar * (1.0 / mag);   // unit vector from star toward ship/planet
-
-			// Godot's DirectionalLight3D emits photons along its local -Z axis.
-			// Photons must travel FROM the sun (at +dir) TOWARD the planet (at -dir),
-			// so the photon travel direction = -dir.
-			// LookAt(target, up) orients -Z toward target, so we point at (lightPos - dir),
-			// making -Z = -dir = the correct photon direction (sun → planet).
-			// This ensures dot(N, L_from_surface) > 0 for the hemisphere facing the sun.
-			Vector3 sunDir    = new Vector3((float)dir.X, (float)dir.Y, (float)dir.Z);
-			Vector3 lightPos  = Vector3.Zero;    // position irrelevant for DirectionalLight3D
-			Vector3 lookTarget = lightPos - sunDir;   // -sunDir = photon travel direction
-
-			// Avoid gimbal issues if sunDir is nearly parallel to Vector3.Up
-			Vector3 up = (System.Math.Abs(dir.Y) > 0.99) ? Vector3.Back : Vector3.Up;
-			_planetSunLight.LookAt(lookTarget, up);
-
-			_planetSunLight.LightEnergy = PlanetSunLightEnergy;
-			_planetSunLight.Visible     = true;
+			// Star is at the origin of Star space → star position relative to ship = -shipInStar metres.
+			// Convert to observer units (÷ ship.LocalPos.Scale) then to render units (× factor).
+			double obsFactor = factor / ship.LocalPos.Scale;
+			return new Vector3(
+				(float)(-shipInStar.X * obsFactor),
+				(float)(-shipInStar.Y * obsFactor),
+				(float)(-shipInStar.Z * obsFactor));
 		}
 
 		// ----- Private helpers -----------------------------------------------
@@ -385,7 +326,8 @@ namespace Universe
 		/// ToLocalDoubleUnits is correct.
 		/// All paths yield observer-unit positions on ship.LocalPos.Scale basis before × factor.
 		///
-		/// <paramref name="isStar"/>: set to true when this body is the star (for OmniLight sync).
+		/// <paramref name="isStar"/>: set to true when this body is the star (for star_dir sync).
+		/// <paramref name="renderPos"/>: the computed render-space position (returned for star_dir).
 		/// </summary>
 		private void RenderBodyAt(
 			int bodyIdx,
@@ -393,7 +335,8 @@ namespace Universe
 			UniObject ship,
 			float factor,
 			bool isParent,
-			out bool isStar)
+			out bool isStar,
+			out Vector3 renderPos)
 		{
 			isStar = IsStarBody(body);
 			var mesh = GetOrCreateMesh(bodyIdx, body);
@@ -420,22 +363,18 @@ namespace Universe
 			else
 			{
 				// Sibling: both body and ship share the same parent frame → direct delta.
-				// Floating-origin: meters → ÷ ship.LocalPos.Scale → observer units.
+				// Floating-origin: metres → ÷ ship.LocalPos.Scale → observer units.
 				relUnits = body.LocalPos.ToLocalDoubleUnits(ship.LocalPos);
 			}
 
 			// × factor → render units (consistent basis for positions and radii).
-			var renderPos = new Vector3(
+			renderPos = new Vector3(
 				(float)(relUnits.X * factor),
 				(float)(relUnits.Y * factor),
 				(float)(relUnits.Z * factor));
 
 			mesh.Position = renderPos;
 			mesh.Visible  = true;
-
-			// If this is the star, move the OmniLight to the same render-space position.
-			if (isStar)
-				_starLight.Position = renderPos;
 		}
 
 		/// <summary>
@@ -445,25 +384,17 @@ namespace Universe
 		/// Mesh geometry: a UNIT sphere (Radius=1, Height=2) is created once. The rendered
 		/// size is applied each frame by setting MeshInstance3D.Scale in RenderBodyAt so
 		/// that the radius correctly reflects the current observer scale and render factor
-		/// after every SOI transition (fixes stale-radius bug where baking the radius at
-		/// creation time caused bodies to stay at their creation-frame size across transitions).
+		/// after every SOI transition.
 		///
-		/// Radius computation (per-frame in RenderBodyAt):
-		///   rawRadiusMeters / ship.LocalPos.Scale  →  observer units
-		///   observer units × factor                 →  render units (applied as mesh.Scale)
-		/// Falls back to DefaultBodyRadius for bodies with no authored radius.
-		///
-		/// Material assignment (RND-03/04):
+		/// Material assignment (RND-03/04, 01-02 shader revision):
 		/// - Star: ShadingMode=Unshaded + EmissionEnabled + EmissionEnergyMultiplier=StarEmissionEnergy.
-		///   No lighting needed — it IS the light source.
-		/// - Planets/other: default-lit StandardMaterial3D with AlbedoColor=body.BaseColor.
-		///   In Star space: receives the OmniLight3D terminator (D-16) from the star mesh position.
-		///   In Planet space: receives the DirectionalLight3D (_planetSunLight) oriented along the
-		///   true cross-frame sun direction, producing a day/night terminator (01-02 revision).
-		///   The sun is NOT rendered as a mesh in Planet space — at 1 AU the sun is ~1.5e7 render
-		///   units, well beyond the 1e6 far plane. Visible sun mesh in Planet space is deferred to
-		///   the Phase 3 tiered/skybox renderer.
-		///   A small ambient floor (Main.tscn) keeps the night hemisphere dark-but-visible.
+		///   No lighting needed — it IS the light source. Bloom via WorldEnvironment glow.
+		/// - Planets/other: ShaderMaterial using body_lit.gdshader (unshaded spatial shader).
+		///   Albedo is set from body.BaseColor at creation. star_dir, light_energy, and ambient
+		///   are pushed each frame in SyncBodies so the Lambert terminator always faces the
+		///   nearest star, in every space, with identical shading character. A separate
+		///   ShaderMaterial instance per body allows independent per-body star_dir uniforms
+		///   (directions differ slightly per body at planetary separation distances).
 		/// </summary>
 		private MeshInstance3D GetOrCreateMesh(int bodyIdx, UniObject body)
 		{
@@ -477,37 +408,59 @@ namespace Universe
 				Height = 2f,
 			};
 
-			// Build per-body material.
-			StandardMaterial3D mat;
+			MeshInstance3D meshInstance;
+
 			if (IsStarBody(body))
 			{
 				// Emissive unshaded star (D-14). No shading pass needed — it is the source.
-				mat = new StandardMaterial3D
+				// Bloom is produced by the WorldEnvironment glow settings in Main.tscn.
+				var mat = new StandardMaterial3D
 				{
-					ShadingMode             = BaseMaterial3D.ShadingModeEnum.Unshaded,
-					AlbedoColor             = body.BaseColor,
-					EmissionEnabled         = true,
-					Emission                = body.BaseColor,
+					ShadingMode              = BaseMaterial3D.ShadingModeEnum.Unshaded,
+					AlbedoColor              = body.BaseColor,
+					EmissionEnabled          = true,
+					Emission                 = body.BaseColor,
 					EmissionEnergyMultiplier = StarEmissionEnergy,
+				};
+
+				meshInstance = new MeshInstance3D
+				{
+					Mesh             = sphereMesh,
+					MaterialOverride = mat,
+					Visible          = false,
 				};
 			}
 			else
 			{
-				// Lit planet: receives OmniLight (Star space) or DirectionalLight3D (Planet space).
-				// In Planet space the DirectionalLight3D is oriented along the real sun direction
-				// each frame; a small ambient floor (Main.tscn) keeps the night side dark-but-visible.
-				mat = new StandardMaterial3D
+				// Lit planet/body: unshaded spatial ShaderMaterial (body_lit.gdshader).
+				// A SEPARATE ShaderMaterial instance per body is mandatory — ShaderMaterial
+				// is a Resource with reference semantics; if bodies shared one instance,
+				// setting star_dir on one would overwrite all others. Each body needs its
+				// own uniform set because star_dir differs per body.
+				var mat = new ShaderMaterial
 				{
-					AlbedoColor = body.BaseColor.IsEqualApprox(default) ? new Color(0.75f, 0.85f, 0.75f) : body.BaseColor,
+					Shader = _bodyLitShader,
+				};
+
+				// Set albedo at creation; it does not change frame-to-frame.
+				Color baseColor = body.BaseColor.IsEqualApprox(default) ? new Color(0.75f, 0.85f, 0.75f) : body.BaseColor;
+				mat.SetShaderParameter("albedo", baseColor);
+
+				// star_dir, light_energy, ambient are set each frame in SyncBodies.
+				// Initialise to safe defaults so the shader is never in an undefined state.
+				mat.SetShaderParameter("star_dir",     Vector3.Up);
+				mat.SetShaderParameter("light_energy", BodyLightEnergy);
+				mat.SetShaderParameter("ambient",      BodyAmbient);
+
+				_litMaterials[bodyIdx] = mat;
+
+				meshInstance = new MeshInstance3D
+				{
+					Mesh             = sphereMesh,
+					MaterialOverride = mat,
+					Visible          = false,
 				};
 			}
-
-			var meshInstance = new MeshInstance3D
-			{
-				Mesh             = sphereMesh,
-				MaterialOverride = mat,
-				Visible          = false,
-			};
 
 			AddChild(meshInstance);
 			_meshes[bodyIdx] = meshInstance;
