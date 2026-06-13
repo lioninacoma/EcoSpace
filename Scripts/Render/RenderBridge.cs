@@ -373,7 +373,18 @@ namespace Universe
 			out bool isStar)
 		{
 			isStar = IsStarBody(body);
-			var mesh = GetOrCreateMesh(bodyIdx, body, ship, factor);
+			var mesh = GetOrCreateMesh(bodyIdx, body);
+
+			// Per-frame radius: true metres → observer units (÷ ship.LocalPos.Scale) → render units (× factor).
+			// Recomputed every frame so the radius is correct after SOI transitions change ship.LocalPos.Scale.
+			// Verified math (Star space, factor=1e-8):
+			//   Planet A: 6.371e6 / 1 × 1e-8 = 0.0637 render units (correct tiny speck)
+			//   Star:     6.96e8  / 1 × 1e-8 = 6.96 render units
+			// Verified math (Planet space, scale=1e-4 m/unit, factor=1e-8):
+			//   Planet A: 6.371e6 / 0.0001 × 1e-8 = 637 render units (correct fills view close-up)
+			double rawRadiusMeters = body.RadiusMeters > 0.0 ? body.RadiusMeters : DefaultBodyRadius;
+			float r = (float)((rawRadiusMeters / ship.LocalPos.Scale) * factor);
+			mesh.Scale = new Vector3(r, r, r);
 
 			Double3 relUnits;
 			if (isParent)
@@ -408,9 +419,16 @@ namespace Universe
 		/// Returns the MeshInstance3D for this body index, creating it lazily on
 		/// first encounter. Never spawns or frees per frame.
 		///
-		/// Radius transform: body.RadiusMeters (true m) → ÷ ship.LocalPos.Scale (observer units)
-		/// → × factor (render units). Falls back to DefaultBodyRadius for bodies with no
-		/// authored radius (Root, Galaxy — not rendered as bodies in this phase).
+		/// Mesh geometry: a UNIT sphere (Radius=1, Height=2) is created once. The rendered
+		/// size is applied each frame by setting MeshInstance3D.Scale in RenderBodyAt so
+		/// that the radius correctly reflects the current observer scale and render factor
+		/// after every SOI transition (fixes stale-radius bug where baking the radius at
+		/// creation time caused bodies to stay at their creation-frame size across transitions).
+		///
+		/// Radius computation (per-frame in RenderBodyAt):
+		///   rawRadiusMeters / ship.LocalPos.Scale  →  observer units
+		///   observer units × factor                 →  render units (applied as mesh.Scale)
+		/// Falls back to DefaultBodyRadius for bodies with no authored radius.
 		///
 		/// Material assignment (RND-03/04):
 		/// - Star: ShadingMode=Unshaded + EmissionEnabled + EmissionEnergyMultiplier=StarEmissionEnergy.
@@ -424,20 +442,16 @@ namespace Universe
 		///   the Phase 3 tiered/skybox renderer.
 		///   A small ambient floor (Main.tscn) keeps the night hemisphere dark-but-visible.
 		/// </summary>
-		private MeshInstance3D GetOrCreateMesh(int bodyIdx, UniObject body, UniObject ship, float factor)
+		private MeshInstance3D GetOrCreateMesh(int bodyIdx, UniObject body)
 		{
 			if (_meshes.TryGetValue(bodyIdx, out var existing))
 				return existing;
 
-			// Radius: true meters → observer units (÷ ship scale) → render units (× factor).
-			double rawRadiusMeters = body.RadiusMeters > 0.0 ? body.RadiusMeters : DefaultBodyRadius;
-			double radiusUnits     = rawRadiusMeters / ship.LocalPos.Scale;
-			float  r               = (float)(radiusUnits * factor);
-
+			// Unit sphere — scale is applied per-frame in RenderBodyAt to handle SOI transitions.
 			var sphereMesh = new SphereMesh
 			{
-				Radius = r,
-				Height = 2f * r,
+				Radius = 1f,
+				Height = 2f,
 			};
 
 			// Build per-body material.
