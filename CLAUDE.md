@@ -166,12 +166,15 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 - Math types use `public struct` and `public static` methods
 - Core game logic uses `public partial class` (Godot C# pattern) with `Node3D` base
 - No public fields except in simple data types (`UniObject` data class)
-- `Universe` root namespace for game logic
-- `Universe.Math` nested namespace for math structures
+- Namespaces match top-level folder under `Scripts/`: `Universe` (core sim), `Universe.Math` (math), `Render`, `Flight`, `Hud`
+- `Universe` namespace for core simulation: `GameWorld`, `UniObject`, `TestSetup`
+- `Universe.Math` nested namespace for math structures (untouched)
+- `Render` namespace: `PostProcessRenderer` (ColorRect/shader host), `WorldRenderer` (Node3D/floating-origin mesh sync)
+- `Flight` namespace: `FlightController` (Node/arcade flight model)
+- `Hud` namespace: `Hud` (Control/speed label)
 - Clear separation: math is pure and reusable, game logic depends on math
 - Structs for math types (`Double3`, `Long3`, `UniVec3`): immutable value semantics, SIMD friendly
 - Classes for game entities (`UniObject`, `GameWorld`): mutable reference semantics, game state
-- `UniRenderer` extends Godot's `ColorRect` class for rendering integration
 
 <!-- GSD:conventions-end -->
 
@@ -195,7 +198,10 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 | UniVec3 | Universal 3D position with unlimited range & precision | `Scripts/Universe/Math/UniVec3.cs` |
 | Double3 | SIMD-optimized double-precision 3D vector (32 bytes, AVX2) | `Scripts/Universe/Math/Double3.cs` |
 | Long3 | 64-bit integer 3D vector for unit coordinates | `Scripts/Universe/Math/Long3.cs` |
-| UniRenderer | Godot UI layer shader management and parameter binding | `Scripts/Universe/UniRenderer.cs` |
+| PostProcessRenderer | Post-process dithering/CRT shader management and parameter binding | `Scripts/Render/PostProcessRenderer.cs` |
+| WorldRenderer | Floating-origin world→mesh sync, per-body lighting uniforms | `Scripts/Render/WorldRenderer.cs` |
+| FlightController | Arcade flight model, mouse steering, throttle, speed envelope | `Scripts/Flight/FlightController.cs` |
+| Hud | Speed HUD label, read-only consumer of world state | `Scripts/Hud/Hud.cs` |
 
 ## Pattern Overview
 
@@ -228,7 +234,7 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 - Depends on: Godot.Mathf, System.Runtime.Intrinsics (SIMD)
 - Used by: UniVec3 implements position arithmetic; GameWorld uses it for translations
 - Purpose: Post-processing shader effects and parameter management
-- Location: `Scripts/Universe/UniRenderer.cs`
+- Location: `Scripts/Render/PostProcessRenderer.cs`
 - Contains: ShaderMaterial binding, property export, parameter updates
 - Depends on: Godot shader loading (`res://Shaders/dithering.gdshader`)
 - Used by: CanvasLayer/ColorRect node in Main.tscn
@@ -271,7 +277,7 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 - Location: `Scripts/Universe/GameWorld.cs:11-14` (_Ready)
 - Triggers: Godot framework
 - Responsibilities: Initializes GameObjects empty list for TestSetup to populate
-- Location: `Scripts/Universe/UniRenderer.cs:85-95` (_Ready)
+- Location: `Scripts/Render/PostProcessRenderer.cs` (_Ready)
 - Triggers: Godot framework
 - Responsibilities: Loads dithering shader and binds parameters
 
@@ -279,7 +285,7 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 
 - **Threading:** Single-threaded. Godot runs _Process in the main thread; no multithreading used.
 - **Global state:** GameWorld.GameObjects list is instance-level (per scene), not truly global. All state is owned by TestSetup instance.
-- **Circular imports:** None detected. Clear dependency graph: TestSetup → GameWorld, UniObject, UniRenderer; Math module has no dependency on higher layers.
+- **Circular imports:** None detected. Clear dependency graph: TestSetup → GameWorld, UniObject; Render/Flight/Hud namespaces depend on Universe (not vice versa); Math module has no dependency on higher layers.
 - **Precision model:** Double3 uses double (64-bit IEEE 754) within each 32-byte SIMD chunk. Long3 uses long (64-bit signed integer) for unit grid. Combined, UniVec3 provides arbitrary range (9.2e18 units per axis) with double precision within each cell.
 - **SOI recursion:** TrySpaceTransition recurses up to `max(depth of object, depth of deepest child) * 2` calls in worst case (one exit, one entry per level). Unbounded but stable in practice for small hierarchies.
 - **Shader hot-reloading:** Not supported. Shader is loaded once in _Ready; changes require scene reload.
@@ -295,7 +301,7 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 - Index safety: `if ((uint)index < (uint)GameObjects.Count)` (see GameWorld.TranslatePos, RemoveGameObject) — cast to uint to check both >= 0 and < Count in one comparison.
 - Parent existence: `if (obj.ParentIndex < 0) return false;` — negative index indicates no parent.
 - SOI boundary: If object far outside parent, TryExitParentSOI returns true; no exception.
-- Shader parameter safety: UniRenderer checks `_material?.SetShaderParameter(...)` with null-coalescing — no crash if material not loaded yet.
+- Shader parameter safety: PostProcessRenderer checks `_material?.SetShaderParameter(...)` with null-coalescing — no crash if material not loaded yet.
 
 ## Cross-Cutting Concerns
 
