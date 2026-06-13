@@ -53,8 +53,8 @@ Shaders/
 
 > Explicit so later work does not re-litigate Phase 1 minimalism.
 
-- Virtual-joystick mouse steering, roll, throttle, distance-scaled speed (Plan 02 — FLT-01/02/03)
-- Per-body distinct colors, true 1:1 radii, emissive star + glow + OmniLight, palette dither extension (Plan 03 — RND-03/04)
+- Per-body distinct colors, true 1:1 radii, emissive star + glow + OmniLight, palette dither extension (Plan 02 — RND-03/04)
+- Virtual-joystick mouse steering, roll, throttle, distance-scaled speed (Plan 03 — FLT-01/02/03)
 - Adaptive speed units, context label, target cycling, off-screen target marker (Plan 04 — HUD-01/02/04)
 - Dynamic spherical skybox / out-of-space projection (Phase 2 — RND-05)
 - Cross-galaxy travel + galaxy/universe-scale authored data (Phase 3 — TRV-02)
@@ -65,8 +65,8 @@ Shaders/
 
 Each later plan adds one vertical slice on top of this skeleton without altering its architectural decisions:
 
-- **Plan 02 — Flight feel:** virtual-joystick steering + persistent throttle + roll + hold-attitude + distance-scaled speed envelope + two reticles (FLT-01/02/03, HUD-03)
-- **Plan 03 — Body rendering:** per-body colors + 1:1 radii + emissive star + glow + OmniLight + color-palette dither extension (RND-03/04, WORLD-01 authoring, completes RND-02)
+- **Plan 02 — Body rendering:** per-body colors + 1:1 radii + emissive star + glow + OmniLight + color-palette dither extension (RND-03/04, WORLD-01 authoring, completes RND-02)
+- **Plan 03 — Flight feel:** virtual-joystick steering + persistent throttle + roll + hold-attitude + distance-scaled speed envelope + two reticles (FLT-01/02/03, HUD-03)
 - **Plan 04 — HUD:** adaptive speed units + context label + target cycling + off-screen direction marker (HUD-01/02/04, TRV-01 integration milestone)
 
 Subsequent Phases build on the same skeleton:
