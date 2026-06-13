@@ -86,6 +86,7 @@ completed: "2026-06-13"
 4. **Deviation: Global RenderScale (uniform k=1e-6)** - `50c6338` (feat, post-checkpoint owner direction)
 5. **Deviation: Unshaded material + remove DirectionalLight3D** - `f6f1a35` (fix, post-checkpoint runtime fix)
 6. **Continuation: Unit-space render via ToLocalDoubleUnits + per-space factors** - `f403b7a` (feat, replaces global RenderScale)
+7. **Fix: Observer-scale unit basis + parent-at-frame-origin rendering** - `e9212da` (fix, pre-Godot verification rendering correctness)
 
 ## Files Created/Modified
 
@@ -123,7 +124,7 @@ completed: "2026-06-13"
 - **Supersedes:** The uniform `RenderScale = 1e-6f` approach added in commit `50c6338` (which itself superseded D-15)
 - **Decision:** Add `UniVec3.ToLocalDoubleUnits(observer)` that expresses the meter delta in observer-cell units by dividing by `observer.Scale`. RenderBridge then multiplies by a per-space factor (`PlanetRenderFactor`, `StarRenderFactor`, etc.) instead of a global meter-based scale. The observer's scale is the unit basis for all bodies in the frame — this keeps bodies at different SOI depths consistent when the ship transitions spaces.
 - **Rationale:** A global meter-based `RenderScale` picks a fixed meter-to-render-unit ratio that may be correct for one tier but wrong at another (Planet scale = 0.0001 m/unit vs. Star scale = 1 m/unit is 10,000× different). By normalizing to observer units first and then applying a small per-space factor, each space tier can be tuned independently from the Inspector without touching code.
-- **New method:** `UniVec3.ToLocalDoubleUnits(in UniVec3 observer)` — returns `(this - observer).ToDouble3() * (1.0 / observer.Scale)`. Marked `[AggressiveInlining]`. Does NOT replace `ToLocalDouble` (which stays in meters; still used by `Hud.cs` for speed).
+- **New method:** `UniVec3.ToLocalDoubleUnits(in UniVec3 observer)` — returns `(this - observer).ToDouble3() * (1.0 / observer.Scale)` (corrected from initial `delta.ToDouble3Units()` — see rendering correctness fix below). Marked `[AggressiveInlining]`. Does NOT replace `ToLocalDouble` (which stays in meters; still used by `Hud.cs` for speed). Also added `ToDouble3Units()` returning `(Double3)Units + Offset / Scale` for absolute unit-space positions.
 - **ToLocalDouble callers checked:** `Scripts/HUD/Hud.cs:72` (`ship.LocalPos.ToLocalDouble(_prevPos)`) — correctly left in meters for speed magnitude; no change needed.
 - **New exports on RenderBridge:**
   - `PlanetRenderFactor = 1e-8f` (Planet scale 0.0001 m/unit: 1 render unit ≈ 1e12 m at this factor)
@@ -141,6 +142,34 @@ completed: "2026-06-13"
   7. `CameraFarPlane` default remains `1e6f`; unshaded material unchanged; no DirectionalLight3D re-added.
 - **Files modified:** `Scripts/Universe/Math/UniVec3.cs`, `Scripts/Render/RenderBridge.cs`
 - **Commit:** `f403b7a`
+- **Build result:** 0 errors, 0 warnings (`dotnet build EcoSpace.csproj`)
+
+### Rendering correctness fix: observer-scale unit basis in ToLocalDoubleUnits
+
+**[Rule 1 - Bug] ToLocalDoubleUnits used body's scale instead of observer's scale as unit basis**
+- **Found during:** post-plan continuation (pre-Godot verification, scale-mismatch analysis)
+- **Root cause:** The previous implementation `delta.ToDouble3Units()` expands to `(Double3)delta.Units + delta.Offset / delta.Scale`. After `delta = this - observer`, `delta.Scale` is `this.Scale` (left-operand scale kept by operator `-`). When a rendered body lives in a different space than the ship (e.g. parent planet at Star scale 1 vs ship in Planet scale 1e-4), the unit basis is the BODY's scale, producing observer-unit values that are 1e4× off from the radius calculation (which always uses `ship.LocalPos.Scale`). This causes camera-inside-planet at any space boundary.
+- **Fix:** Replace with `delta.ToDouble3() * (1.0 / observer.Scale)` — converts the meter delta to observer units using the observer's scale unconditionally. `ToDouble3Units()` is retained for absolute unit positions (caller `ship.LocalPos.ToDouble3Units()` in RenderBridge).
+- **Contract preserved:** `ToLocalDouble` (meters, used by Hud.cs for speed) unchanged. `ToDouble3Units` (absolute units) unchanged.
+- **Files modified:** `Scripts/Universe/Math/UniVec3.cs`
+- **Commit:** `e9212da`
+- **Build result:** 0 errors, 0 warnings (`dotnet build EcoSpace.csproj`)
+
+### Rendering correctness fix: parent body rendered at -ship offset (frame-origin)
+
+**[Rule 1 - Bug] Parent body positioned using parent.LocalPos (grandparent frame) diffed against ship.LocalPos (parent frame) — frame mismatch**
+- **Found during:** post-plan continuation (scale-mismatch analysis; same commit)
+- **Root cause:** `RenderBodyAt` used `body.LocalPos.ToLocalDoubleUnits(ship.LocalPos)` for all bodies including the parent. For siblings this is correct: both body and ship are children of the same parent, so they share a frame. But the PARENT's `LocalPos` is expressed relative to the GRANDPARENT (e.g. planet position relative to the star), while `ship.LocalPos` is expressed relative to the PARENT (planet). Differencing them mixes frames — the planet renders at roughly its distance from the star (~1 AU) instead of its distance from the ship (~7,000 km).
+- **Fix:** Added `isParent` boolean parameter to `RenderBodyAt`. When `isParent=true`, position is computed as `ship.LocalPos.ToDouble3Units() * -1.0` (parent at frame origin → ship-relative position is negation of ship's own offset). When `isParent=false` (siblings), `ToLocalDoubleUnits` is used unchanged. All three render quantities — parent position, sibling position, radius — are on the `ship.LocalPos.Scale` observer-unit basis, all multiplied by `factor`.
+- **Sanity check (Planet space, ship 7e6 m from planet):**
+  - `ship.LocalPos.Scale = 1e-4` m/unit (Planet space)
+  - Ship offset in observer units: `7e6 / 1e-4 = 7e10` units along Z
+  - Parent render Z: `-(7e10) * 1e-8 = -700 render units` (correct)
+  - Planet radius observer units: `6.371e6 / 1e-4 = 6.371e10` units
+  - Planet render radius: `6.371e10 * 1e-8 = 637 render units` → surface 63 render units from ship (planet looms nearby)
+- **Plan 01-02 contract:** per-body radii use the same `meters / ship.LocalPos.Scale * factor` transform — no change to radius path.
+- **Files modified:** `Scripts/Render/RenderBridge.cs`
+- **Commit:** `e9212da`
 - **Build result:** 0 errors, 0 warnings (`dotnet build EcoSpace.csproj`)
 
 ### Post-checkpoint runtime fix
@@ -167,14 +196,14 @@ completed: "2026-06-13"
 
 No new threat surface introduced beyond what the plan's threat model covers.
 
-## Self-Check: PASSED (post-checkpoint fix + unit-space render continuation included)
+## Self-Check: PASSED (post-checkpoint fix + unit-space render continuation + rendering correctness fixes included)
 
 Files exist:
 - Scripts/Universe/GameWorld.cs: FOUND
 - Scripts/Render/RenderBridge.cs: FOUND
 - Scripts/HUD/Hud.cs: FOUND
 - Scripts/Universe/TestSetup.cs: FOUND
-- Scripts/Universe/Math/UniVec3.cs: FOUND (ToLocalDoubleUnits added)
+- Scripts/Universe/Math/UniVec3.cs: FOUND (ToLocalDoubleUnits + ToDouble3Units)
 - Main.tscn: FOUND
 - project.godot: FOUND
 
@@ -185,5 +214,6 @@ Commits verified:
 - 50c6338 (deviation — global RenderScale): FOUND
 - f6f1a35 (deviation — unshaded material, remove DirectionalLight): FOUND
 - f403b7a (continuation — unit-space render via ToLocalDoubleUnits + per-space factors): FOUND
+- e9212da (fix — observer-scale unit basis + parent-at-frame-origin rendering): FOUND
 
 Build: 0 errors, 0 warnings confirmed (all commits).
