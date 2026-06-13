@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "01-02 complete & approved (ambient-floor lighting accepted for MVP); ready to execute 01-03 FlightController"
-last_updated: "2026-06-13T13:09:36.126Z"
-last_activity: "2026-06-13 -- Phase 01 Plan 02 approved (ambient floor for MVP); advancing to 01-03"
+stopped_at: 01-03 tasks 1-3 complete (human-verify checkpoint); next is 01-04 Minimal HUD
+last_updated: "2026-06-13T13:33:00.000Z"
+last_activity: 2026-06-13 -- Phase 01 execution started
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 4
   completed_plans: 2
-  percent: 50
+  percent: 0
 ---
 
 # Project State
@@ -26,29 +26,29 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 ## Current Position
 
 Phase: 01 (in-system-flight-mvp) — EXECUTING
-Plan: 3 of 4 (01-01 & 01-02 complete & approved; 01-03 FlightController not yet started)
+Plan: 3 of 4 (01-03 tasks 1-3 done; checkpoint:human-verify pending)
 Status: Executing Phase 01
-Last activity: 2026-06-13 -- Phase 01 Plan 02 approved (ambient floor for MVP); advancing to 01-03
+Last activity: 2026-06-13 -- Plan 01-03 FlightController implemented
 
-Progress: [█████░░░░░] 50%
+Progress: [███████░░░] 75%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 1
-- Average duration: 4 min
-- Total execution time: ~4 min
+- Total plans completed: 3
+- Average duration: 7 min
+- Total execution time: ~20 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-in-system-flight-mvp | 1 | 4 min | 4 min |
+| 01-in-system-flight-mvp | 3 | ~20 min | ~7 min |
 
 **Recent Trend:**
 
-- Last 5 plans: 01-01 (4 min)
+- Last 5 plans: 01-01 (4 min), 01-02 (12 min), 01-03 (4 min)
 - Trend: —
 
 *Updated after each plan completion*
@@ -69,6 +69,8 @@ Recent decisions affecting current work:
 - 01-01: RenderBridge snapshots ChildIndices before foreach to prevent mutation exception
 - 01-01: HUD computes speed from prev-frame position delta — read-only consumer pattern
 - 01-02: Ambient-floor-only lighting ACCEPTED for MVP; cross-space directional terminator deferred (no day/night terminator while orbiting in planet space)
+- 01-03: Mouse mode = Confined (not Captured); software cursor drives steering (Pitfall 8 avoided)
+- 01-03: Distance-scaled speed envelope: contextMax = Lerp(contextMax, nearest*SpeedPerMeter, easing*dt); actualSpeed = throttle * contextMax
 
 ### Pending Todos
 
@@ -96,6 +98,6 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-13 (resumed)
-Stopped at: 01-02 complete & approved (ambient floor for MVP); next is 01-03 FlightController
-Resume: /gsd-execute-phase 01 (executes 01-03)
+Last session: 2026-06-13
+Stopped at: 01-03 checkpoint:human-verify — fly the game and confirm steering, hold-attitude, roll, throttle, speed-scaling, crosshair
+Resume: /gsd-execute-phase 01 (executes 01-04 after human-verify approval)
