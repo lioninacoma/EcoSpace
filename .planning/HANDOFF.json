@@ -1,31 +1,39 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-13T13:30:00.000Z",
+  "timestamp": "2026-06-13T21:12:48Z",
   "phase": "01",
   "phase_name": "in-system-flight-mvp",
   "phase_dir": ".planning/phases/01-in-system-flight-mvp",
-  "plan": "01-03",
-  "task": 0,
-  "total_tasks": 0,
-  "status": "ready_to_execute",
-  "wave": "3 of 4",
+  "plan": "01-04",
+  "task": 1,
+  "total_tasks": 4,
+  "status": "paused",
+  "wave": "4 of 4",
   "completed_tasks": [
-    {"id": "01-01", "name": "Walking skeleton (verified + APPROVED by user)", "status": "done"},
-    {"id": "01-02", "name": "Body rendering: per-body hue/radius/emissive/OmniLight/dither (verified + APPROVED, ambient-floor lighting accepted for MVP)", "status": "done", "commit": "dfc05d0"}
+    {"id": "01-01", "name": "Walking skeleton (verified + APPROVED)", "status": "done"},
+    {"id": "01-02", "name": "Body rendering: per-body hue/radius/emissive/dither (verified + APPROVED)", "status": "done"},
+    {"id": "01-03", "name": "FlightController arcade model incl. reverse + mouse-toggle + steering fixes (verified + APPROVED)", "status": "done", "commit": "913383d"},
+    {"id": "rev-radius", "name": "Rendering revision: per-frame body radius recompute (stale-radius fix)", "status": "done", "commit": "5dd542d"},
+    {"id": "rev-light", "name": "Rendering revision: shader-based nearest-star Lambert lighting; removed Godot light nodes", "status": "done", "commit": "253cb35"},
+    {"id": "refactor-1", "name": "Refactor: UniRenderer->PostProcessRenderer, RenderBridge->WorldRenderer, folder-aligned namespaces, dead shaders deleted", "status": "done", "commit": "e951d27"},
+    {"id": "refactor-2", "name": "Refactor: dropped Universe namespace/folder; core+Math global; Math->Scripts/Math/", "status": "done", "commit": "0c8037b"}
   ],
   "remaining_tasks": [
-    {"id": "01-03", "name": "Wave 3: FlightController arcade model (virtual joystick, roll, persistent throttle + full-stop, distance-to-surface speed envelope, crosshair/reticle)", "status": "not_started"},
-    {"id": "01-04", "name": "Wave 4: Full minimal HUD (adaptive units, context label, target readout, edge marker, phosphor-green)", "status": "not_started"}
+    {"id": "01-04", "name": "Wave 4: Full minimal HUD — adaptive speed units (HUD-01/D-10), context label tier+nearest body (HUD-02/D-11), cycle-able target readout + off-screen edge marker (HUD-04/D-12), phosphor-green CRT styling (D-09). Composes TRV-01.", "status": "not_started"}
   ],
   "blockers": [],
-  "human_actions_pending": [],
+  "human_actions_pending": [
+    {"action": "Play-test each 01-04 checkpoint in Godot (F5)", "context": "01-04 is non-autonomous with checkpoints; HUD changes are visual and need human verification", "blocking": false}
+  ],
   "decisions": [
-    {"decision": "01-02 human-verify APPROVED; ambient-floor-only lighting (ambient_light_energy=0.08) accepted for the MVP — cross-space directional terminator DEFERRED", "rationale": "In Planet space the star is not in the render set (RND-02) so there is no point light in frame; ambient floor is the accepted MVP stand-in. No day/night terminator while orbiting in Planet space.", "phase": "01"},
-    {"decision": "Render in scaled UNIT-space, not 1:1 meters: RenderBridge uses UniVec3.ToLocalDoubleUnits(ship) x per-space RenderFactor; camera far = 1e6 render units", "rationale": "1:1-meters rendering forced far=1e12 which broke Godot's light culler (prepare_camera) and destroyed depth precision. SUPERSEDES locked decision D-15.", "phase": "01"},
-    {"decision": "ToLocalDoubleUnits uses the OBSERVER's scale as the single per-frame unit basis; parent body rendered at -ship.LocalPos, siblings via ToLocalDoubleUnits", "rationale": "Consistent per-frame basis for positions and radii; parent.LocalPos is in the GRANDPARENT frame so it sits at the ship-frame origin.", "phase": "01"},
-    {"decision": "Worktrees auto-degraded to sequential (no origin/HEAD); plans run sequentially on main tree", "rationale": "worktree base-check shouldDegrade=true in this local-only repo.", "phase": "01"}
+    {"decision": "Throttle is bidirectional [-1,1] (W forward / S reverse / X full-stop, all eased)", "rationale": "User-approved refinement of locked D-03 — user wanted reverse flight", "phase": "01"},
+    {"decision": "Body lighting done entirely in shader (Shaders/body_lit.gdshader), nearest-star Lambert, no Godot light nodes", "rationale": "OmniLight(Star space) vs DirectionalLight(Planet space) made shading character change across the SOI; shader is consistent in every space", "phase": "01"},
+    {"decision": "In-planet-space: terminator-only via shader, no visible sun mesh", "rationale": "Sun at 1 AU is ~15x beyond the planet-space far plane; faithful visible sun deferred to the Phase 3 tiered/skybox renderer", "phase": "01"},
+    {"decision": "Body mesh radius recomputed every frame from current scale/factor (WorldRenderer)", "rationale": "Radius cached at mesh creation rendered planets ~10000x too large after an SOI scale change (the 'giant blue ball' / 'planet gone')", "phase": "01"},
+    {"decision": "Dropped Universe namespace/folder; core sim + Math now global; Math moved to Scripts/Math/", "rationale": "User request; Render/Flight/Hud keep folder-aligned namespaces; Math kept global (not literally named Math) to avoid System.Math collision", "phase": "01"},
+    {"decision": "Worktrees auto-degraded to sequential (no origin/HEAD); plans run sequentially on main tree", "rationale": "worktree base-check shouldDegrade=true in this local-only repo (#683)", "phase": "01"}
   ],
   "uncommitted_files": [],
-  "next_action": "Execute Wave 3 (plan 01-03 FlightController) via /gsd-execute-phase 01. Spawn a gsd-executor (model sonnet, sequential, main tree); BRIEF it on the unit-space render architecture and have it read 01-01-SUMMARY.md + 01-02-SUMMARY.md. Executor runs auto tasks, writes SUMMARY, and STOPS at the human-verify checkpoint without marking the plan complete or touching ROADMAP/STATE — the orchestrator finalizes after the user verifies.",
-  "context_notes": "Mid /gsd-execute-phase 1. Phase has 4 plans = 4 waves, fully sequential dependency chain, all autonomous:false (each ends in a human-verify checkpoint). 01-01 and 01-02 complete & approved. Render architecture is scaled unit-space (supersedes original plan phrasing about 1:1 render meters); read 01-01-SUMMARY.md + 01-02-SUMMARY.md before touching render math."
+  "next_action": "Run /gsd-execute-phase 01 — it targets the only remaining incomplete plan, 01-04 (Minimal HUD), dispatches a sequential gsd-executor (model sonnet, main tree), and surfaces its human-verify checkpoint(s). Finalize after the user approves; then no incomplete plans remain -> phase verification/completion.",
+  "context_notes": "Phase 01 is 3/4 plans done. This session finalized 01-03, then did a chain of user-driven rendering revisions (planet-space terminator -> stale-radius fix -> brightness consistency -> fully shader-based nearest-star lighting) and a structural/namespace refactor ending in removing the Universe namespace (core sim + Math now global; Render/Flight/Hud folder-aligned). All committed, dotnet build clean, every play-test checkpoint approved. Only 01-04 (Minimal HUD) remains before phase verification. See .continue-here.md anti-patterns: per-frame scale-dependent recompute, Control mouse_filter swallowing input, and no per-space light-type switching."
 }
