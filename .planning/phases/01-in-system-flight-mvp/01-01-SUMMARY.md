@@ -20,7 +20,8 @@ tech-stack:
     - "Scripts/Render/RenderBridge.cs (new Node3D component)"
     - "Scripts/HUD/Hud.cs (new Control component)"
   patterns:
-    - "Floating-origin: UniVec3.ToLocalDouble(ship.LocalPos) for all body render positions"
+    - "Floating-origin: UniVec3.ToLocalDoubleUnits(ship.LocalPos) × per-space factor for render positions"
+    - "Floating-origin (meters): UniVec3.ToLocalDouble(ship.LocalPos) for HUD speed calculation (unchanged)"
     - "Null-safe GameObjects accessor: Get(int) with unsigned-cast bounds check"
     - "Iterative SOI transition: bounded while loop with lastExitedIndex anti-oscillation"
     - "Mesh lifecycle: create once per body, reposition each frame, toggle Visible"
@@ -42,6 +43,7 @@ key-decisions:
   - "Skeleton speed as [Export] double SkeletonSpeed=1e8 m/s placeholder — true context-scaled speed deferred to Plan 02"
   - "RenderBridge snapshots ChildIndices before foreach iteration — prevents InvalidOperationException on mutation"
   - "HUD computes speed from prev-frame position delta rather than internal sim state — keeps it a clean read-only consumer"
+  - "Unit-space render via ToLocalDoubleUnits: observer-scale as unit basis + per-space RenderFactor; supersedes global RenderScale (D-15 reversed again)"
 
 patterns-established:
   - "Pattern 1 (STAB-01): Bounded iterative TrySpaceTransition with lastExitedIndex anti-oscillation and MaxIterations cap"
@@ -81,6 +83,9 @@ completed: "2026-06-13"
 1. **Task 1: Iterative null-safe SOI transition (STAB-01)** - `b31161c` (feat)
 2. **Task 2: Floating-origin RenderBridge + thrust-driven ship** - `f51ba3b` (feat)
 3. **Task 3: Phosphor-green live-speed HUD label** - `0f0cd61` (feat)
+4. **Deviation: Global RenderScale (uniform k=1e-6)** - `50c6338` (feat, post-checkpoint owner direction)
+5. **Deviation: Unshaded material + remove DirectionalLight3D** - `f6f1a35` (fix, post-checkpoint runtime fix)
+6. **Continuation: Unit-space render via ToLocalDoubleUnits + per-space factors** - `f403b7a` (feat, replaces global RenderScale)
 
 ## Files Created/Modified
 
@@ -111,6 +116,33 @@ completed: "2026-06-13"
 - **Commit:** `50c6338`
 - **Build result:** 0 errors, 0 warnings (`dotnet build EcoSpace.csproj`)
 
+### Unit-space render architecture (supersedes uniform RenderScale)
+
+**[Architecture Decision] Replace global RenderScale with per-space RenderFactor via ToLocalDoubleUnits**
+- **Decided after:** human-verify checkpoint, continuation pass (owner direction)
+- **Supersedes:** The uniform `RenderScale = 1e-6f` approach added in commit `50c6338` (which itself superseded D-15)
+- **Decision:** Add `UniVec3.ToLocalDoubleUnits(observer)` that expresses the meter delta in observer-cell units by dividing by `observer.Scale`. RenderBridge then multiplies by a per-space factor (`PlanetRenderFactor`, `StarRenderFactor`, etc.) instead of a global meter-based scale. The observer's scale is the unit basis for all bodies in the frame — this keeps bodies at different SOI depths consistent when the ship transitions spaces.
+- **Rationale:** A global meter-based `RenderScale` picks a fixed meter-to-render-unit ratio that may be correct for one tier but wrong at another (Planet scale = 0.0001 m/unit vs. Star scale = 1 m/unit is 10,000× different). By normalizing to observer units first and then applying a small per-space factor, each space tier can be tuned independently from the Inspector without touching code.
+- **New method:** `UniVec3.ToLocalDoubleUnits(in UniVec3 observer)` — returns `(this - observer).ToDouble3() * (1.0 / observer.Scale)`. Marked `[AggressiveInlining]`. Does NOT replace `ToLocalDouble` (which stays in meters; still used by `Hud.cs` for speed).
+- **ToLocalDouble callers checked:** `Scripts/HUD/Hud.cs:72` (`ship.LocalPos.ToLocalDouble(_prevPos)`) — correctly left in meters for speed magnitude; no change needed.
+- **New exports on RenderBridge:**
+  - `PlanetRenderFactor = 1e-8f` (Planet scale 0.0001 m/unit: 1 render unit ≈ 1e12 m at this factor)
+  - `StarRenderFactor = 1e-8f` (Star scale 1 m/unit: 1 render unit ≈ 1e8 m at this factor)
+  - `GalaxyRenderFactor = 1e-8f` (placeholder, Galaxy not exercised by MVP scene)
+  - `UniverseRenderFactor = 1e-8f` (placeholder, Universe not exercised by MVP scene)
+- **Radius transform contract (plan 01-02 obligation):** `DefaultBodyRadius (meters) / ship.LocalPos.Scale (→ observer units) × factor (→ render units)`. Plan 01-02 MUST apply this exact same transform when it introduces true per-body `RadiusMeters` (RND-03/04). Do NOT hardcode radii in render units.
+- **Changes made:**
+  1. `UniVec3.ToLocalDoubleUnits` added after `ToLocalDouble` in the Conversion sector of `UniVec3.cs`.
+  2. `RenderBridge.RenderScale` export removed; replaced with four per-space `[Export]` properties.
+  3. `RenderFactorFor(Space)` switch helper added (private, returns matching export by ship space, defaults to `StarRenderFactor`).
+  4. `SyncBodies`: computes `factor` once from `ship.CurrentSpace`; passes to `RenderBodyAt` / `GetOrCreateMesh`.
+  5. `RenderBodyAt`: calls `ToLocalDoubleUnits` then multiplies each component by `factor`.
+  6. `GetOrCreateMesh`: radius computed as `(float)(DefaultBodyRadius / ship.LocalPos.Scale * factor)`.
+  7. `CameraFarPlane` default remains `1e6f`; unshaded material unchanged; no DirectionalLight3D re-added.
+- **Files modified:** `Scripts/Universe/Math/UniVec3.cs`, `Scripts/Render/RenderBridge.cs`
+- **Commit:** `f403b7a`
+- **Build result:** 0 errors, 0 warnings (`dotnet build EcoSpace.csproj`)
+
 ### Post-checkpoint runtime fix
 
 **[Rule 1 - Bug] Removed placeholder DirectionalLight3D; added unshaded skeleton material**
@@ -127,7 +159,7 @@ completed: "2026-06-13"
 ## Known Stubs
 
 - **SkeletonSpeed = 1e8 m/s** in `TestSetup.cs` — placeholder forward speed; true context-auto-scaled speed arrives in Plan 02 (FLT-01/02/03)
-- **DefaultBodyRadius = 6.371e6f** in `RenderBridge.cs` — uniform Earth-radius sphere for all bodies (expressed in true meters, scaled by RenderScale at mesh creation); true 1:1 per-body radii and materials arrive in Plan 02 (RND-03/04)
+- **DefaultBodyRadius = 6.371e6f** in `RenderBridge.cs` — uniform Earth-radius sphere for all bodies (expressed in true meters; converted to observer units then multiplied by per-space factor at mesh creation); true 1:1 per-body radii and materials arrive in Plan 02 (RND-03/04) using the same meters→observer-units→×factor transform
 - **Speed display: raw m/s only** in `Hud.cs` — adaptive unit ladder (m/s → km/s → AU/s → ly/s) deferred to Plan 04 (HUD-01 full)
 - **Forward-only thrust (+Z)** in `TestSetup._Process` — attitude-oriented (Basis) motion arrives in Plan 02 (FLT-02)
 
@@ -135,13 +167,14 @@ completed: "2026-06-13"
 
 No new threat surface introduced beyond what the plan's threat model covers.
 
-## Self-Check: PASSED (post-checkpoint fix included)
+## Self-Check: PASSED (post-checkpoint fix + unit-space render continuation included)
 
 Files exist:
 - Scripts/Universe/GameWorld.cs: FOUND
 - Scripts/Render/RenderBridge.cs: FOUND
 - Scripts/HUD/Hud.cs: FOUND
 - Scripts/Universe/TestSetup.cs: FOUND
+- Scripts/Universe/Math/UniVec3.cs: FOUND (ToLocalDoubleUnits added)
 - Main.tscn: FOUND
 - project.godot: FOUND
 
@@ -149,5 +182,8 @@ Commits verified:
 - b31161c (Task 1 — feat: iterative SOI transition): FOUND
 - f51ba3b (Task 2 — feat: RenderBridge + thrust): FOUND
 - 0f0cd61 (Task 3 — feat: Hud.cs): FOUND
+- 50c6338 (deviation — global RenderScale): FOUND
+- f6f1a35 (deviation — unshaded material, remove DirectionalLight): FOUND
+- f403b7a (continuation — unit-space render via ToLocalDoubleUnits + per-space factors): FOUND
 
-Build: 0 errors, 0 warnings confirmed.
+Build: 0 errors, 0 warnings confirmed (all commits).
