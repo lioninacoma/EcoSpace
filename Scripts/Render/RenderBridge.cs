@@ -134,9 +134,18 @@ namespace Universe
 				Height = DefaultBodyRadius * 2f,
 			};
 
+			// Skeleton placeholder material: unshaded so bodies stay visible with no
+			// scene light. Per-body albedo/emissive + 1:1 radii are elaborated in Plan 02 (RND-03/04).
+			var mat = new StandardMaterial3D
+			{
+				ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+				AlbedoColor = new Color(0.75f, 0.85f, 0.75f),   // light gray-green, clearly visible
+			};
+
 			var meshInstance = new MeshInstance3D
 			{
 				Mesh = sphereMesh,
+				MaterialOverride = mat,
 				Visible = false,
 			};
 

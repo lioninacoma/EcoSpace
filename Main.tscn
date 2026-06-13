@@ -55,5 +55,4 @@ far = 1e+12
 script = ExtResource("4_rendbrg")
 WorldPath = NodePath("..")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=17292665]
-transform = Transform3D(-0.57437617, 0.37806886, -0.726055, -0.7896631, -0.48961192, 0.36974695, -0.21569541, 0.7857128, 0.5797684, 0, 0, 0)
+
