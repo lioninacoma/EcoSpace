@@ -38,7 +38,7 @@ Plans:
 
 - [x] 01-01-PLAN.md — Walking Skeleton: STAB-01 iterative transition + floating-origin render + thrust-driven ship + live speed HUD
 - [x] 01-02-PLAN.md — Body rendering: per-body hues + 1:1 radii + emissive star/OmniLight + color-palette dither
-- [x] 01-03-PLAN.md — Flight feel: virtual-joystick steering + roll + persistent throttle + distance-scaled speed + crosshair/reticle (human-verify pending)
+- [x] 01-03-PLAN.md — Flight feel: virtual-joystick steering + roll + persistent throttle [-1,1] (reverse) + distance-scaled speed + crosshair/reticle (APPROVED)
 - [ ] 01-04-PLAN.md — Minimal HUD: adaptive speed units + context label + target cycle + off-screen marker + phosphor-green (TRV-01)
 
 **UI hint**: yes
@@ -81,6 +81,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. In-System Flight MVP | 3/4 | In Progress|  |
+| 1. In-System Flight MVP | 3/4 (01-03 APPROVED) | In Progress|  |
 | 2. Dynamic Skybox | 0/TBD | Not started | - |
 | 3. Cross-Galaxy Travel | 0/TBD | Not started | - |

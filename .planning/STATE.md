@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: 01-03 tasks 1-3 complete (human-verify checkpoint); next is 01-04 Minimal HUD
-last_updated: "2026-06-13T13:33:00.000Z"
-last_activity: 2026-06-13 -- Phase 01 execution started
+stopped_at: 01-03 COMPLETE (human-verified after 3 play-test rounds); next is 01-04 Minimal HUD
+last_updated: "2026-06-13T14:00:00.000Z"
+last_activity: 2026-06-13 -- Plan 01-03 FlightController approved and finalized
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 ## Current Position
 
 Phase: 01 (in-system-flight-mvp) — EXECUTING
-Plan: 3 of 4 (01-03 tasks 1-3 done; checkpoint:human-verify pending)
+Plan: 4 of 4 (01-03 COMPLETE; starting 01-04 Minimal HUD next)
 Status: Executing Phase 01
-Last activity: 2026-06-13 -- Plan 01-03 FlightController implemented
+Last activity: 2026-06-13 -- Plan 01-03 FlightController complete (approved, 3 play-test rounds)
 
-Progress: [███████░░░] 75%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
@@ -69,8 +69,10 @@ Recent decisions affecting current work:
 - 01-01: RenderBridge snapshots ChildIndices before foreach to prevent mutation exception
 - 01-01: HUD computes speed from prev-frame position delta — read-only consumer pattern
 - 01-02: Ambient-floor-only lighting ACCEPTED for MVP; cross-space directional terminator deferred (no day/night terminator while orbiting in planet space)
-- 01-03: Mouse mode = Confined (not Captured); software cursor drives steering (Pitfall 8 avoided)
-- 01-03: Distance-scaled speed envelope: contextMax = Lerp(contextMax, nearest*SpeedPerMeter, easing*dt); actualSpeed = throttle * contextMax
+- 01-03: Mouse mode = T-key toggle Confined/Captured; steering accumulation in _Input (not _UnhandledInput) so HUD Controls cannot swallow MouseMotion
+- 01-03: Distance-scaled speed envelope: contextMax = Lerp(contextMax, parentSurfaceDist*SpeedPerMeter, easing*dt); distance = ship.LocalPos.Magnitude() - parent.RadiusMeters
+- 01-03: DESIGN REFINEMENT D-03: throttle range [-1,1] (W=forward, S=reverse, X eases to 0) — approved in play-test; reverse thrust without turning was required in practice
+- 01-03: SteeringReticle mouse_filter=Ignore (2) required; default Stop swallows MouseMotion before _Input accumulation
 
 ### Pending Todos
 
@@ -99,5 +101,5 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 ## Session Continuity
 
 Last session: 2026-06-13
-Stopped at: 01-03 checkpoint:human-verify — fly the game and confirm steering, hold-attitude, roll, throttle, speed-scaling, crosshair
-Resume: /gsd-execute-phase 01 (executes 01-04 after human-verify approval)
+Stopped at: 01-03 COMPLETE — all 4 tasks done, human-verified after 3 play-test rounds; ready for 01-04
+Resume: /gsd-execute-phase 01 (executes 01-04 Minimal HUD)
