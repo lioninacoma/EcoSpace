@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. Player can cross SOI boundaries (enter and exit planet/star SOI) at high speed without a crash or hierarchy corruption
 **Plans**: 4 plans
 Plans:
-- [ ] 01-01-PLAN.md — Walking Skeleton: STAB-01 iterative transition + floating-origin render + thrust-driven ship + live speed HUD
+- [x] 01-01-PLAN.md — Walking Skeleton: STAB-01 iterative transition + floating-origin render + thrust-driven ship + live speed HUD
 - [ ] 01-02-PLAN.md — Body rendering: per-body hues + 1:1 radii + emissive star/OmniLight + color-palette dither
 - [ ] 01-03-PLAN.md — Flight feel: virtual-joystick steering + roll + persistent throttle + distance-scaled speed + crosshair/reticle
 - [ ] 01-04-PLAN.md — Minimal HUD: adaptive speed units + context label + target cycle + off-screen marker + phosphor-green (TRV-01)
@@ -67,6 +67,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. In-System Flight MVP | 0/4 | Not started | - |
+| 1. In-System Flight MVP | 1/4 | In progress | - |
 | 2. Dynamic Skybox | 0/TBD | Not started | - |
 | 3. Cross-Galaxy Travel | 0/TBD | Not started | - |

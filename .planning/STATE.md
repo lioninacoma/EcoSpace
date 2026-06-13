@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 1 context gathered
-last_updated: "2026-06-12T20:13:41.905Z"
-last_activity: 2026-06-12 — Roadmap created; Phase 1 ready for planning
+status: executing
+stopped_at: "01-01 complete; checkpoint:human-verify pending for walking skeleton"
+last_updated: "2026-06-13T01:44:38Z"
+last_activity: "2026-06-13 -- Phase 01 Plan 01 complete (3/3 auto tasks); checkpoint pending"
 progress:
   total_phases: 3
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  total_plans: 4
+  completed_plans: 1
+  percent: 25
 ---
 
 # Project State
@@ -21,35 +21,35 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-12)
 
 **Core value:** The player can fly seamlessly through a massive 1:1-scale universe — from a planet's surroundings out to interstellar and intergalactic distances — with rendering and flight that stay correct and feel good across every scale.
-**Current focus:** Phase 1 — In-System Flight MVP
+**Current focus:** Phase 01 — in-system-flight-mvp
 
 ## Current Position
 
-Phase: 1 of 3 (In-System Flight MVP)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-06-12 — Roadmap created; Phase 1 ready for planning
+Phase: 01 (in-system-flight-mvp) — EXECUTING
+Plan: 2 of 4 (Plan 01 complete; awaiting human-verify checkpoint)
+Status: Executing Phase 01
+Last activity: 2026-06-13 -- Phase 01 Plan 01 complete; checkpoint:human-verify pending
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [██░░░░░░░░] 25%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 1
+- Average duration: 4 min
+- Total execution time: ~4 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-in-system-flight-mvp | 1 | 4 min | 4 min |
 
 **Recent Trend:**
 
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: 01-01 (4 min)
+- Trend: —
 
 *Updated after each plan completion*
 
@@ -63,6 +63,11 @@ Recent decisions affecting current work:
 - Roadmap: Phase 1 folds STAB-01 fix + render sync + flight + HUD into one vertical slice (coarse granularity; avoids thin "Phase 0" stub)
 - Roadmap: Dynamic skybox isolated as Phase 2 — flagged for shallow phase research per SUMMARY.md
 - Roadmap: Cross-galaxy travel is Phase 3 (second sequenced acceptance goal)
+- 01-01: Iterative SOI transition (MaxIterations=32) replaces recursive form
+- 01-01: Floating origin anchored on ship.LocalPos in RenderBridge (not parent body)
+- 01-01: SkeletonSpeed=1e8 m/s placeholder; context-scaled speed deferred to Plan 02
+- 01-01: RenderBridge snapshots ChildIndices before foreach to prevent mutation exception
+- 01-01: HUD computes speed from prev-frame position delta — read-only consumer pattern
 
 ### Pending Todos
 
@@ -82,6 +87,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-06-12T20:13:41.899Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-in-system-flight-mvp/01-CONTEXT.md
+Last session: 2026-06-13T01:44:38Z
+Stopped at: 01-01 complete; Task 4 checkpoint:human-verify (launch game and verify walking skeleton)
+Resume file: .planning/phases/01-in-system-flight-mvp/01-01-SUMMARY.md
