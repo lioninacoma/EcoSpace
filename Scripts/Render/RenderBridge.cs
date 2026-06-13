@@ -19,10 +19,20 @@ namespace Universe
 		/// <summary>NodePath to the GameWorld / TestSetup node in the scene.</summary>
 		[Export] public NodePath WorldPath { get; set; }
 
-		/// <summary>Far plane for the Camera3D (meters). Expose for runtime tuning.</summary>
-		[Export] public float CameraFarPlane { get; set; } = 1e12f;
+		/// <summary>Far plane for the Camera3D (render units). 1e6 render units = 1e12 m at k=1e-6.</summary>
+		[Export] public float CameraFarPlane { get; set; } = 1e6f;
 
-		/// <summary>Default sphere mesh radius (meters) for skeleton bodies.</summary>
+		/// <summary>
+		/// Render units per meter (uniform scale applied to both body positions and radii).
+		/// Universe math (UniVec3, TranslatePos, SOI) operates in true 1:1 meters; only
+		/// RenderBridge applies this factor so the camera far plane stays reasonable (≤ 1e6
+		/// render units). A uniform scale is perspective-invariant — visually identical to 1:1.
+		/// Plan 01-02 MUST reuse this same RenderScale when applying true 1:1 body radii.
+		/// Default: 1e-6 → 1 render unit = 1,000,000 m; far=1e6 covers ~1e12 m (≥ 1 AU).
+		/// </summary>
+		[Export] public float RenderScale { get; set; } = 1e-6f;
+
+		/// <summary>Default sphere mesh radius (true meters) for skeleton bodies.</summary>
 		[Export] public float DefaultBodyRadius { get; set; } = 6.371e6f;   // Earth-radius default
 
 		// ----- Private state --------------------------------------------------
@@ -113,8 +123,9 @@ namespace Universe
 		{
 			var mesh = GetOrCreateMesh(bodyIdx, body);
 
-			// Floating-origin: compute render position relative to ship
-			Double3 rel = body.LocalPos.ToLocalDouble(ship.LocalPos);
+			// Floating-origin: compute render position relative to ship, then scale to render space.
+			// RenderScale (k=1e-6) is applied uniformly — perspective-invariant, keeps camera far ≤ 1e6.
+			Double3 rel = body.LocalPos.ToLocalDouble(ship.LocalPos) * RenderScale;
 			mesh.Position = new Vector3((float)rel.X, (float)rel.Y, (float)rel.Z);
 			mesh.Visible = true;
 		}
@@ -128,10 +139,12 @@ namespace Universe
 			if (_meshes.TryGetValue(bodyIdx, out var existing))
 				return existing;
 
+			// Radius stored in true meters; scaled to render space by RenderScale.
+			// Plan 01-02 replaces DefaultBodyRadius with per-body true radii using the same factor.
 			var sphereMesh = new SphereMesh
 			{
-				Radius = DefaultBodyRadius,
-				Height = DefaultBodyRadius * 2f,
+				Radius = DefaultBodyRadius * RenderScale,
+				Height = DefaultBodyRadius * 2f * RenderScale,
 			};
 
 			// Skeleton placeholder material: unshaded so bodies stay visible with no
