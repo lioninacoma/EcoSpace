@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: 01-02 shader revision AWAITING HUMAN VERIFY — shader-based Lambert body lighting (commit 253cb35); next is 01-04 Minimal HUD after approval
+stopped_at: Universe namespace/folder eliminated (commits 6c203cb..0294a33) — AWAITING HUMAN VERIFY before 01-04 Minimal HUD
 last_updated: "2026-06-13T00:00:00.000Z"
 last_activity: 2026-06-13 -- pre-01-04 shader revision: body lighting moved from Godot Omni/Directional lights to unshaded spatial shader (body_lit.gdshader); BodyLightEnergy/BodyAmbient exports; commit 253cb35
 progress:
@@ -105,7 +105,7 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 ## Session Continuity
 
 Last session: 2026-06-13
-Stopped at: Repo refactor complete (01-mvp namespace realignment) — AWAITING HUMAN VERIFY before 01-04
+Stopped at: Universe namespace/folder eliminated — AWAITING HUMAN VERIFY before 01-04 Minimal HUD
 Resume: /gsd-execute-phase 01 (executes 01-04 Minimal HUD) after approving refactor
 
 ## Refactor Notes
@@ -122,4 +122,22 @@ Applied behaviour-preserving structural refactor (5 commits + 1 doc commit):
 - Main.tscn ext_resource paths updated (uids unchanged)
 - CLAUDE.md factual updates: component table, namespace convention, layers, entry points, arch constraints
 - Scripts/Universe/Math/ UNTOUCHED (namespace Universe.Math preserved)
+- dotnet build: 0 errors, 0 warnings
+
+**2026-06-13 — Repo refactor: Universe namespace/folder fully eliminated**
+
+Applied behaviour-preserving structural refactor (5 commits):
+- `Scripts/Universe/Math/Double3.cs` → `Scripts/Math/Double3.cs` (global namespace; namespace Universe.Math removed)
+- `Scripts/Universe/Math/Long3.cs` → `Scripts/Math/Long3.cs` (global namespace; namespace Universe.Math removed)
+- `Scripts/Universe/Math/UniVec3.cs` → `Scripts/Math/UniVec3.cs` (global namespace; namespace Universe.Math removed)
+- `Scripts/Universe/GameWorld.cs` → `Scripts/GameWorld.cs` (global namespace; namespace Universe + using Universe.Math removed)
+- `Scripts/Universe/UniObject.cs` → `Scripts/UniObject.cs` (global namespace; namespace Universe + using Universe.Math removed)
+- `Scripts/Universe/TestSetup.cs` → `Scripts/TestSetup.cs` (global namespace; namespace Universe + using Universe.Math removed)
+- `Scripts/Universe/` folder fully deleted (no files remain)
+- All .uid sidecars moved alongside source files (content unchanged, uids preserved)
+- `using Universe;` and `using Universe.Math;` removed from WorldRenderer.cs, FlightController.cs, Hud.cs
+- Namespaces Render, Flight, Hud retained unchanged
+- Main.tscn: TestSetup path updated (res://Scripts/Universe/TestSetup.cs → res://Scripts/TestSetup.cs); uid unchanged
+- project.godot: no Universe references found; no changes needed
+- CLAUDE.md: all factual file paths and namespace descriptions updated
 - dotnet build: 0 errors, 0 warnings
