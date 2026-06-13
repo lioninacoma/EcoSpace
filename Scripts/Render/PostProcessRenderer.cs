@@ -1,8 +1,13 @@
 using Godot;
 
-namespace Universe
+namespace Render
 {
-    public partial class UniRenderer : ColorRect
+    /// <summary>
+    /// Post-processing renderer: hosts the dithering/CRT shader on a full-screen ColorRect
+    /// in the CanvasLayer. Manages the ShaderMaterial binding and exposes all tuning
+    /// parameters as [Export] properties that push directly to the shader when set.
+    /// </summary>
+    public partial class PostProcessRenderer : ColorRect
     {
         private ShaderMaterial _material;
 
