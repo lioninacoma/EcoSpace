@@ -74,7 +74,7 @@ completed: "2026-06-13"
 - Removed autopilot from `TestSetup`; added keyboard thrust via `Input.GetActionStrength("thrust_forward"/"thrust_back")` and added `ShipIndex` property for downstream consumers
 - Added `thrust_forward` (W) and `thrust_back` (S) InputMap actions to `project.godot`
 - Created `Hud.cs`: phosphor-green per-frame speed label (prev-frame delta magnitude / delta) as a read-only sim consumer
-- Updated `Main.tscn`: RenderBridge node, Hud + SpeedLabel nodes, Camera3D far=1e12, removed static MeshInstance3D
+- Updated `Main.tscn`: RenderBridge node, Hud + SpeedLabel nodes, Camera3D far=1e12, removed static MeshInstance3D; DirectionalLight3D placeholder subsequently removed (post-checkpoint fix — see Deviations)
 
 ## Task Commits
 
@@ -93,9 +93,18 @@ completed: "2026-06-13"
 
 ## Deviations from Plan
 
-None — plan executed exactly as written.
+### Post-checkpoint runtime fix
 
-The only judgment call made: Task 2 and Task 3 files were written and committed separately per the plan task structure, but both were built together in a single `dotnet build` pass to confirm compilation integrity before committing.
+**[Rule 1 - Bug] Removed placeholder DirectionalLight3D; added unshaded skeleton material**
+- **Found during:** human-verify checkpoint — Godot logged `prepare_camera: Condition "!res" is true. Returning: false` every frame at startup
+- **Root cause:** `Camera3D.far = 1e12` (needed for AU-scale visibility) combined with the placeholder `DirectionalLight3D` caused the rendering light culler to fail building a valid frustum. With no light in the scene no frustum is attempted and the error disappears.
+- **Fix:**
+  1. Removed `DirectionalLight3D` node entirely from `Main.tscn`. The node was a placeholder scheduled for replacement by an `OmniLight3D` in Plan 02; removing it early has no functional downside for the skeleton.
+  2. Added `StandardMaterial3D` with `ShadingMode = Unshaded` and a light gray-green albedo via `MaterialOverride` in `RenderBridge.GetOrCreateMesh` so skeleton sphere bodies remain visible without any scene light. Per-body materials/radii elaborated in Plan 02 (RND-03/04).
+  3. Camera `far = 1e12` left unchanged — AU-scale bodies must stay visible post SOI transition.
+- **Files modified:** `Main.tscn`, `Scripts/Render/RenderBridge.cs`
+- **Commit:** `f6f1a35`
+- **Build result:** 0 errors, 0 warnings (`dotnet build EcoSpace.csproj`)
 
 ## Known Stubs
 
@@ -108,7 +117,7 @@ The only judgment call made: Task 2 and Task 3 files were written and committed 
 
 No new threat surface introduced beyond what the plan's threat model covers.
 
-## Self-Check: PASSED
+## Self-Check: PASSED (post-checkpoint fix included)
 
 Files exist:
 - Scripts/Universe/GameWorld.cs: FOUND
