@@ -93,6 +93,24 @@ completed: "2026-06-13"
 
 ## Deviations from Plan
 
+### Architecture decision: uniform render-scale (supersedes D-15)
+
+**[Architecture Decision] Render in uniformly scaled-down space; camera far 1e6**
+- **Decided after:** human-verify checkpoint (post-plan, owner decision)
+- **Supersedes:** D-15 ("honest 1:1 render distances, specks growing on approach") — that decision has been reversed
+- **Decision:** Universe/SOI math remains 1:1 (UniVec3, TranslatePos, all SOI distances and speed envelopes are unchanged). Rendering is done in a uniformly scaled-down render space via a single factor `k = RenderScale = 1e-6` (1 render unit = 1,000,000 m). Because the scale is uniform and applied to both positions and radii, perspective is invariant — visually identical to 1:1. This keeps the camera far plane at a reasonable 1e6 render units (covers ~1e12 m ≥ 1 AU for every MVP body).
+- **Rationale:** "Only universe calculations are done in 1:1 scale. Rendering uses a scaled-down render space with relative, small distances and a reasonable camera far plane (max 1e6)."
+- **Changes made:**
+  1. Added `[Export] public float RenderScale { get; set; } = 1e-6f` to `RenderBridge` with full doc comment.
+  2. `RenderBodyAt`: position scaled via `Double3 rel = body.LocalPos.ToLocalDouble(ship.LocalPos) * RenderScale` (uses AVX2-accelerated `Double3.operator*(Double3, double)`).
+  3. `GetOrCreateMesh`: `SphereMesh.Radius = DefaultBodyRadius * RenderScale`, `Height = DefaultBodyRadius * 2f * RenderScale`. `DefaultBodyRadius` stays in true meters.
+  4. `CameraFarPlane` default changed 1e12 → 1e6.
+  5. `Main.tscn` `Camera3D far` updated 1e+12 → 1e+06 (consistent with runtime override in `_Ready`).
+- **Note for Plan 01-02:** Plan 01-02 MUST reuse `RenderBridge.RenderScale` when applying true 1:1 body radii (RND-03/04). Do NOT hardcode radii directly in render units — always express radii in true meters and multiply by `RenderScale` at mesh creation, exactly as this pattern establishes.
+- **Files modified:** `Scripts/Render/RenderBridge.cs`, `Main.tscn`
+- **Commit:** `50c6338`
+- **Build result:** 0 errors, 0 warnings (`dotnet build EcoSpace.csproj`)
+
 ### Post-checkpoint runtime fix
 
 **[Rule 1 - Bug] Removed placeholder DirectionalLight3D; added unshaded skeleton material**
@@ -109,7 +127,7 @@ completed: "2026-06-13"
 ## Known Stubs
 
 - **SkeletonSpeed = 1e8 m/s** in `TestSetup.cs` — placeholder forward speed; true context-auto-scaled speed arrives in Plan 02 (FLT-01/02/03)
-- **DefaultBodyRadius = 6.371e6f** in `RenderBridge.cs` — uniform Earth-radius sphere for all bodies; true 1:1 radii and per-body materials arrive in Plan 03 (RND-03/04)
+- **DefaultBodyRadius = 6.371e6f** in `RenderBridge.cs` — uniform Earth-radius sphere for all bodies (expressed in true meters, scaled by RenderScale at mesh creation); true 1:1 per-body radii and materials arrive in Plan 02 (RND-03/04)
 - **Speed display: raw m/s only** in `Hud.cs` — adaptive unit ladder (m/s → km/s → AU/s → ly/s) deferred to Plan 04 (HUD-01 full)
 - **Forward-only thrust (+Z)** in `TestSetup._Process` — attitude-oriented (Basis) motion arrives in Plan 02 (FLT-02)
 
