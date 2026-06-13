@@ -1,13 +1,13 @@
 [gd_scene format=3 uid="uid://cu0h3b3qv1uhi"]
 
 [ext_resource type="Script" uid="uid://bjvhy26s7ksln" path="res://Scripts/Universe/TestSetup.cs" id="1_glv2v"]
-[ext_resource type="Script" uid="uid://b434isdpy4rh8" path="res://Scripts/Universe/UniRenderer.cs" id="3_cm0pq"]
-[ext_resource type="Script" uid="uid://dfcuoiqq1lvar" path="res://Scripts/FPS.gd" id="3_r0du0"]
+[ext_resource type="Script" uid="uid://3_cm0pq" path="res://Scripts/Universe/UniRenderer.cs" id="3_cm0pq"]
+[ext_resource type="Script" uid="uid://3_r0du0" path="res://Scripts/FPS.gd" id="3_r0du0"]
+[ext_resource type="Script" path="res://Scripts/Render/RenderBridge.cs" id="4_rendbrg"]
+[ext_resource type="Script" path="res://Scripts/HUD/Hud.cs" id="5_hudhud"]
 
 [sub_resource type="Environment" id="Environment_r0du0"]
 background_mode = 1
-
-[sub_resource type="SphereMesh" id="SphereMesh_r0du0"]
 
 [node name="Main" type="Node3D" unique_id=543215257]
 script = ExtResource("1_glv2v")
@@ -34,12 +34,26 @@ offset_bottom = 28.0
 text = "FPS: 120.0"
 script = ExtResource("3_r0du0")
 
+[node name="Hud" type="Control" parent="CanvasLayer" unique_id=3001000001]
+offset_left = 5.0
+offset_top = 30.0
+offset_right = 300.0
+offset_bottom = 60.0
+script = ExtResource("5_hudhud")
+
+[node name="SpeedLabel" type="Label" parent="CanvasLayer/Hud" unique_id=3001000002]
+modulate = Color(0.1, 1.0, 0.3, 1.0)
+offset_right = 290.0
+offset_bottom = 28.0
+text = "Speed: 0 m/s"
+
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1364607324]
 environment = SubResource("Environment_r0du0")
+far = 1e+12
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=314180022]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.3834558)
-mesh = SubResource("SphereMesh_r0du0")
+[node name="RenderBridge" type="Node3D" parent="." unique_id=3001000003]
+script = ExtResource("4_rendbrg")
+WorldPath = NodePath("..")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=17292665]
 transform = Transform3D(-0.57437617, 0.37806886, -0.726055, -0.7896631, -0.48961192, 0.36974695, -0.21569541, 0.7857128, 0.5797684, 0, 0, 0)

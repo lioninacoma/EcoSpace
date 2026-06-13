@@ -34,11 +34,21 @@ namespace Universe
 		private const double StarSOI = 1.5e15;               // ~10 000 AU
 		private const double PlanetSOI = 1.0e9;              // ~1 000 000 km
 		private const double ShipOrbitMeters = 7e6;
-		private const double ShipSpeedMetersPerTick = 1e8;
+
+		// ----- Skeleton thrust parameters -----------------------------------
+
+		/// <summary>
+		/// Placeholder thrust speed in m/s for the walking skeleton.
+		/// Exposed as export for in-editor tuning. True context-scaled speed arrives in Plan 02.
+		/// </summary>
+		[Export] public double SkeletonSpeed { get; set; } = 1e8;   // 1e8 m/s skeleton placeholder
+
+		// ----- Public accessors for RenderBridge / HUD ----------------------
+
+		/// <summary>Index of the player ship in GameObjects. Read by RenderBridge and Hud.</summary>
+		public int ShipIndex => _ship;
 
 		// ----- Godot callbacks ----------------------------------------------
-		private bool _arrived = false;
-
 
 		public override void _Ready()
 		{
@@ -47,37 +57,20 @@ namespace Universe
 			PrintState("Initial state");
 		}
 
-		private int _cellOffset = 0;
-		private double _cellOffsetTimer = 0;
-		private double _cellOffsetTimeout = 0.01;
-
 		public override void _Process(double delta)
 		{
 			base._Process(delta);
-			if (_arrived) return;
 
-			var ship = GameObjects[_ship];
-			var planetB = GameObjects[_planetB];
+			// Read thrust input from InputMap actions (project.godot defines these)
+			float thrustAxis = Input.GetActionStrength("thrust_forward") -
+							   Input.GetActionStrength("thrust_back");
 
-			TranslatePos(_ship, new Double3(0, 0, ShipSpeedMetersPerTick));
-
-			UniVec3 shipInStar = ship.LocalPos;
-			int p = ship.ParentIndex;
-			while (p >= 0 && GameObjects[p].CurrentSpace != UniObject.Space.Galaxy)
+			if (thrustAxis != 0f)
 			{
-				shipInStar = ChildPosToParentSpace(shipInStar, GameObjects[p]);
-				p = GameObjects[p].ParentIndex;
-			}
-			double distToB = UniVec3.Distance(shipInStar, planetB.LocalPos);
-
-			GD.Print($"[Ship] space={ship.CurrentSpace,-10}  parentIdx={ship.ParentIndex,2}  " +
-					 $"shipPos={ship.LocalPos:e5}  " +
-					 $"distToB={distToB:e5} m");
-
-			if (ship.ParentIndex == _planetB)
-			{
-				_arrived = true;
-				PrintState("Arrived at Planet B");
+				// Placeholder forward motion in ship-local +Z.
+				// True attitude-oriented motion (Basis multiply) arrives in Plan 02.
+				double thrust = thrustAxis * SkeletonSpeed * delta;
+				TranslatePos(_ship, new Double3(0, 0, thrust));
 			}
 		}
 
@@ -85,12 +78,12 @@ namespace Universe
 
 		private void SetupScene()
 		{
-			_root = AddGameObject(-1, new Double3(0, 0, 0), double.MaxValue);
-			_galaxy = AddGameObject(_root, new Double3(0, 0, 0), 5e3);
-			_star = AddGameObject(_galaxy, new Double3(0, 0, 0), StarSOI);
-			_planetA = AddGameObject(_star, new Double3(0, 0, PlanetA_Z), PlanetSOI);
-			_planetB = AddGameObject(_star, new Double3(0, 0, PlanetB_Z), PlanetSOI);
-			_ship = AddGameObject(_planetA, new Double3(0, 0, ShipOrbitMeters), 0);
+			_root    = AddGameObject(-1,       new Double3(0, 0, 0),         double.MaxValue);
+			_galaxy  = AddGameObject(_root,    new Double3(0, 0, 0),         5e3);
+			_star    = AddGameObject(_galaxy,  new Double3(0, 0, 0),         StarSOI);
+			_planetA = AddGameObject(_star,    new Double3(0, 0, PlanetA_Z), PlanetSOI);
+			_planetB = AddGameObject(_star,    new Double3(0, 0, PlanetB_Z), PlanetSOI);
+			_ship    = AddGameObject(_planetA, new Double3(0, 0, ShipOrbitMeters), 0);
 		}
 
 		// ----- Debug --------------------------------------------------------
