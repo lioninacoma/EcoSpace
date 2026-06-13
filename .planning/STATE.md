@@ -5,7 +5,7 @@ milestone_name: milestone
 status: executing
 stopped_at: 01-03 COMPLETE (human-verified after 3 play-test rounds); next is 01-04 Minimal HUD
 last_updated: "2026-06-13T00:00:00.000Z"
-last_activity: 2026-06-13 -- 01-02 revision: planet-space DirectionalLight3D terminator (RND-02/D-16); ambient floor 0.08→0.03
+last_activity: 2026-06-13 -- pre-01-04 fix: RenderBridge stale-radius bug (5dd542d); body radii now per-frame; bodies correctly tiny specks in Star space after SOI transition
 progress:
   total_phases: 3
   completed_phases: 0
@@ -74,6 +74,7 @@ Recent decisions affecting current work:
 - 01-03: Distance-scaled speed envelope: contextMax = Lerp(contextMax, parentSurfaceDist*SpeedPerMeter, easing*dt); distance = ship.LocalPos.Magnitude() - parent.RadiusMeters
 - 01-03: DESIGN REFINEMENT D-03: throttle range [-1,1] (W=forward, S=reverse, X eases to 0) — approved in play-test; reverse thrust without turning was required in practice
 - 01-03: SteeringReticle mouse_filter=Ignore (2) required; default Stop swallows MouseMotion before _Input accumulation
+- 01-render (pre-01-04 fix): RenderBridge stale-radius bug fixed (commit 5dd542d) — body radii now recompute per frame (r = RadiusMeters / ship.LocalPos.Scale * factor applied as mesh.Scale) so bodies are correctly sized across SOI transitions; at true 1:1 scale distant bodies are correctly tiny specks; findability of tiny specks deferred to 01-04 HUD marker + Phase 3 tiered renderer
 
 ### Pending Todos
 
