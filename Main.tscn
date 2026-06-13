@@ -1,20 +1,18 @@
 [gd_scene format=3 uid="uid://cu0h3b3qv1uhi"]
 
 [ext_resource type="Script" uid="uid://bjvhy26s7ksln" path="res://Scripts/Universe/TestSetup.cs" id="1_glv2v"]
-[ext_resource type="Script" uid="uid://3_cm0pq" path="res://Scripts/Universe/UniRenderer.cs" id="3_cm0pq"]
-[ext_resource type="Script" uid="uid://3_r0du0" path="res://Scripts/FPS.gd" id="3_r0du0"]
-[ext_resource type="Script" path="res://Scripts/Render/RenderBridge.cs" id="4_rendbrg"]
-[ext_resource type="Script" path="res://Scripts/HUD/Hud.cs" id="5_hudhud"]
+[ext_resource type="Script" uid="uid://b434isdpy4rh8" path="res://Scripts/Universe/UniRenderer.cs" id="3_cm0pq"]
+[ext_resource type="Script" uid="uid://dfcuoiqq1lvar" path="res://Scripts/FPS.gd" id="3_r0du0"]
+[ext_resource type="Script" uid="uid://ci31tr454vcvs" path="res://Scripts/Render/RenderBridge.cs" id="4_rendbrg"]
+[ext_resource type="Script" uid="uid://15wnt1j1werr" path="res://Scripts/HUD/Hud.cs" id="5_hudhud"]
 
 [sub_resource type="Environment" id="Environment_r0du0"]
 background_mode = 1
-background_color = Color(0, 0, 0, 1)
 ambient_light_source = 2
 ambient_light_color = Color(1, 1, 1, 1)
 ambient_light_energy = 0.08
 glow_enabled = true
 glow_intensity = 0.8
-glow_strength = 1.0
 glow_bloom = 0.2
 glow_blend_mode = 2
 
@@ -30,9 +28,7 @@ offset_right = 768.0
 offset_bottom = 432.0
 color = Color(1, 1, 1, 0)
 script = ExtResource("3_cm0pq")
-DitheringSize = 16
 ResolutionScale = 1
-Threshold = 100.0
 
 [node name="FPSLabel" type="Label" parent="CanvasLayer" unique_id=2114709689]
 modulate = Color(1, 0, 1, 1)
@@ -43,25 +39,26 @@ offset_bottom = 28.0
 text = "FPS: 120.0"
 script = ExtResource("3_r0du0")
 
-[node name="Hud" type="Control" parent="CanvasLayer" unique_id=3001000001]
+[node name="Hud" type="Control" parent="CanvasLayer" unique_id=-1293967295]
+layout_mode = 3
+anchors_preset = 0
 offset_left = 5.0
 offset_top = 30.0
 offset_right = 300.0
 offset_bottom = 60.0
 script = ExtResource("5_hudhud")
 
-[node name="SpeedLabel" type="Label" parent="CanvasLayer/Hud" unique_id=3001000002]
-modulate = Color(0.1, 1.0, 0.3, 1.0)
+[node name="SpeedLabel" type="Label" parent="CanvasLayer/Hud" unique_id=-1293967294]
+modulate = Color(0.1, 1, 0.3, 1)
+layout_mode = 0
 offset_right = 290.0
 offset_bottom = 28.0
 text = "Speed: 0 m/s"
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1364607324]
 environment = SubResource("Environment_r0du0")
-far = 1e+06
+far = 1000000.0
 
-[node name="RenderBridge" type="Node3D" parent="." unique_id=3001000003]
+[node name="RenderBridge" type="Node3D" parent="." unique_id=-1293967293]
 script = ExtResource("4_rendbrg")
 WorldPath = NodePath("..")
-
-
