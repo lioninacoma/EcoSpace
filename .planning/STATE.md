@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: 01-04 Task 4 checkpoint-failure fixed (commit 55c70ad) — RE-PRESENTING HUMAN VERIFY
-last_updated: "2026-06-14T20:30:00.000Z"
-last_activity: 2026-06-14 -- 01-04 HUD checkpoint fix: parent body included in HUD target/nearest set; build clean (0 errors); re-presenting human-verify
+status: verifying
+stopped_at: 01-04 Minimal HUD APPROVED (human-verified 2026-06-14, fix 55c70ad) — all 4 plans complete; running phase verification
+last_updated: "2026-06-14T21:00:00.000Z"
+last_activity: 2026-06-14 -- 01-04 Minimal HUD human-verified & APPROVED; extended targeting HUD (tree selector + world-pinned outline) deferred to backlog 999.1; running phase verifier
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 4
-  completed_plans: 3
-  percent: 0
+  completed_plans: 4
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 
 ## Current Position
 
-Phase: 01 (in-system-flight-mvp) — EXECUTING
-Plan: 4 of 4 (01-03 COMPLETE; starting 01-04 Minimal HUD next)
-Status: Executing Phase 01
-Last activity: 2026-06-13 -- Plan 01-03 FlightController complete (approved, 3 play-test rounds)
+Phase: 01 (in-system-flight-mvp) — VERIFYING
+Plan: 4 of 4 (01-04 Minimal HUD COMPLETE & human-verified — TRV-01 milestone composed)
+Status: All Phase 01 plans complete; running phase verification
+Last activity: 2026-06-14 -- Plan 01-04 Minimal HUD human-verified & APPROVED; extended targeting HUD deferred to backlog 999.1
 
-Progress: [█████████░] 90%
+Progress: [██████████] 100% (plans complete; verifying)
 
 ## Performance Metrics
 
@@ -92,7 +92,7 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| HUD / targeting | Extended targeting system: hierarchy tree selector (any object, overrides D-12) + world-pinned target outline w/ minimum on-screen radius + name/distance label pinned to & tracking the object | Backlog 999.1 | 2026-06-14 (01-04 checkpoint) |
 
 ## Quick Tasks Completed
 

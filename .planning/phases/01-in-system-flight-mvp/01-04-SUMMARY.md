@@ -2,7 +2,9 @@
 phase: 01-in-system-flight-mvp
 plan: "04"
 subsystem: hud
-status: checkpoint-failure-fixed-re-presenting-human-verify
+status: complete
+human_verified: true
+human_verified_date: "2026-06-14"
 tags: [godot, csharp, hud, ui, phosphor-green, adaptive-units, target-cycle, direction-marker, tdd]
 
 requires:
@@ -45,11 +47,15 @@ metrics:
 
 # Phase 01 Plan 04: Minimal HUD Summary
 
-**One-liner:** Phosphor-green HUD with adaptive-unit speed (m/s→ly/s), space-tier context label, cycle-able target readout with off-screen edge direction marker — completing the TRV-01 in-system-flight milestone. AWAITING HUMAN VERIFY.
+**One-liner:** Phosphor-green HUD with adaptive-unit speed (m/s→ly/s), space-tier context label, cycle-able target readout with off-screen edge direction marker — completing the TRV-01 in-system-flight milestone. HUMAN-VERIFIED & APPROVED (2026-06-14).
 
 ## Status
 
-**Tasks 1–3 complete** (3 commits). Task 4 is a `checkpoint:human-verify` gate — the player must play-test the full HUD loop before this plan is marked complete.
+**COMPLETE — human-verified.** All 4 tasks done; the human-verify checkpoint was APPROVED on 2026-06-14 after the parent-body target/context fix (`55c70ad`). The full in-system flight loop (fly → dithered bodies → adaptive speed + context + target HUD) works end-to-end.
+
+### Deferred to backlog (999.1)
+
+During checkpoint review the user requested an **extended targeting system** beyond this plan's minimal-HUD scope: a folder/tree-structure menu to select **any** object in the hierarchy (overrides locked D-12), a **world-pinned target outline** with a **minimum on-screen radius** (always visible when the body is far), and a **name + distance label pinned to and tracking the object** on screen. This is captured as ROADMAP **Backlog Phase 999.1** and does not block 01-04 / TRV-01. The 01-04 deliverable (current-space cycle + fixed readout + off-screen edge marker, per D-12) stands as the approved minimal HUD.
 
 ## Tasks Completed
 
@@ -58,8 +64,8 @@ metrics:
 | 1 | Adaptive speed units + context label (TDD) | `0566018` (RED), `ed731ee` (GREEN) | Done |
 | 2 | Target cycle + off-screen direction marker | `eac7d11` | Done |
 | 3 | Phosphor-green CRT recolor | subsumed in Task 1/2 | Done |
-| 4 | Human-verify checkpoint | — | **RE-PRESENTING** |
 | 4a | Fix: parent body in target/nearest set | `55c70ad` | Done |
+| 4 | Human-verify checkpoint | — | **APPROVED (2026-06-14)** |
 
 ## What Was Built
 

@@ -39,7 +39,7 @@ Plans:
 - [x] 01-01-PLAN.md — Walking Skeleton: STAB-01 iterative transition + floating-origin render + thrust-driven ship + live speed HUD
 - [x] 01-02-PLAN.md — Body rendering: per-body hues + 1:1 radii + emissive star/OmniLight + color-palette dither
 - [x] 01-03-PLAN.md — Flight feel: virtual-joystick steering + roll + persistent throttle [-1,1] (reverse) + distance-scaled speed + crosshair/reticle (APPROVED)
-- [ ] 01-04-PLAN.md — Minimal HUD: adaptive speed units + context label + target cycle + off-screen marker + phosphor-green (TRV-01)
+- [x] 01-04-PLAN.md — Minimal HUD: adaptive speed units + context label + target cycle + off-screen marker + phosphor-green (TRV-01) (APPROVED)
 
 **UI hint**: yes
 
@@ -74,6 +74,22 @@ Plans:
 
 **Plans**: TBD
 
+## Backlog
+
+### Phase 999.1: Targeting & navigation HUD — hierarchy tree selector + world-pinned target outline (BACKLOG)
+
+**Goal:** A target/selection system beyond the Phase-1 minimal HUD, deferred from plan 01-04:
+  1. A folder/tree-structure menu to select **any** object in the universe hierarchy (across spaces) — overrides locked decision **D-12** (current-parent-space targeting only).
+  2. A **world-pinned target outline** drawn around the selected body that holds a **minimum on-screen radius**, so a distant star/planet is always visible even as a sub-pixel speck.
+  3. A **name + distance label pinned to the outline** that tracks the object on screen (moves with the body), augmenting the fixed-corner target readout + off-screen edge marker shipped in 01-04.
+
+  Cross-space constraint to resolve in planning: `WorldRenderer` only renders bodies in the ship's current space, so a cross-space target can show direction + distance (edge marker) but the 3D outline can only be drawn once that body enters the rendered set (i.e. once the ship is in its space).
+**Requirements:** TBD (extends HUD-04 + findability; revisits D-12)
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)
+
 ## Progress
 
 **Execution Order:**
@@ -81,6 +97,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. In-System Flight MVP | 3/4 (01-03 APPROVED) | In Progress|  |
+| 1. In-System Flight MVP | 4/4 (TRV-01 milestone; HUD targeting deferred → 999.1) | Plans complete — verifying |  |
 | 2. Dynamic Skybox | 0/TBD | Not started | - |
 | 3. Cross-Galaxy Travel | 0/TBD | Not started | - |
