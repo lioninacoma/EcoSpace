@@ -4,9 +4,6 @@ shader_type canvas_item;
 uniform bool  dithering       = true;
 uniform int   dithering_size  = 10;
 uniform int   resolution_scale = 2;
-uniform float threshold       = 60.0;
-uniform vec4  white : source_color = vec4(1, 1, 1, 1);
-uniform vec4  black : source_color = vec4(0, 0, 0, 1);
 uniform sampler2D screen_texture : hint_screen_texture, filter_nearest;
 
 // Per-channel ordered quantize (D-13 color palette extension).
@@ -46,7 +43,6 @@ void fragment() {
 		bayer_offset = float(dithering_pattern(fragcoord)) / 255.0;
 	}
 
-	// Hue-preserving per-channel ordered quantize (replaces 1-bit avg<threshold collapse).
 	// Each channel is independently posterized to quantize_levels steps using the Bayer
 	// offset, producing ~levels^3 distinct colours while retaining the ordered-dither
 	// texture. Formula: floor(c * levels + bayer) / levels   (standard posterize + dither).
@@ -58,6 +54,5 @@ void fragment() {
 	// white/black uniforms: still available for tinting / overlay use.
 	// They no longer drive a hard 1-bit branch; instead they serve as optional
 	// tint endpoints. The output is full-colour by default.
-	// (threshold, white, black uniforms kept declared so UniRenderer pushes don't break.)
 	COLOR = vec4(c, 1.0);
 }
