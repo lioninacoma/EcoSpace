@@ -13,7 +13,7 @@ Three phases build the playable game layer on top of EcoSpace's existing multi-s
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: In-System Flight MVP** - Fix pre-flight crash, floating-origin rendering, arcade flight, HUD — player can fly a star system and approach dithered bodies
+- [x] **Phase 1: In-System Flight MVP** - Fix pre-flight crash, floating-origin rendering, arcade flight, HUD — player can fly a star system and approach dithered bodies (COMPLETE 2026-06-14)
 - [ ] **Phase 2: Dynamic Skybox** - Shader-type sky updated on scale-tier transitions; only the next tier out (other systems' stars, then only galaxies) is projected onto a stable spherical skybox, with a visually continuous skybox↔mesh handoff
 - [ ] **Phase 3: Cross-Galaxy Travel** - Extend hand-authored data to galaxy/universe scale; full SOI chain validated at intergalactic distances
 
@@ -97,6 +97,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. In-System Flight MVP | 4/4 (TRV-01 milestone; HUD targeting deferred → 999.1) | Plans complete — verifying |  |
+| 1. In-System Flight MVP | 4/4 (TRV-01 milestone) | ✓ Complete | 2026-06-14 |
 | 2. Dynamic Skybox | 0/TBD | Not started | - |
 | 3. Cross-Galaxy Travel | 0/TBD | Not started | - |

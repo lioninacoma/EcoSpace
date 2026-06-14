@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: 01-04 Minimal HUD APPROVED (human-verified 2026-06-14, fix 55c70ad) — all 4 plans complete; running phase verification
-last_updated: "2026-06-14T21:00:00.000Z"
-last_activity: 2026-06-14 -- 01-04 Minimal HUD human-verified & APPROVED; extended targeting HUD (tree selector + world-pinned outline) deferred to backlog 999.1; running phase verifier
+status: phase_complete
+stopped_at: Phase 01 (in-system-flight-mvp) COMPLETE & VERIFIED 2026-06-14 — TRV-01 milestone achieved; ready for Phase 02 (Dynamic Skybox)
+last_updated: "2026-06-14T21:15:00.000Z"
+last_activity: 2026-06-14 -- Phase 01 verified (build 0/0, 5/5 criteria, RND-02 Planet-space deferred → P2/3 per D-16); ROADMAP/REQUIREMENTS updated; extended targeting HUD → backlog 999.1
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
   completed_plans: 4
   percent: 100
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 
 ## Current Position
 
-Phase: 01 (in-system-flight-mvp) — VERIFYING
-Plan: 4 of 4 (01-04 Minimal HUD COMPLETE & human-verified — TRV-01 milestone composed)
-Status: All Phase 01 plans complete; running phase verification
-Last activity: 2026-06-14 -- Plan 01-04 Minimal HUD human-verified & APPROVED; extended targeting HUD deferred to backlog 999.1
+Phase: 01 (in-system-flight-mvp) — ✓ COMPLETE & VERIFIED (2026-06-14)
+Plan: 4 of 4 complete — TRV-01 in-system-flight milestone achieved
+Status: Phase 01 closed. Next: Phase 02 — Dynamic Skybox (shallow phase research recommended before planning)
+Last activity: 2026-06-14 -- Phase 01 verified & closed (build 0/0, 5/5 criteria); RND-02 Planet-space cross-body rendering deferred → Phase 2/3 (D-16); extended targeting HUD → backlog 999.1
 
-Progress: [██████████] 100% (plans complete; verifying)
+Progress: [██████████] 100% — Phase 01 complete (1 of 3 phases)
 
 ## Performance Metrics
 
