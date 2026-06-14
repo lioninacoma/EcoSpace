@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: phase_complete
-stopped_at: Phase 01 (in-system-flight-mvp) COMPLETE & VERIFIED 2026-06-14 — TRV-01 milestone achieved; ready for Phase 02 (Dynamic Skybox)
-last_updated: "2026-06-14T21:15:00.000Z"
-last_activity: 2026-06-14 -- Phase 01 verified (build 0/0, 5/5 criteria, RND-02 Planet-space deferred → P2/3 per D-16); ROADMAP/REQUIREMENTS updated; extended targeting HUD → backlog 999.1
+status: planning
+stopped_at: Phase 02 context gathered
+last_updated: "2026-06-14T21:22:32.375Z"
+last_activity: 2026-06-14 -- Phase 01 verified & closed (build 0/0, 5/5 criteria); RND-02 Planet-space cross-body rendering deferred → Phase 2/3 (D-16); extended targeting HUD → backlog 999.1
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 1
   total_plans: 4
   completed_plans: 4
-  percent: 100
+  percent: 25
 ---
 
 # Project State
@@ -104,8 +104,8 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-14
-Stopped at: 01-04 checkpoint-failure fix committed (55c70ad) — RE-PRESENTING HUMAN VERIFY checkpoint (Task 4)
+Last session: 2026-06-14T21:22:32.367Z
+Stopped at: Phase 02 context gathered
 Resume: Reply "approved" after play-testing the HUD with the corrected target/nearest behaviour to complete 01-04 and the TRV-01 milestone
 
 ## Refactor Notes
@@ -113,6 +113,7 @@ Resume: Reply "approved" after play-testing the HUD with the corrected target/ne
 **2026-06-13 — Repo refactor: folder-aligned namespaces**
 
 Applied behaviour-preserving structural refactor (5 commits + 1 doc commit):
+
 - `namespace Universe` / `Scripts/Universe/UniRenderer.cs` → `namespace Render` / `Scripts/Render/PostProcessRenderer.cs` (class renamed PostProcessRenderer)
 - `namespace Universe` / `Scripts/Render/RenderBridge.cs` → `namespace Render` / `Scripts/Render/WorldRenderer.cs` (class renamed WorldRenderer; using Universe; added)
 - `namespace Universe` / `Scripts/Flight/FlightController.cs` → `namespace Flight` (using Universe; added; file/class unchanged)
@@ -127,6 +128,7 @@ Applied behaviour-preserving structural refactor (5 commits + 1 doc commit):
 **2026-06-13 — Repo refactor: Universe namespace/folder fully eliminated**
 
 Applied behaviour-preserving structural refactor (5 commits):
+
 - `Scripts/Universe/Math/Double3.cs` → `Scripts/Math/Double3.cs` (global namespace; namespace Universe.Math removed)
 - `Scripts/Universe/Math/Long3.cs` → `Scripts/Math/Long3.cs` (global namespace; namespace Universe.Math removed)
 - `Scripts/Universe/Math/UniVec3.cs` → `Scripts/Math/UniVec3.cs` (global namespace; namespace Universe.Math removed)
