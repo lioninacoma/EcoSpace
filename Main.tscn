@@ -75,21 +75,6 @@ offset_right = 390.0
 offset_bottom = 66.0
 text = "TGT  --- · ---"
 
-[node name="DirMarker" type="Control" parent="CanvasLayer/Hud" unique_id=-1293967284]
-visible = false
-layout_mode = 0
-offset_right = 16.0
-offset_bottom = 16.0
-mouse_filter = 2
-
-[node name="Arrow" type="ColorRect" parent="CanvasLayer/Hud/DirMarker" unique_id=-1293967283]
-modulate = Color(0.1, 1, 0.3, 1)
-layout_mode = 0
-offset_left = 6.0
-offset_top = 0.0
-offset_right = 10.0
-offset_bottom = 16.0
-
 [node name="Crosshair" type="Control" parent="CanvasLayer" unique_id=-1293967292]
 layout_mode = 3
 anchors_preset = 8
@@ -147,6 +132,24 @@ offset_left = -1.0
 offset_top = -8.0
 offset_right = 1.0
 offset_bottom = 8.0
+
+[node name="DirMarker" type="Control" parent="CanvasLayer" unique_id=-1293967284]
+visible = false
+layout_mode = 3
+anchors_preset = 0
+offset_left = 376.0
+offset_top = 208.0
+offset_right = 392.0
+offset_bottom = 224.0
+mouse_filter = 2
+
+[node name="Arrow" type="ColorRect" parent="CanvasLayer/DirMarker" unique_id=-1293967283]
+modulate = Color(0.1, 1, 0.3, 1)
+layout_mode = 0
+offset_left = 6.0
+offset_top = 0.0
+offset_right = 10.0
+offset_bottom = 16.0
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1364607324]
 environment = SubResource("Environment_r0du0")

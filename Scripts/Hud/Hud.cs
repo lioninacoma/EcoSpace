@@ -87,7 +87,9 @@ namespace Hud
             _speedLabel   = GetNodeOrNull<Label>("SpeedLabel");
             _contextLabel = GetNodeOrNull<Label>("ContextLabel");
             _targetLabel  = GetNodeOrNull<Label>("TargetLabel");
-            _dirMarker    = GetNodeOrNull<Control>("DirMarker");
+            // DirMarker lives as a sibling under CanvasLayer (not a child of Hud)
+            // so it can be positioned in full viewport coordinates without offset math.
+            _dirMarker    = GetParent()?.GetNodeOrNull<Control>("DirMarker");
 
             // Apply phosphor-green to all child labels
             ApplyPhosphorGreen(_speedLabel);
