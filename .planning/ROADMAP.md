@@ -51,10 +51,10 @@ Plans:
 **Requirements**: RND-05, RND-07
 **Success Criteria** (what must be TRUE):
 
-  1. The skybox visibly changes (its light points reposition / re-tier) when the player crosses a scale boundary
+  1. The re-tier logic correctly classifies which bodies are skybox points vs current-tier meshes for the ship's space, recomputed each frame and on SOI/scale transitions — verified by unit tests; in-system, the sibling-star points are projected at world-fixed directions. (The *visible* Star↔Galaxy re-tier is demonstrated in Phase 3 — D-24.)
   2. The skybox does not rotate or drift as the player rotates the ship — it remains fixed to world space
   3. Only the next tier out is on the skybox; bodies of the current tier are meshes (in Galaxy space the galaxy's stars are meshes, not skybox points), and bodies beyond the next tier are neither
-  4. The skybox↔mesh handoff is visually continuous (RND-07): a star promoted from a skybox point to a mesh, or demoted back, on a scale transition shows no perceptible pop in position, brightness, or color
+  4. The skybox↔mesh handoff machinery (RND-07 baseline) is built and proven in-system: a skybox point and its corresponding mesh can be aligned to the same screen position with matched color and brightness for an instant, pop-free swap (no crossfade — D-21). (The *visible* promotion/demotion on a scale boundary is demonstrated in Phase 3 — D-24.)
 
 **Plans**: TBD
 
