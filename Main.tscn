@@ -4,8 +4,8 @@
 [ext_resource type="Script" uid="uid://b434isdpy4rh8" path="res://Scripts/Render/PostProcessRenderer.cs" id="3_cm0pq"]
 [ext_resource type="Script" uid="uid://dfcuoiqq1lvar" path="res://Scripts/Hud/Fps.gd" id="3_r0du0"]
 [ext_resource type="Script" uid="uid://ci31tr454vcvs" path="res://Scripts/Render/WorldRenderer.cs" id="4_rendbrg"]
-[ext_resource type="Script" uid="uid://15wnt1j1werr" path="res://Scripts/Hud/Hud.cs" id="5_hudhud"]
-[ext_resource type="Script" uid="uid://bflightctrl03" path="res://Scripts/Flight/FlightController.cs" id="6_flight"]
+[ext_resource type="Script" uid="uid://biupwsicrc0rv" path="res://Scripts/Hud/Hud.cs" id="5_hudhud"]
+[ext_resource type="Script" uid="uid://6rgvete7r3rp" path="res://Scripts/Flight/FlightController.cs" id="6_flight"]
 
 [sub_resource type="Environment" id="Environment_r0du0"]
 background_mode = 1
@@ -29,7 +29,9 @@ offset_right = 768.0
 offset_bottom = 432.0
 color = Color(1, 1, 1, 0)
 script = ExtResource("3_cm0pq")
+DitheringSize = 8
 ResolutionScale = 1
+QuantizeLevels = 6
 
 [node name="FPSLabel" type="Label" parent="CanvasLayer" unique_id=2114709689]
 modulate = Color(0.1, 1, 0.3, 1)
@@ -86,6 +88,8 @@ offset_left = -8.0
 offset_top = -8.0
 offset_right = 8.0
 offset_bottom = 8.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
 
 [node name="CrossH" type="ColorRect" parent="CanvasLayer/Crosshair" unique_id=-1293967291]
@@ -107,10 +111,6 @@ offset_bottom = 8.0
 [node name="SteeringReticle" type="Control" parent="CanvasLayer" unique_id=-1293967289]
 layout_mode = 3
 anchors_preset = 0
-anchor_left = 0.0
-anchor_top = 0.0
-anchor_right = 0.0
-anchor_bottom = 0.0
 offset_left = 376.0
 offset_top = 208.0
 offset_right = 392.0
@@ -147,7 +147,6 @@ mouse_filter = 2
 modulate = Color(0.1, 1, 0.3, 1)
 layout_mode = 0
 offset_left = 6.0
-offset_top = 0.0
 offset_right = 10.0
 offset_bottom = 16.0
 
@@ -155,7 +154,7 @@ offset_bottom = 16.0
 environment = SubResource("Environment_r0du0")
 far = 1000000.0
 
-[node name="RenderBridge" type="Node3D" parent="." unique_id=-1293967293]
+[node name="RenderBridge" type="Node3D" parent="." unique_id=792530993]
 script = ExtResource("4_rendbrg")
 WorldPath = NodePath("..")
 
