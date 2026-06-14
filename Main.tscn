@@ -32,7 +32,7 @@ script = ExtResource("3_cm0pq")
 ResolutionScale = 1
 
 [node name="FPSLabel" type="Label" parent="CanvasLayer" unique_id=2114709689]
-modulate = Color(1, 0, 1, 1)
+modulate = Color(0.1, 1, 0.3, 1)
 texture_filter = 1
 offset_left = 5.0
 offset_right = 86.0
@@ -45,17 +45,50 @@ layout_mode = 3
 anchors_preset = 0
 offset_left = 5.0
 offset_top = 30.0
-offset_right = 300.0
-offset_bottom = 60.0
+offset_right = 400.0
+offset_bottom = 100.0
 mouse_filter = 2
 script = ExtResource("5_hudhud")
+FlightPath = NodePath("../../FlightController")
+CameraPath = NodePath("../../Camera3D")
 
 [node name="SpeedLabel" type="Label" parent="CanvasLayer/Hud" unique_id=-1293967294]
 modulate = Color(0.1, 1, 0.3, 1)
 layout_mode = 0
-offset_right = 290.0
-offset_bottom = 28.0
-text = "Speed: 0 m/s"
+offset_right = 390.0
+offset_bottom = 22.0
+text = "SPD  0 m/s"
+
+[node name="ContextLabel" type="Label" parent="CanvasLayer/Hud" unique_id=-1293967293]
+modulate = Color(0.1, 1, 0.3, 1)
+layout_mode = 0
+offset_top = 22.0
+offset_right = 390.0
+offset_bottom = 44.0
+text = "STAR SPACE · nearest: ---"
+
+[node name="TargetLabel" type="Label" parent="CanvasLayer/Hud" unique_id=-1293967285]
+modulate = Color(0.1, 1, 0.3, 1)
+layout_mode = 0
+offset_top = 44.0
+offset_right = 390.0
+offset_bottom = 66.0
+text = "TGT  --- · ---"
+
+[node name="DirMarker" type="Control" parent="CanvasLayer/Hud" unique_id=-1293967284]
+visible = false
+layout_mode = 0
+offset_right = 16.0
+offset_bottom = 16.0
+mouse_filter = 2
+
+[node name="Arrow" type="ColorRect" parent="CanvasLayer/Hud/DirMarker" unique_id=-1293967283]
+modulate = Color(0.1, 1, 0.3, 1)
+layout_mode = 0
+offset_left = 6.0
+offset_top = 0.0
+offset_right = 10.0
+offset_bottom = 16.0
 
 [node name="Crosshair" type="Control" parent="CanvasLayer" unique_id=-1293967292]
 layout_mode = 3
