@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Universe namespace/folder eliminated (commits 6c203cb..0294a33) — AWAITING HUMAN VERIFY before 01-04 Minimal HUD
-last_updated: "2026-06-13T00:00:00.000Z"
-last_activity: 2026-06-13 -- pre-01-04 shader revision: body lighting moved from Godot Omni/Directional lights to unshaded spatial shader (body_lit.gdshader); BodyLightEnergy/BodyAmbient exports; commit 253cb35
+stopped_at: 01-04 Tasks 1-3 complete (commits 0566018..eac7d11) — AWAITING HUMAN VERIFY (Task 4 checkpoint)
+last_updated: "2026-06-14T19:55:00.000Z"
+last_activity: 2026-06-14 -- 01-04 HUD: FormatSpeed/Distance, context label, target cycle, off-screen marker, phosphor-green recolor; build clean; awaiting play-test
 progress:
   total_phases: 3
   completed_phases: 0
@@ -104,9 +104,9 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-13
-Stopped at: Universe namespace/folder eliminated — AWAITING HUMAN VERIFY before 01-04 Minimal HUD
-Resume: /gsd-execute-phase 01 (executes 01-04 Minimal HUD) after approving refactor
+Last session: 2026-06-14
+Stopped at: 01-04 Tasks 1-3 done (adaptive HUD, target cycle, phosphor-green) — AWAITING HUMAN VERIFY checkpoint (Task 4)
+Resume: Reply "approved" after play-testing the HUD to complete 01-04 and the TRV-01 milestone
 
 ## Refactor Notes
 
