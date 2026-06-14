@@ -2,7 +2,7 @@
 phase: 01-in-system-flight-mvp
 plan: "04"
 subsystem: hud
-status: checkpoint-pending-human-verify
+status: checkpoint-failure-fixed-re-presenting-human-verify
 tags: [godot, csharp, hud, ui, phosphor-green, adaptive-units, target-cycle, direction-marker, tdd]
 
 requires:
@@ -58,7 +58,8 @@ metrics:
 | 1 | Adaptive speed units + context label (TDD) | `0566018` (RED), `ed731ee` (GREEN) | Done |
 | 2 | Target cycle + off-screen direction marker | `eac7d11` | Done |
 | 3 | Phosphor-green CRT recolor | subsumed in Task 1/2 | Done |
-| 4 | Human-verify checkpoint | — | **PENDING** |
+| 4 | Human-verify checkpoint | — | **RE-PRESENTING** |
+| 4a | Fix: parent body in target/nearest set | `55c70ad` | Done |
 
 ## What Was Built
 
@@ -99,6 +100,25 @@ Subsumed in Tasks 1 and 2:
 - `DirMarker`/`Arrow` created phosphor-green
 - `PhosphorGreen` export on `Hud` applies programmatically via `ApplyPhosphorGreen()` in `_Ready()`
 - Zero magenta `Color(1, 0, 1, 1)` remains in `Main.tscn` (verified by grep)
+
+## Checkpoint Failure and Fix (2026-06-14)
+
+Human-verify checkpoint FAILED on items 3 and 4:
+- Item 3 (context nearest body): showed `nearest: ---` while orbiting Planet A
+- Item 4 (target readout + Tab cycle): showed `TGT ---` and Tab cycled nothing
+
+**Root cause:** `BuildSiblingList` returned the ship's siblings within Planet A's `ChildIndices` — which only contained the ship itself, yielding an empty list. The parent body (Planet A) was never in the targetable set. `WorldRenderer` correctly renders the PARENT body at the frame origin, but `Hud` was only scanning siblings.
+
+**Fix (commit `55c70ad`):**
+- `BuildSiblingList` replaced by `BuildTargetableList` which adds the parent body first (with `IsParent=true`), then iterates siblings as before. Count is now ≥ 1 whenever the ship has a valid parent.
+- New `TargetEntry` struct (Index + IsParent flag) drives the correct math path.
+- New `GetRelativeMeters(ship, body, isParent)` helper: for the parent, returns `ship.LocalPos.ToDouble3() * -1.0` (parent sits at SOI origin — its LocalPos is in the grandparent frame, not the ship's frame); for siblings, returns `body.LocalPos.ToLocalDouble(ship.LocalPos)` as before.
+- `UpdateContextLabel`, `UpdateTargetReadout`, `_Input` cycle handler all updated to use `BuildTargetableList` and `GetRelativeMeters`.
+- `UpdateDirectionMarker` now accepts a precomputed `Double3 relD` (no longer calls `targetObj.LocalPos.ToLocalDouble` which was wrong for the parent).
+
+Expected behaviour after fix:
+- Orbiting Planet A: `PLANET SPACE · nearest: PLANET A` and `TGT  PLANET A · <dist>`; Tab cycles to Planet A only (only one targetable body in Planet SOI).
+- After exiting to Star space: `STAR SPACE · nearest: <closest of Star/Planet A/Planet B>` and Tab cycles Star → Planet A → Planet B.
 
 ## Deviations from Plan
 

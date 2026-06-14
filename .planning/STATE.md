@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: 01-04 Tasks 1-3 complete (commits 0566018..eac7d11) — AWAITING HUMAN VERIFY (Task 4 checkpoint)
-last_updated: "2026-06-14T19:55:00.000Z"
-last_activity: 2026-06-14 -- 01-04 HUD: FormatSpeed/Distance, context label, target cycle, off-screen marker, phosphor-green recolor; build clean; awaiting play-test
+stopped_at: 01-04 Task 4 checkpoint-failure fixed (commit 55c70ad) — RE-PRESENTING HUMAN VERIFY
+last_updated: "2026-06-14T20:30:00.000Z"
+last_activity: 2026-06-14 -- 01-04 HUD checkpoint fix: parent body included in HUD target/nearest set; build clean (0 errors); re-presenting human-verify
 progress:
   total_phases: 3
   completed_phases: 0
@@ -105,8 +105,8 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 ## Session Continuity
 
 Last session: 2026-06-14
-Stopped at: 01-04 Tasks 1-3 done (adaptive HUD, target cycle, phosphor-green) — AWAITING HUMAN VERIFY checkpoint (Task 4)
-Resume: Reply "approved" after play-testing the HUD to complete 01-04 and the TRV-01 milestone
+Stopped at: 01-04 checkpoint-failure fix committed (55c70ad) — RE-PRESENTING HUMAN VERIFY checkpoint (Task 4)
+Resume: Reply "approved" after play-testing the HUD with the corrected target/nearest behaviour to complete 01-04 and the TRV-01 milestone
 
 ## Refactor Notes
 
