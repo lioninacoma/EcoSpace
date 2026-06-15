@@ -118,11 +118,13 @@ public partial class TestSetup : GameWorld
         GameObjects[_planetA].Name         = "PLANET A";
         GameObjects[_planetA].BaseColor    = PlanetA_Color;
         GameObjects[_planetA].RadiusMeters = PlanetA_RadiusMeters;
+        GameObjects[_planetA].Luminosity   = 0.0;
 
         _planetB = AddGameObject(_star,    new Double3(0, 0, PlanetB_Z), PlanetSOI);
         GameObjects[_planetB].Name         = "PLANET B";
         GameObjects[_planetB].BaseColor    = PlanetB_Color;
         GameObjects[_planetB].RadiusMeters = PlanetB_RadiusMeters;
+        GameObjects[_planetB].Luminosity   = 0.0;
 
         _ship    = AddGameObject(_planetA, new Double3(0, 0, ShipOrbitMeters), 0);
         GameObjects[_ship].Name = "SHIP";
