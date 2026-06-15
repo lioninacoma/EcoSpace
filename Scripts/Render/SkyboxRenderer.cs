@@ -148,10 +148,10 @@ namespace Render
 				float  eff   = Mathf.Max((float)theta, pixelAngle);
 				_sizes[count] = 1f - Mathf.Cos(eff);
 
-				// BRIGHTNESS — purely physical: inverse-square apparent flux (Luminosity / d²)
-				// from the shared StarRendering rule. Values >1 feed the WorldEnvironment glow,
-				// so a bright/near star blooms slightly and distant ones stay dim points.
-				float alpha = StarRendering.SkyBrightness(body.Luminosity, len);
+				// BRIGHTNESS — the SAME shared rule the mesh uses: inverse-square flux through a
+				// magnitude (log) curve, shifted by the one global StarRendering.Exposure. Result
+				// is in [0,1] so the star's BaseColor hue is preserved instead of washing out.
+				float alpha = StarRendering.ApparentBrightness(body.Luminosity, len);
 				_colors[count] = new Color(body.BaseColor.R, body.BaseColor.G, body.BaseColor.B, alpha);
 
 				count++;

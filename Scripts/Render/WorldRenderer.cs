@@ -49,25 +49,25 @@ namespace Render
 		/// Planet scale = 0.0001 m/unit → 1 observer-unit = 0.0001 m. Factor=1e-8 → 1 render unit = 1e12 m.
 		/// Radius transform: RadiusMeters (true m) / ship.LocalPos.Scale (→ observer units) × factor (→ render units).
 		/// </summary>
-		[Export] public float PlanetRenderFactor { get; set; } = 1e-8f;
+		private float PlanetRenderFactor { get; set; } = 1e-8f;
 
 		/// <summary>
 		/// Render units per observer-unit for Star-space frames (applied after ToLocalDoubleUnits).
 		/// Star scale = 1 m/unit → 1 observer-unit = 1 m. Factor=1e-8 → 1 render unit = 1e8 m.
 		/// </summary>
-		[Export] public float StarRenderFactor { get; set; } = 1e-8f;
+		private float StarRenderFactor { get; set; } = 1e-8f;
 
 		/// <summary>
 		/// Render units per observer-unit for Galaxy-space frames.
 		/// Placeholder — Galaxy tier not exercised by MVP scene; tune when reached.
 		/// </summary>
-		[Export] public float GalaxyRenderFactor { get; set; } = 1e-8f;
+		private float GalaxyRenderFactor { get; set; } = 1e-8f;
 
 		/// <summary>
 		/// Render units per observer-unit for Universe-space frames.
 		/// Placeholder — Universe tier not exercised by MVP scene; tune when reached.
 		/// </summary>
-		[Export] public float UniverseRenderFactor { get; set; } = 1e-8f;
+		private float UniverseRenderFactor { get; set; } = 1e-8f;
 
 		/// <summary>
 		/// Default sphere mesh radius (true meters) used for unnamed/unpresented bodies.
@@ -76,9 +76,19 @@ namespace Render
 		[Export] public float DefaultBodyRadius { get; set; } = 6.371e6f;   // Earth-radius fallback
 
 		// ----- Star emissive ---------------------------------------------------
-		// A star mesh's emitted light is derived from its own Luminosity via the shared
-		// StarRendering rule (the SAME per-star source the skybox uses), so there is no
-		// separate mesh-only brightness knob to keep in sync.
+
+		/// <summary>
+		/// THE single global star-brightness knob, shared by the star mesh AND the skybox light
+		/// points (it is the editor handle for <see cref="StarRendering.Exposure"/>). In
+		/// magnitude/exposure stops: 0 = calibrated default, positive brightens every star
+		/// everywhere, negative dims them. There is no separate mesh-only or sky-only brightness.
+		/// A star's relative brightness still comes from its own Luminosity + distance.
+		/// </summary>
+		[Export] public float StarBrightness
+		{
+			get => StarRendering.Exposure;
+			set => StarRendering.Exposure = value;
+		}
 
 		// ----- Shader-based body lighting exports (replaces Godot light nodes) ----
 
@@ -423,6 +433,17 @@ namespace Render
 
 			mesh.Position = renderPos;
 			mesh.Visible  = true;
+
+			// Star mesh emitted light: driven each frame by the SAME shared StarRendering curve
+			// the skybox uses (inverse-square flux of the star's own Luminosity at its true
+			// distance, through the magnitude curve + global Exposure). distMeters = observer-unit
+			// distance × ship scale. Updating per frame keeps mesh and sky coherent under live
+			// Exposure tuning and as the star's distance changes.
+			if (isStar && mesh.MaterialOverride is StandardMaterial3D starMat)
+			{
+				double distMeters = relUnits.Magnitude() * ship.LocalPos.Scale;
+				starMat.EmissionEnergyMultiplier = StarRendering.ApparentBrightness(body.Luminosity, distMeters);
+			}
 		}
 
 		/// <summary>
@@ -435,8 +456,9 @@ namespace Render
 		/// after every SOI transition.
 		///
 		/// Material assignment (RND-03/04, 01-02 shader revision):
-		/// - Star: ShadingMode=Unshaded + EmissionEnabled + EmissionEnergyMultiplier from
-		///   StarRendering.MeshEmissionEnergy(Luminosity) — the shared per-star light rule.
+		/// - Star: ShadingMode=Unshaded + EmissionEnabled; EmissionEnergyMultiplier is set each
+		///   frame in RenderBodyAt from StarRendering.ApparentBrightness — the shared star light
+		///   rule (identical curve to the skybox points).
 		///   No lighting needed — it IS the light source. Bloom via WorldEnvironment glow.
 		/// - Planets/other: ShaderMaterial using body_lit.gdshader (unshaded spatial shader).
 		///   Albedo is set from body.BaseColor at creation. star_dir, light_energy, and ambient
@@ -469,8 +491,9 @@ namespace Render
 					AlbedoColor              = body.BaseColor,
 					EmissionEnabled          = true,
 					Emission                 = body.BaseColor,
-					// Emitted light from the star's own Luminosity (shared rule with the skybox).
-					EmissionEnergyMultiplier = StarRendering.MeshEmissionEnergy(body.Luminosity),
+					// Emitted light comes from the shared StarRendering curve (same as the skybox);
+					// updated each frame in RenderBodyAt from the star's Luminosity + distance.
+					EmissionEnergyMultiplier = 1f,
 				};
 
 				meshInstance = new MeshInstance3D
