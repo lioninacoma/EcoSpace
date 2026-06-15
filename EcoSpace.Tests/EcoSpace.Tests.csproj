@@ -33,6 +33,8 @@
          project is needed. This keeps the Godot game build completely unaffected. -->
     <Compile Include="..\Scripts\UniObject.cs" />
     <Compile Include="..\Scripts\TierClassifier.cs" />
+    <!-- Shared star brightness/size model — units under test for the brightness asserts. -->
+    <Compile Include="..\Scripts\Render\StarRendering.cs" />
     <!-- Math types referenced transitively by UniObject (UniVec3 field type). -->
     <Compile Include="..\Scripts\Math\UniVec3.cs" />
     <Compile Include="..\Scripts\Math\Double3.cs" />

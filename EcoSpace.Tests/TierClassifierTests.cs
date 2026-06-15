@@ -183,48 +183,58 @@ public class TierClassifierTests
         Assert.Equal(SkyTier.NextTierSkybox, TierClassifier.Classify(sirius, ship));
     }
 
-    // ── D-19 minimum-brightness floor ─────────────────────────────────────
+    // ── Star brightness model (Render.StarRendering.ApparentBrightness) ────────
+    // These exercise the SHIPPED brightness function used by BOTH SkyboxRenderer and
+    // WorldRenderer — an inverse-square flux (L/d²) through a magnitude (log10) curve
+    // clamped to [0,1]. Render.StarRendering.Exposure is a mutable process-global static
+    // (WR-02); each test sets it explicitly to avoid cross-test order dependence.
 
     [Fact]
-    public void MinBrightFloor_ReturnedWhen_RawBrightnessIsBelowFloor()
+    public void ApparentBrightness_ClampsToZero_ForFaintDistantBody()
     {
-        // Magnitude model (SkyboxRenderer): brightness = Max(raw, MinBrightFloor)
-        // where raw = (float)(L * LuminosityScale / (d * d)).
-        //
-        // This test uses the exact same formula as SkyboxRenderer.SyncSkyPoints:
-        //   Luminosity   = 0.001 (very faint body)
-        //   LuminosityScale = 2e35 (SkyboxRenderer default)
-        //   dist         = 1e26 m (enormous — sub-threshold result guaranteed)
-        //   MinBrightFloor = 0.1f (SkyboxRenderer default)
-        //
-        // Expected: raw ≈ 0 < floor → brightness == floor.
-        double luminosity     = 0.001;
-        double luminosityScale = 2e35;
-        double dist           = 1e26;     // much larger than any real interstellar distance
-        float  floor          = 0.1f;
-
-        float rawAlpha = (float)(luminosity * luminosityScale / (dist * dist));
-        float brightness = System.Math.Max(rawAlpha, floor);
-
-        Assert.Equal(floor, brightness, precision: 5);
+        Render.StarRendering.Exposure = 0f;
+        // L=0.001 at 1e26 m: log10 flux is far below the floor → curve clamps to 0 (invisible).
+        float b = Render.StarRendering.ApparentBrightness(luminosity: 0.001, distMeters: 1e26);
+        Assert.Equal(0f, b);
     }
 
     [Fact]
-    public void MinBrightFloor_NotApplied_WhenBrightnessExceedsFloor()
+    public void ApparentBrightness_ZeroLuminosity_IsZero()
     {
-        // Verify the model is NOT clamped upward when natural brightness exceeds the floor.
-        // Uses Sirius-like params: L=25.4, LuminosityScale=2e35, d=8e16 m (~8.6 ly).
-        double luminosity      = 25.4;
-        double luminosityScale = 2e35;
-        double dist            = 8e16;
-        float  floor           = 0.1f;
+        Render.StarRendering.Exposure = 0f;
+        // Non-emissive bodies (planets, Luminosity = 0) contribute no star light.
+        Assert.Equal(0f, Render.StarRendering.ApparentBrightness(luminosity: 0.0, distMeters: 1.5e11));
+    }
 
-        float rawAlpha   = (float)(luminosity * luminosityScale / (dist * dist));
-        float brightness = System.Math.Max(rawAlpha, floor);
+    [Fact]
+    public void ApparentBrightness_InRange_AndRanksSiriusAboveBarnard()
+    {
+        Render.StarRendering.Exposure = 0f;
+        // Authored sibling data (TestSetup): Sirius L=25.4 @ 8.13e16 m, Barnard L=0.0035 @ 5.63e16 m.
+        float sirius  = Render.StarRendering.ApparentBrightness(25.4,   8.13e16);
+        float barnard = Render.StarRendering.ApparentBrightness(0.0035, 5.63e16);
 
-        // rawAlpha is significantly above the floor — brightness should equal rawAlpha, not floor.
-        Assert.True(brightness > floor,
-            $"Expected brightness ({brightness}) > floor ({floor}) for bright Sirius-like body.");
-        Assert.Equal(rawAlpha, brightness, precision: 3);
+        Assert.InRange(sirius,  0f, 1f);
+        Assert.InRange(barnard, 0f, 1f);
+        // Inverse-square + magnitude curve must preserve physical ranking: Sirius >> Barnard.
+        Assert.True(sirius > barnard,
+            $"Expected Sirius brightness ({sirius}) > Barnard ({barnard}).");
+    }
+
+    [Fact]
+    public void ApparentBrightness_ExposureBrightensMonotonically()
+    {
+        // The single global exposure knob lifts a star's brightness; verify it is monotonic
+        // and still clamped to [0,1]. Use a mid-range body so it is not already saturated.
+        Render.StarRendering.Exposure = 0f;
+        float baseB = Render.StarRendering.ApparentBrightness(1.519, 3.97e16); // Alpha-Cen-like
+
+        Render.StarRendering.Exposure = 10f;
+        float brightB = Render.StarRendering.ApparentBrightness(1.519, 3.97e16);
+
+        Render.StarRendering.Exposure = 0f; // reset for any later test in this process
+        Assert.True(brightB >= baseB,
+            $"Higher exposure must not dim a star (base {baseB}, bright {brightB}).");
+        Assert.InRange(brightB, 0f, 1f);
     }
 }

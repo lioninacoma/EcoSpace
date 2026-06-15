@@ -151,6 +151,11 @@ namespace Render
 		/// <summary>Per-body mesh instances: keyed by GameObjects index.</summary>
 		private readonly Dictionary<int, MeshInstance3D> _meshes = [];
 
+		/// <summary>Reused per-frame scratch (cleared at the top of SyncBodies) to avoid
+		/// steady GC pressure from allocating fresh collections every frame (WR-01).</summary>
+		private readonly HashSet<int> _activeIndices = [];
+		private readonly Dictionary<int, Vector3> _renderPositions = [];
+
 		/// <summary>
 		/// Per-body shader materials for lit (non-star) bodies.
 		/// Keyed by GameObjects index. star_dir, light_energy, and ambient
@@ -210,11 +215,14 @@ namespace Render
 			float factor = RenderFactorFor(ship.CurrentSpace);
 
 			// Track which indices are rendered this frame to hide bodies that left the set.
-			var activeIndices = new HashSet<int>();
+			// Reused scratch fields (WR-01) — cleared each frame instead of reallocated.
+			var activeIndices = _activeIndices;
+			activeIndices.Clear();
 
 			// Collect per-body render positions for this frame (used for star_dir computation
 			// and persisted to _lastRenderPositions for RND-07/D-21 handoff baseline).
-			var renderPositions = new Dictionary<int, Vector3>();
+			var renderPositions = _renderPositions;
+			renderPositions.Clear();
 
 			// Clear persisted positions — rebuilt fresh each frame (T-02-05 mitigation).
 			_lastRenderPositions.Clear();

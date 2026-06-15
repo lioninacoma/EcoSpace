@@ -32,6 +32,11 @@ namespace Render
 		private Camera3D       _cam;
 
 		private const int MaxStars = 8;
+
+		/// <summary>Safety cap on a sky point's angular disc radius (radians, ~28°). Next-tier-out
+		/// bodies are always far so their true angular size is sub-pixel; this only guards against
+		/// a degenerate near body producing a smoothstep edge of 1−cos(θ) → 1 (which breaks the disc).</summary>
+		private const float MaxDiscAngle = 0.5f;
 		private readonly Vector3[] _dirs   = new Vector3[MaxStars];
 		private readonly Color[]   _colors = new Color[MaxStars];
 		private readonly float[]   _sizes  = new float[MaxStars];
@@ -145,7 +150,10 @@ namespace Render
 				// handoff cannot pop), floored at the pixel footprint because nothing can render
 				// smaller than one pixel. The smoothstep disc param is (1 − cos θ_eff).
 				double theta = StarRendering.AngularRadius(body.RadiusMeters, len);
-				float  eff   = Mathf.Max((float)theta, pixelAngle);
+				// Floor at one pixel (resolution limit) and cap at MaxDiscAngle so a degenerate
+				// near body cannot drive 1−cos toward 1 (which collapses the shader smoothstep).
+				// Next-tier-out bodies are always far, so this cap is a safety bound, not a tuning knob.
+				float  eff   = Mathf.Clamp((float)theta, pixelAngle, MaxDiscAngle);
 				_sizes[count] = 1f - Mathf.Cos(eff);
 
 				// BRIGHTNESS — the SAME shared rule the mesh uses: inverse-square flux through a
