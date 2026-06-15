@@ -124,9 +124,9 @@ namespace Render
 				// body.Luminosity = 0 → reflected-light body (planet) → floors to MinBrightFloor.
 				// Values >> 1.0 drive Forward+ HDR bloom; tone mapper handles the upper range.
 				float rawAlpha = body.Luminosity > 0
-				    ? (float)(body.Luminosity * LuminosityScale / (len * len))
-				    : 0f;
-				float alpha = MathF.Max(rawAlpha, MinBrightFloor);
+					? (float)(body.Luminosity * LuminosityScale / (len * len))
+					: 0f;
+				float alpha = Mathf.Max(rawAlpha, MinBrightFloor);
 				_colors[count] = new Color(body.BaseColor.R, body.BaseColor.G, body.BaseColor.B, alpha);
 
 				count++;
@@ -162,7 +162,7 @@ namespace Render
 			double  scale = obj.LocalPos.Scale;
 			var     u     = obj.LocalPos.Units;
 			Double3 pos   = obj.LocalPos.Offset
-			                + new Double3((double)u.X * scale, (double)u.Y * scale, (double)u.Z * scale);
+							+ new Double3((double)u.X * scale, (double)u.Y * scale, (double)u.Z * scale);
 			int pIdx = obj.ParentIndex;
 
 			while ((uint)pIdx < (uint)objs.Count && objs[pIdx] != null)
@@ -174,8 +174,8 @@ namespace Render
 				// Accumulate parent's full position in metres and add our metres-from-parent.
 				var pu = parent.LocalPos.Units;
 				pos = parent.LocalPos.Offset
-				      + new Double3((double)pu.X * pScale, (double)pu.Y * pScale, (double)pu.Z * pScale)
-				      + pos;
+					  + new Double3((double)pu.X * pScale, (double)pu.Y * pScale, (double)pu.Z * pScale)
+					  + pos;
 				pIdx = parent.ParentIndex;
 			}
 
