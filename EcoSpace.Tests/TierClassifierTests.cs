@@ -22,7 +22,8 @@
 // Coverage:
 //   - Full ship-space × body-space matrix (ship in Star and Planet)
 //   - Skip cases: null body, null ship, body==ship, Root-space body
-//   - D-19 min-brightness floor: inverse-square model clamped to MinBrightFloor
+//   - Star brightness: Render.StarRendering.ApparentBrightness (inverse-square flux through a
+//     log magnitude curve clamped to [0,1]) — zero-clamp, zero-luminosity, ranking, exposure
 //   - Ship in Star space seeing a sibling star system in Galaxy space (the real in-system case,
 //     confirmed in 02-01-SUMMARY).
 
