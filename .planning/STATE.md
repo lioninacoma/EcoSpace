@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
+status: executing
 stopped_at: Phase 02 context gathered
-last_updated: "2026-06-14T21:22:32.375Z"
-last_activity: 2026-06-14 -- Phase 01 verified & closed (build 0/0, 5/5 criteria); RND-02 Planet-space cross-body rendering deferred → Phase 2/3 (D-16); extended targeting HUD → backlog 999.1
+last_updated: "2026-06-15T12:56:25.345Z"
+last_activity: 2026-06-15 -- Phase 02 execution started
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 4
+  total_plans: 7
   completed_plans: 4
   percent: 25
 ---
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-12)
 
 **Core value:** The player can fly seamlessly through a massive 1:1-scale universe — from a planet's surroundings out to interstellar and intergalactic distances — with rendering and flight that stay correct and feel good across every scale.
-**Current focus:** Phase 01 — in-system-flight-mvp
+**Current focus:** Phase 02 — dynamic-skybox
 
 ## Current Position
 
-Phase: 01 (in-system-flight-mvp) — ✓ COMPLETE & VERIFIED (2026-06-14)
-Plan: 4 of 4 complete — TRV-01 in-system-flight milestone achieved
-Status: Phase 01 closed. Next: Phase 02 — Dynamic Skybox (shallow phase research recommended before planning)
-Last activity: 2026-06-14 -- Phase 01 verified & closed (build 0/0, 5/5 criteria); RND-02 Planet-space cross-body rendering deferred → Phase 2/3 (D-16); extended targeting HUD → backlog 999.1
+Phase: 02 (dynamic-skybox) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 02
+Last activity: 2026-06-15 -- Completed quick task 260615-m4b: Implement magnitude model in SkyboxRenderer
 
 Progress: [██████████] 100% — Phase 01 complete (1 of 3 phases)
 
@@ -101,6 +101,7 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 | 2026-06-13 | clarify-system-mesh-vs-skybox-rendering | Docs: tiered mesh/skybox model — in-system → planets + sun(s) as meshes; in-galaxy → that galaxy's stars as meshes; skybox = next tier out; added RND-07 (continuous skybox↔mesh handoff) |
 | 2026-06-13 | align-roadmap-state-to-tier-model | Docs: propagated the tier model into ROADMAP Phase 2 (goal/criteria/overview + RND-07); added RND-06 to Phase 1 reqs (ROADMAP + 01-CONTEXT); fixed STATE current-position (01-02 tasks 1-3 done, task-4 human-verify pending) |
 | 2026-06-13 | tiered-rendering-phase-coverage | Docs: marked RND-02/04/05/07 phase-spanning in traceability (in-system early, galaxy tier in Phase 3); gave ROADMAP Phase 3 explicit galaxy-tier rendering coverage + success criterion (closes audit finding #5) |
+| 2026-06-15 | implement-magnitude-model-in-skyboxrende | feat: inverse-square luminosity model (L/D²×LuminosityScale) replaces flat alpha=1.0 in SkyboxRenderer; MinBrightFloor=0.1 floor for faint stars; MinStarSize=3e-6 minimum disc; planets set Luminosity=0 |
 
 ## Session Continuity
 
