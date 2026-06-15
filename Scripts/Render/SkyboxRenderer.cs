@@ -121,7 +121,7 @@ namespace Render
             Double3 skyBodyRoot = AbsolutePositionInRoot(skyBody, objs);
             Double3 shipRoot    = AbsolutePositionInRoot(ship, objs);
             Double3 delta       = skyBodyRoot - shipRoot;
-            double  len         = delta.Length();
+            double  len         = delta.Magnitude();
 
             // Guard coincident positions (should never happen at interstellar scale).
             if (len < 1e-30) return Vector3.Up;
