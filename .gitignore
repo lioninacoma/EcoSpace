@@ -1,6 +1,10 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+# .NET build output (e.g. standalone EcoSpace.Tests project)
+[Bb]in/
+[Oo]bj/
+
 # Claude
 .claude/
 claude-p.ps1
