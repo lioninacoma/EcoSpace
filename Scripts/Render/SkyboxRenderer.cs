@@ -21,34 +21,15 @@ namespace Render
 		/// <summary>NodePath to the TestSetup node (GameWorld / world state).</summary>
 		[Export] public NodePath WorldPath { get; set; }
 
-		/// <summary>Scale factor mapping physical flux L/D² (solar-lum / m²) to sky shader
-		/// brightness (alpha). Calibrated against the authored siblings so the brightest
-		/// star (Sirius, L=25.4 @ 8.6 ly) lands near alpha≈3 — just into the HDR bloom range —
-		/// and fainter stars rank below it by the true inverse-square law. Exported for
-		/// in-editor tuning without recompile.</summary>
-		[Export] public double LuminosityScale { get; set; } = 8e32;
-
-		/// <summary>Minimum alpha for any sky point regardless of distance/luminosity.
-		/// Keeps faint stars (Barnard's, dim M-dwarfs) a visible dim point without faking
-		/// their brightness. Physical ranking is preserved above this floor.</summary>
-		[Export] public float MinBrightFloor { get; set; } = 0.15f;
-
-		/// <summary>Upper clamp on a sky point's brightness so an approached/very luminous
-		/// star produces only a slight bloom halo rather than washing out the sky. Stars are
-		/// point sources — their apparent "size" comes from this bloom, never disc geometry.</summary>
-		[Export] public float MaxBright { get; set; } = 5.0f;
-
-		/// <summary>Fixed angular half-width of every star's render disc, in smoothstep
-		/// (dot-product) space. Stars are unresolved point sources, so this is a small
-		/// CONSTANT for all of them — brightness, not geometry, distinguishes them, and
-		/// bloom supplies any apparent glare. 2e-6 ≈ 0.11° ≈ a ~3 px point at 75° FOV / 1080 tall.
-		/// Does NOT scale with luminosity (that produced unrealistic giant discs).</summary>
-		[Export] public float StarAngularSize { get; set; } = 2e-6f;
+		// No per-renderer tuning knobs: a star's size and emitted light are derived ENTIRELY
+		// from its own Luminosity / RadiusMeters / BaseColor via the shared StarRendering rules,
+		// so the mesh and skybox stay coherent. See StarRendering for the single config point.
 
 		// ----- Private state --------------------------------------------------
 
 		private TestSetup      _world;
 		private ShaderMaterial _skyMat;
+		private Camera3D       _cam;
 
 		private const int MaxStars = 8;
 		private readonly Vector3[] _dirs   = new Vector3[MaxStars];
@@ -83,8 +64,8 @@ namespace Render
 			// Obtain the sky ShaderMaterial from Camera3D's Environment.
 			// Walk: Camera3D → Environment → Sky → SkyMaterial (cast to ShaderMaterial).
 			// Null-guard each hop so a missing resource only silences the renderer, not crashes.
-			var cam = GetTree().Root.FindChild("Camera3D", true, false) as Camera3D;
-			var env = cam?.Environment;
+			_cam = GetTree().Root.FindChild("Camera3D", true, false) as Camera3D;
+			var env = _cam?.Environment;
 			var sky = env?.Sky;
 			_skyMat = sky?.SkyMaterial as ShaderMaterial;
 
@@ -122,6 +103,11 @@ namespace Render
 			// Cache ship's root-frame position once — reused for every body's direction.
 			Double3 shipRoot = AbsolutePositionInRoot(ship, objs);
 
+			// Angular size of one screen pixel (radians). A star can never render smaller than
+			// the screen can resolve, so this is the floor on a sky point's disc — the only
+			// "minimum" and it is a physical resolution limit, not artificial size enhancement.
+			float pixelAngle = PixelAngularSize();
+
 			int count = 0;
 			for (int i = 0; i < objs.Count && count < MaxStars; i++)
 			{
@@ -149,26 +135,23 @@ namespace Render
 				}
 				_dirs[count] = dir3;
 
-				// Stars are unresolved point sources: every disc is the same small fixed
-				// angular size. Apparent magnitude is conveyed by brightness (below) + bloom,
-				// NOT by inflating disc geometry.
-				_sizes[count] = StarAngularSize;
-
 				// Cache world-fixed sky direction per body for RND-07/D-21 handoff baseline.
 				// Phase 3 reads this to align a newly spawned mesh with the sky point's
 				// screen position for a pop-free instant swap.
 				_skyDirs[body.Index] = dir3;
 
-				// Physically accurate apparent brightness via the inverse-square law (D-17/D-18/D-19):
-				// flux = Luminosity / distance², scaled to display range by LuminosityScale.
-				// body.Luminosity = 0 → reflected-light body (planet) → floors to MinBrightFloor.
-				// Clamped to [MinBrightFloor, MaxBright]: the floor keeps faint stars visible
-				// without faking their magnitude; the cap keeps the brightest star to a slight
-				// bloom. Values >1 feed the Forward+ HDR WorldEnvironment glow (D-20).
-				float rawAlpha = body.Luminosity > 0 && len >= 1e-30
-					? (float)(body.Luminosity * LuminosityScale / (len * len))
-					: 0f;
-				float alpha = Mathf.Clamp(rawAlpha, MinBrightFloor, MaxBright);
+				// SIZE — purely physical: the disc subtends the star's true angular radius
+				// θ = RadiusMeters / distance (the SAME rule the mesh sphere obeys, so the
+				// handoff cannot pop), floored at the pixel footprint because nothing can render
+				// smaller than one pixel. The smoothstep disc param is (1 − cos θ_eff).
+				double theta = StarRendering.AngularRadius(body.RadiusMeters, len);
+				float  eff   = Mathf.Max((float)theta, pixelAngle);
+				_sizes[count] = 1f - Mathf.Cos(eff);
+
+				// BRIGHTNESS — purely physical: inverse-square apparent flux (Luminosity / d²)
+				// from the shared StarRendering rule. Values >1 feed the WorldEnvironment glow,
+				// so a bright/near star blooms slightly and distant ones stay dim points.
+				float alpha = StarRendering.SkyBrightness(body.Luminosity, len);
 				_colors[count] = new Color(body.BaseColor.R, body.BaseColor.G, body.BaseColor.B, alpha);
 
 				count++;
@@ -207,6 +190,20 @@ namespace Render
 			if (_skyDirs.TryGetValue(bodyIdx, out dir)) return true;
 			dir = default;
 			return false;
+		}
+
+		/// <summary>
+		/// Angular size of a single screen pixel in radians, from the camera's vertical FOV and
+		/// the viewport height. Used as the minimum disc size for a sky point (a star cannot
+		/// render smaller than the display can resolve). Falls back to a sane default if the
+		/// camera or viewport is unavailable.
+		/// </summary>
+		private float PixelAngularSize()
+		{
+			float fovRad = Mathf.DegToRad(_cam?.Fov ?? 75f);
+			float height = GetViewport()?.GetVisibleRect().Size.Y ?? 1080f;
+			if (height < 1f) height = 1080f;
+			return fovRad / height;
 		}
 
 		// ----- Hierarchy position math (read-only, double-precision) ------------

@@ -75,14 +75,10 @@ namespace Render
 		/// </summary>
 		[Export] public float DefaultBodyRadius { get; set; } = 6.371e6f;   // Earth-radius fallback
 
-		// ----- Star / emissive exports ----------------------------------------
-
-		/// <summary>
-		/// Emission energy multiplier for the star's unshaded emissive material.
-		/// Values &gt;1 cause glow/bloom when the WorldEnvironment has GlowEnabled=true.
-		/// Tune to taste; default provides strong bloom on approach.
-		/// </summary>
-		[Export] public float StarEmissionEnergy { get; set; } = 3.0f;
+		// ----- Star emissive ---------------------------------------------------
+		// A star mesh's emitted light is derived from its own Luminosity via the shared
+		// StarRendering rule (the SAME per-star source the skybox uses), so there is no
+		// separate mesh-only brightness knob to keep in sync.
 
 		// ----- Shader-based body lighting exports (replaces Godot light nodes) ----
 
@@ -439,7 +435,8 @@ namespace Render
 		/// after every SOI transition.
 		///
 		/// Material assignment (RND-03/04, 01-02 shader revision):
-		/// - Star: ShadingMode=Unshaded + EmissionEnabled + EmissionEnergyMultiplier=StarEmissionEnergy.
+		/// - Star: ShadingMode=Unshaded + EmissionEnabled + EmissionEnergyMultiplier from
+		///   StarRendering.MeshEmissionEnergy(Luminosity) — the shared per-star light rule.
 		///   No lighting needed — it IS the light source. Bloom via WorldEnvironment glow.
 		/// - Planets/other: ShaderMaterial using body_lit.gdshader (unshaded spatial shader).
 		///   Albedo is set from body.BaseColor at creation. star_dir, light_energy, and ambient
@@ -472,7 +469,8 @@ namespace Render
 					AlbedoColor              = body.BaseColor,
 					EmissionEnabled          = true,
 					Emission                 = body.BaseColor,
-					EmissionEnergyMultiplier = StarEmissionEnergy,
+					// Emitted light from the star's own Luminosity (shared rule with the skybox).
+					EmissionEnergyMultiplier = StarRendering.MeshEmissionEnergy(body.Luminosity),
 				};
 
 				meshInstance = new MeshInstance3D
