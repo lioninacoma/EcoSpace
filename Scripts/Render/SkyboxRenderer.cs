@@ -21,29 +21,29 @@ namespace Render
 		/// <summary>NodePath to the TestSetup node (GameWorld / world state).</summary>
 		[Export] public NodePath WorldPath { get; set; }
 
-		/// <summary>Scale factor mapping L/D² (solar-lum / m²) to sky shader alpha.
-		/// Calibrated so Alpha-Cen-like stars (~4 ly, L=1.5) land around alpha=200.
-		/// Exported for in-editor tuning without recompile.</summary>
-		[Export] public double LuminosityScale { get; set; } = 2e35;
+		/// <summary>Scale factor mapping physical flux L/D² (solar-lum / m²) to sky shader
+		/// brightness (alpha). Calibrated against the authored siblings so the brightest
+		/// star (Sirius, L=25.4 @ 8.6 ly) lands near alpha≈3 — just into the HDR bloom range —
+		/// and fainter stars rank below it by the true inverse-square law. Exported for
+		/// in-editor tuning without recompile.</summary>
+		[Export] public double LuminosityScale { get; set; } = 8e32;
 
 		/// <summary>Minimum alpha for any sky point regardless of distance/luminosity.
-		/// Ensures even faint stars (Barnard's, dim M-dwarfs) remain a visible pixel.</summary>
-		[Export] public float MinBrightFloor { get; set; } = 0.1f;
+		/// Keeps faint stars (Barnard's, dim M-dwarfs) a visible dim point without faking
+		/// their brightness. Physical ranking is preserved above this floor.</summary>
+		[Export] public float MinBrightFloor { get; set; } = 0.15f;
 
-		/// <summary>Minimum smoothstep disc half-width in SkyboxRenderer coords.
-		/// ~3 screen pixels at 75° FOV / 1920 wide — prevents sub-pixel invisibility
-		/// for any star regardless of true angular size.</summary>
-		[Export] public float MinStarSize { get; set; } = 3e-6f;
+		/// <summary>Upper clamp on a sky point's brightness so an approached/very luminous
+		/// star produces only a slight bloom halo rather than washing out the sky. Stars are
+		/// point sources — their apparent "size" comes from this bloom, never disc geometry.</summary>
+		[Export] public float MaxBright { get; set; } = 5.0f;
 
-		/// <summary>Maximum smoothstep disc half-width. Clamps even very bright/close
-		/// points so they do not fill the sky unrealistically.</summary>
-		[Export] public float MaxStarSize { get; set; } = 0.005f;
-
-		/// <summary>Disc radius per unit of apparent brightness (alpha). Larger values
-		/// make brighter stars appear as wider discs, producing magnitude-ranked sizing
-		/// consistent with Elite/Frontier. Default 2e-6 keeps even Sirius (alpha≈200)
-		/// within a visually pleasing ~5 px disc at 1920 wide.</summary>
-		[Export] public float SizePerBright { get; set; } = 2e-6f;
+		/// <summary>Fixed angular half-width of every star's render disc, in smoothstep
+		/// (dot-product) space. Stars are unresolved point sources, so this is a small
+		/// CONSTANT for all of them — brightness, not geometry, distinguishes them, and
+		/// bloom supplies any apparent glare. 2e-6 ≈ 0.11° ≈ a ~3 px point at 75° FOV / 1080 tall.
+		/// Does NOT scale with luminosity (that produced unrealistic giant discs).</summary>
+		[Export] public float StarAngularSize { get; set; } = 2e-6f;
 
 		// ----- Private state --------------------------------------------------
 
@@ -141,10 +141,7 @@ namespace Render
 
 				Vector3 dir3;
 				if (len < 1e-30)
-				{
-					dir3         = Vector3.Up;
-					_sizes[count] = MinStarSize;
-				}
+					dir3 = Vector3.Up;
 				else
 				{
 					Double3 dir  = delta * (1.0 / len);
@@ -152,25 +149,27 @@ namespace Render
 				}
 				_dirs[count] = dir3;
 
+				// Stars are unresolved point sources: every disc is the same small fixed
+				// angular size. Apparent magnitude is conveyed by brightness (below) + bloom,
+				// NOT by inflating disc geometry.
+				_sizes[count] = StarAngularSize;
+
 				// Cache world-fixed sky direction per body for RND-07/D-21 handoff baseline.
 				// Phase 3 reads this to align a newly spawned mesh with the sky point's
 				// screen position for a pop-free instant swap.
 				_skyDirs[body.Index] = dir3;
 
-				// Inverse-square luminosity model (D-17/D-18/D-19).
+				// Physically accurate apparent brightness via the inverse-square law (D-17/D-18/D-19):
+				// flux = Luminosity / distance², scaled to display range by LuminosityScale.
 				// body.Luminosity = 0 → reflected-light body (planet) → floors to MinBrightFloor.
-				// Values >> 1.0 drive Forward+ HDR bloom; tone mapper handles the upper range.
+				// Clamped to [MinBrightFloor, MaxBright]: the floor keeps faint stars visible
+				// without faking their magnitude; the cap keeps the brightest star to a slight
+				// bloom. Values >1 feed the Forward+ HDR WorldEnvironment glow (D-20).
 				float rawAlpha = body.Luminosity > 0 && len >= 1e-30
 					? (float)(body.Luminosity * LuminosityScale / (len * len))
 					: 0f;
-				float alpha = Mathf.Max(rawAlpha, MinBrightFloor);
+				float alpha = Mathf.Clamp(rawAlpha, MinBrightFloor, MaxBright);
 				_colors[count] = new Color(body.BaseColor.R, body.BaseColor.G, body.BaseColor.B, alpha);
-
-				// Magnitude-ranked disc size (D-17): brighter → larger disc, clamped to
-				// [MinStarSize, MaxStarSize] so faint stars are always ≥1 pixel and bright
-				// ones don't fill the sky unrealistically (SizePerBright tunable in inspector).
-				if (len >= 1e-30)
-					_sizes[count] = Mathf.Clamp(alpha * SizePerBright, MinStarSize, MaxStarSize);
 
 				count++;
 			}

@@ -39,8 +39,9 @@ uniform vec3  star_dirs[MAX_STARS];
 /// Mapped from C# Color[] → vec4[] : source_color.
 uniform vec4  star_colors[MAX_STARS] : source_color;
 
-/// Angular disc half-size in smoothstep space. E.g. 0.002 = tight point, 0.005 = larger disc.
-/// Computed from magnitude model in SkyboxRenderer (Plan 02 adds tuning exports).
+/// Angular disc half-size in smoothstep space. A small CONSTANT for every star
+/// (stars are unresolved point sources) — SkyboxRenderer.StarAngularSize. Apparent
+/// magnitude is conveyed by star_colors[].a (brightness) + HDR bloom, NOT disc size.
 uniform float star_sizes[MAX_STARS];
 
 /// Number of valid sky bodies in the arrays above. Shader loops only up to this count.
