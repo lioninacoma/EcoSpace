@@ -6,9 +6,18 @@
 [ext_resource type="Script" uid="uid://ci31tr454vcvs" path="res://Scripts/Render/WorldRenderer.cs" id="4_rendbrg"]
 [ext_resource type="Script" uid="uid://biupwsicrc0rv" path="res://Scripts/Hud/Hud.cs" id="5_hudhud"]
 [ext_resource type="Script" uid="uid://6rgvete7r3rp" path="res://Scripts/Flight/FlightController.cs" id="6_flight"]
+[ext_resource type="Script" path="res://Scripts/Render/SkyboxRenderer.cs" id="7_skybox"]
+[ext_resource type="Shader" path="res://Shaders/skybox.gdshader" id="8_skyshdr"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("8_skyshdr")
+
+[sub_resource type="Sky" id="Sky_main"]
+sky_material = SubResource("ShaderMaterial_sky")
 
 [sub_resource type="Environment" id="Environment_r0du0"]
-background_mode = 1
+background_mode = 2
+sky = SubResource("Sky_main")
 ambient_light_source = 2
 ambient_light_color = Color(1, 1, 1, 1)
 ambient_light_energy = 0.03
@@ -162,3 +171,7 @@ WorldPath = NodePath("..")
 script = ExtResource("6_flight")
 WorldPath = NodePath("..")
 CameraPath = NodePath("../Camera3D")
+
+[node name="SkyboxRenderer" type="Node" parent="." unique_id=-1293967282]
+script = ExtResource("7_skybox")
+WorldPath = NodePath("..")
