@@ -6,13 +6,13 @@
 // renders as meshes, per the tiered space model (RND-05, D-22).
 //
 // Classification rule (ship.CurrentSpace drives the entire partitioning):
-//   null or same-Index         → Skip       (self or invalid)
-//   Root-space body            → Skip       (Root has no meaningful position)
+//   null or same-Index         → Skip             (self or invalid)
+//   Root-space body            → Skip             (Root has no meaningful position)
 //   body.CurrentSpace == ship.CurrentSpace
-//                              → CurrentTierMesh   (WorldRenderer owns these)
-//   body.CurrentSpace == ParentSpace(ship.CurrentSpace)
-//                              → NextTierSkybox    (SkyboxRenderer draws these as points)
-//   everything else            → Beyond     (two or more tiers out — not rendered)
+//                              → CurrentTierMesh  (WorldRenderer owns these)
+//   body.CurrentSpace is any ancestor of ship.CurrentSpace
+//                              → NextTierSkybox   (SkyboxRenderer draws these as points)
+//   everything else            → Beyond           (sibling or child spaces — not rendered)
 
 /// <summary>
 /// Classifies each game body relative to the player ship's current space into one of
@@ -29,7 +29,7 @@ public enum SkyTier
     CurrentTierMesh,
 
     /// <summary>
-    /// Body is one tier out from the ship's current space (i.e. in ParentSpace of ship.CurrentSpace).
+    /// Body is in any ancestor space of the ship's current space.
     /// SkyboxRenderer projects these as world-fixed light points.
     /// </summary>
     NextTierSkybox,
@@ -61,10 +61,14 @@ public static class TierClassifier
         // (they share the same parent coordinate frame as the ship).
         if (body.CurrentSpace == ship.CurrentSpace)     return SkyTier.CurrentTierMesh;
 
-        // Next tier out = the parent space of the ship's current space.
-        // e.g. ship in Planet → Star is next-tier; ship in Star → Galaxy is next-tier.
-        UniObject.Space nextOut = UniObject.ParentSpace(ship.CurrentSpace);
-        if (body.CurrentSpace == nextOut)               return SkyTier.NextTierSkybox;
+        // Any body whose space is an ancestor of the ship's current space is a sky point.
+        // e.g. ship in Planet → Star and Galaxy bodies are all sky points.
+        var s = ship.CurrentSpace;
+        while (s != UniObject.Space.Root)
+        {
+            s = UniObject.ParentSpace(s);
+            if (body.CurrentSpace == s) return SkyTier.NextTierSkybox;
+        }
 
         return SkyTier.Beyond;
     }
