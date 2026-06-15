@@ -1,5 +1,5 @@
 ---
-status: testing
+status: complete
 phase: 02-dynamic-skybox
 source: [02-VERIFICATION.md]
 started: 2026-06-15
@@ -8,12 +8,7 @@ updated: 2026-06-15
 
 ## Current Test
 
-number: 2
-name: Skybox does not drift with camera rotation (SC2)
-expected: |
-  Rotate the ship (pitch, yaw, roll) while looking at a sibling star point. The point stays
-  pinned to its world direction — it must NOT rotate or drift with the camera.
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -24,18 +19,18 @@ note: Confirmed during the 02-02 play-test approval (2026-06-15) — user approv
 
 ### 2. No camera drift (SC2)
 expected: Rotate the ship (pitch/yaw/roll) while watching a star point; it stays pinned to world space and does not move with the camera (EYEDIR world-space projection).
-result: pending
+result: pass
 
 ### 3. Dither pass-through
 expected: Toggle PostProcessRenderer dithering on/off; the sky points quantize/de-quantize along with the rest of the scene (no second dither pass added).
-result: pending
+result: pass
 
 ## Summary
 
 total: 3
-passed: 1
+passed: 3
 issues: 0
-pending: 2
+pending: 0
 skipped: 0
 blocked: 0
 
