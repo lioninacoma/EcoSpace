@@ -19,6 +19,20 @@ namespace Render
 		/// <summary>NodePath to the TestSetup node (GameWorld / world state).</summary>
 		[Export] public NodePath WorldPath { get; set; }
 
+		/// <summary>Scale factor mapping L/D² (solar-lum / m²) to sky shader alpha.
+		/// Calibrated so Alpha-Cen-like stars (~4 ly, L=1.5) land around alpha=200.
+		/// Exported for in-editor tuning without recompile.</summary>
+		[Export] public double LuminosityScale { get; set; } = 2e35;
+
+		/// <summary>Minimum alpha for any sky point regardless of distance/luminosity.
+		/// Ensures even faint stars (Barnard's, dim M-dwarfs) remain a visible pixel.</summary>
+		[Export] public float MinBrightFloor { get; set; } = 0.1f;
+
+		/// <summary>Minimum smoothstep disc half-width in SkyboxRenderer coords.
+		/// ~3 screen pixels at 75° FOV / 1920 wide — prevents sub-pixel invisibility
+		/// for any star regardless of true angular size.</summary>
+		[Export] public float MinStarSize { get; set; } = 3e-6f;
+
 		// ----- Private state --------------------------------------------------
 
 		private TestSetup      _world;
@@ -94,7 +108,7 @@ namespace Render
 				Double3 delta    = bodyRoot - shipRoot;
 				double  len      = delta.Magnitude();
 
-				if (len < 1e-30) { _dirs[count] = Vector3.Up; _sizes[count] = 1e-7f; }
+				if (len < 1e-30) { _dirs[count] = Vector3.Up; _sizes[count] = MinStarSize; }
 				else
 				{
 					Double3 dir  = delta * (1.0 / len);
@@ -103,13 +117,17 @@ namespace Render
 					// so the sky point shrinks/grows with distance and matches the mesh at the
 					// SOI transition boundary (Finding 2 fix). Clamped to [1e-7, 0.01].
 					float angR   = (float)(body.RadiusMeters / len);
-					_sizes[count] = Mathf.Clamp(angR * angR * 0.5f, 1e-7f, 0.01f);
+					_sizes[count] = Mathf.Clamp(angR * angR * 0.5f, MinStarSize, 0.01f);
 				}
 
-				// Plan 01: flat placeholder brightness — Plan 02 adds the real magnitude model
-				// (D-17 inverse-square law + D-19 min-floor). Using alpha = 1.0 for uniform
-				// brightness; BaseColor carries the hue (D-18).
-				_colors[count] = new Color(body.BaseColor.R, body.BaseColor.G, body.BaseColor.B, 1.0f);
+				// Inverse-square luminosity model (D-17/D-18/D-19).
+				// body.Luminosity = 0 → reflected-light body (planet) → floors to MinBrightFloor.
+				// Values >> 1.0 drive Forward+ HDR bloom; tone mapper handles the upper range.
+				float rawAlpha = body.Luminosity > 0
+				    ? (float)(body.Luminosity * LuminosityScale / (len * len))
+				    : 0f;
+				float alpha = MathF.Max(rawAlpha, MinBrightFloor);
+				_colors[count] = new Color(body.BaseColor.R, body.BaseColor.G, body.BaseColor.B, alpha);
 
 				count++;
 			}
