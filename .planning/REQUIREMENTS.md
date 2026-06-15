@@ -27,9 +27,9 @@ Requirements for the initial playable travel-and-rendering milestone. Each maps 
 - [~] **RND-02**: Bodies belonging to the current render tier are rendered dynamically as sphere-mesh geometry; bodies one tier further out are deferred to the skybox (RND-05). Concretely: **inside a star system** (both Star space and Planet space, not just the immediate parent) the system's planet(s) *and* star(s)/sun(s) — including every sun of a multi-star system — are meshes; **in Galaxy space** the stars/suns of the current galaxy are meshes. Bodies beyond the current tier (other systems' stars while in-system, other galaxies while in-galaxy) are not rendered as meshes  _(Phase 1 PARTIAL: in Star space the system's planets + star render as meshes ✓. In Planet space only the orbited planet renders; rendering the star + sibling planet while in Planet space is bounded by the far-plane/1:1-scale limit — the sun at 1 AU is ~15× beyond the far plane — and is deferred with D-16 to the Phase 2/3 tiered/skybox renderer. Accepted at 2026-06-14 Phase 1 verification.)_
 - [x] **RND-03**: Planets are rendered as sphere meshes with dithering and an 8-bit color palette
 - [x] **RND-04**: The current system's star(s)/sun(s) — including each sun in a multi-star system — are rendered as bright, light-emitting sphere meshes (no cast shadows), each casting light that affects the system's planets  _(Phase 1: Star-space emissive sun mesh + shader-based Lambert lighting on planets ✓; galaxy-tier suns-as-meshes → Phase 3.)_
-- [ ] **RND-05**: A dynamic spherical skybox represents the bodies just *outside* the current render tier as distant light points — the stars of other star systems (and other galaxies) while inside a system, and *only* other galaxies while in Galaxy space. It updates when the player crosses a scale boundary and never drifts with camera rotation
+- [x] **RND-05**: A dynamic spherical skybox represents the bodies just *outside* the current render tier as distant light points — the stars of other star systems (and other galaxies) while inside a system, and *only* other galaxies while in Galaxy space. It updates when the player crosses a scale boundary and never drifts with camera rotation
 - [x] **RND-06**: Distances are kept 1:1 in both calculation and rendering — the universe simulation (SOI, `UniVec3`, distances, speed envelopes) runs at true 1:1 meters, and rendering reproduces those distances in a uniformly scaled **unit-space** (observer-scale unit basis × per-space render factor) so 1:1 proportions and perspective are preserved while the camera far plane stays bounded (≤ 1e6 render units). Body radii are likewise rendered at true 1:1 scale. (Reframes the earlier "honest 1:1 render distances" idea: uniform unit-space scaling *is* the 1:1 model, not a violation of it.)
-- [ ] **RND-07**: The skybox↔mesh handoff is visually continuous. When the player crosses a scale boundary and a star switches between a skybox light-point and a rendered mesh (e.g. Star→Galaxy space, where in-galaxy stars become meshes), the change in its apparent position, brightness, and color is barely perceptible — no pop, jump, or flicker
+- [x] **RND-07**: The skybox↔mesh handoff is visually continuous. When the player crosses a scale boundary and a star switches between a skybox light-point and a rendered mesh (e.g. Star→Galaxy space, where in-galaxy stars become meshes), the change in its apparent position, brightness, and color is barely perceptible — no pop, jump, or flicker
 
 ### HUD
 
@@ -85,9 +85,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RND-02 | Phase 1 (Star-space in-system meshes) · Phase 2/3 (Planet-space cross-body + galaxy-tier meshes) | Partial — Star-space ✓ (Phase 1); Planet-space cross-body deferred (D-16) → Phase 2/3 |
 | RND-03 | Phase 1 | Done (Phase 1 ✓) |
 | RND-04 | Phase 1 (Star-space system sun mesh + lighting) · Phase 3 (galaxy stars as meshes) | Done (Phase 1 portion ✓); galaxy-tier → Phase 3 |
-| RND-05 | Phase 2 (in-system skybox) · Phase 3 (in-galaxy skybox = only galaxies) | Pending |
+| RND-05 | Phase 2 (in-system skybox) · Phase 3 (in-galaxy skybox = only galaxies) | Complete |
 | RND-06 | Phase 1 | Done (Phase 1 ✓) |
-| RND-07 | Phase 2 (handoff baseline) · Phase 3 (Star→Galaxy-scale handoff) | Pending |
+| RND-07 | Phase 2 (handoff baseline) · Phase 3 (Star→Galaxy-scale handoff) | Complete |
 | HUD-01 | Phase 1 | Done (Phase 1 ✓) |
 | HUD-02 | Phase 1 | Done (Phase 1 ✓) |
 | HUD-03 | Phase 1 | Done (Phase 1 ✓) |
@@ -96,6 +96,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TRV-02 | Phase 3 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 18 total
 - Mapped to phases: 18
 - Unmapped: 0 ✓
