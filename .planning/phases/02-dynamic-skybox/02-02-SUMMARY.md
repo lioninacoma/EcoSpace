@@ -175,3 +175,33 @@ None — the magnitude model is fully wired. The human-verify checkpoint (Task 3
 | No Tween/crossfade | VERIFIED |
 | No TranslatePos/LocalPos writes | VERIFIED |
 | dotnet build: 0 errors | PASSED |
+
+---
+
+## Addendum — Post-play-test rework (APPROVED 2026-06-15)
+
+The original 02-02 magnitude model (above) rendered sibling sky points as **huge white spheres**
+(brightness-scaled disc size hitting `MaxStarSize`, plus `LuminosityScale` saturating bright stars).
+Following play-test feedback, star rendering was reworked into a unified, physically-coherent model
+and **approved** by the user. The frontmatter exports listed above (`LuminosityScale`,
+`MinBrightFloor`, `MaxBright`, `StarAngularSize`, `MinStarSize`, `MaxStarSize`, `SizePerBright`)
+and `WorldRenderer.StarEmissionEnergy` were **removed**.
+
+**Final design (3 follow-up commits on `main` after this SUMMARY):**
+
+- **`Scripts/Render/StarRendering.cs`** is the single source of truth. A star's appearance derives
+  ONLY from its per-instance `Luminosity` / `RadiusMeters` / `BaseColor`.
+- **Size** = physical angular radius `RadiusMeters / distance`, identical for mesh and skybox; the
+  sky disc is floored at one screen pixel (resolution limit, not artificial enhancement).
+- **Brightness** = inverse-square flux `Luminosity / distance²` through a magnitude (`log10`) curve,
+  clamped to `[0,1]` so `BaseColor` hue is preserved (never saturates to white). The star mesh's
+  emission energy and the sky point's alpha both come from the SAME `StarRendering.ApparentBrightness`.
+- **One global knob:** `StarRendering.Exposure`, editor-exposed as **`WorldRenderer.StarBrightness`**
+  (default 0), shifts every star — mesh and sky — together. No separate mesh/sky brightness.
+- **Why a log curve:** Sun@1AU vs sibling@8ly differ ~1e10 in received flux; no single *linear* scale
+  shows both without one saturating to white. The log curve compresses the range into the
+  hue-preserving display band.
+
+The RND-07/D-21 handoff baseline accessors (`GetSkyDirection`, `GetRenderPosition`) are unchanged and
+still in place. Visible Star↔Galaxy point↔mesh swap remains Phase-3 deferred (D-24). Build clean,
+02-03 tests 16/16 green.

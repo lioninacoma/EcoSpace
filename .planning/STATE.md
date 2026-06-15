@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 02-03 complete — 16/16 xUnit tests green; full phase 02 plan execution done
+status: paused
+stopped_at: Phase 02 all plans executed; 02-02 star rendering APPROVED via play-test; paused before phase verification/completion
 last_updated: "2026-06-15T18:32:47.493Z"
-last_activity: 2026-06-15 -- Phase 02 execution started
+last_activity: 2026-06-15 -- 02-02 skybox star rendering approved; paused
 progress:
   total_phases: 4
   completed_phases: 2
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 
 ## Current Position
 
-Phase: 02 (dynamic-skybox) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-06-15 -- Phase 02 execution started
+Phase: 02 (dynamic-skybox) — PLANS EXECUTED, phase verification pending
+Plan: 3 of 3 (all executed; 02-02 play-test APPROVED 2026-06-15)
+Status: PAUSED — resume at phase-level verification/completion
+Last activity: 2026-06-15 -- 02-02 skybox star rendering approved after play-test; paused
 
 Progress: [██████████] 100% — Phase 01 complete (1 of 3 phases)
 
@@ -79,6 +79,7 @@ Recent decisions affecting current work:
 - 01-render (pre-01-04 fix, commit 2b29b66): Star-space planet under-shading fixed — OmniLight3D.OmniAttenuation set to 0 (constant brightness up to OmniRange, no distance falloff) and StarLightEnergy lowered 2.0→1.8 to match PlanetSunLightEnergy; OmniLight remains positional so terminator direction still derives from the star-mesh render position; StarLightAttenuation exposed as [Export] for runtime tuning; lit-side brightness in Star space now matches Planet space
 - 01-02 SHADER REVISION (pre-01-04, commit 253cb35): Body lighting moved from Godot OmniLight3D (Star space) + DirectionalLight3D (Planet space) to a single unshaded spatial shader (Shaders/body_lit.gdshader). Lambert terminator computed per body from star_dir uniform (world-space direction from body surface toward nearest star, set each frame by RenderBridge). Shading character is IDENTICAL in every space — no node-type change on cross-space transitions. OmniLight3D and DirectionalLight3D fully removed. Exports StarLightEnergy/StarLightRange/StarLightAttenuation/PlanetSunLightEnergy replaced by BodyLightEnergy (default 1.8) and BodyAmbient (default 0.03). Star stays emissive StandardMaterial3D. Dither post-process, per-frame radius scaling, and floating-origin positioning unchanged.
 - [Phase ?]: 02-03: xUnit test strategy: xunit-godotsharp-linked — GodotSharp 4.6.2 + linked Compile Include files; TierClassifier full matrix verified green
+- 02-02 POST-CHECKPOINT REDESIGN (play-test feedback, APPROVED 2026-06-15): The 02-02 magnitude model produced huge white star spheres. Reworked star rendering to be physically coherent and unified across mesh + skybox. New `Scripts/Render/StarRendering.cs` is the SINGLE source of truth: a star's appearance derives ONLY from its per-instance Luminosity / RadiusMeters / BaseColor. Size = physical angular radius (R/d), identical for mesh and sky (sky disc floored at one screen pixel). Brightness = inverse-square flux (L/d²) through a magnitude (log10) curve, clamped to [0,1] so BaseColor hue is never washed to white. ONE global knob `StarRendering.Exposure` (editor handle: `WorldRenderer.StarBrightness`, default 0) shifts every star (mesh + sky) together. Star mesh emission set per-frame from the same `ApparentBrightness`. REMOVED all prior global star knobs: SkyboxRenderer LuminosityScale/MinBrightFloor/MaxBright/StarAngularSize/MinStarSize/MaxStarSize/SizePerBright and WorldRenderer StarEmissionEnergy. Rationale: Sun@1AU vs sibling@8ly differ ~1e10 in flux — no single LINEAR scale renders both without one saturating to white; the log curve compresses the range so one exposure works for both and stays in the hue-preserving band. Commits: bf… (point-source), then coherent-refactor, then unify-brightness (3 commits on main after 02-02 SUMMARY).
 
 ### Pending Todos
 
@@ -107,9 +108,9 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-15T18:32:47.486Z
-Stopped at: Phase 02-03 complete — 16/16 xUnit tests green; full phase 02 plan execution done
-Resume: Run /gsd-execute-phase 02 to execute remaining plans 02-02 (SkyboxRenderer magnitude/bloom/handoff) and 02-03 (TierClassifier tests). NOTE: quick task 260615-m4b already implemented the inverse-square magnitude model + min-floor in SkyboxRenderer — 02-02 is partially done; executor should reconcile remaining must-haves (per-point BaseColor D-18, bloom feeding D-20, GetRenderPosition handoff baseline, cached sky-direction accessor).
+Last session: 2026-06-15 (paused after 02-02 approval)
+Stopped at: All Phase 02 plans executed (02-01, 02-02, 02-03). 02-02 reworked post-play-test into a unified, physically-coherent star renderer (StarRendering.cs) and APPROVED by the user. 02-03 tests 16/16 green. Build clean.
+Resume: Re-run `/gsd-execute-phase 02` — discover_plans sees all SUMMARYs and skips straight to the post-execution gates: code-review → regression → verify_phase_goal (gsd-verifier) → mark phase complete (update_roadmap) → transition to Phase 03. Nothing left to implement; this is the verification/completion tail only. Note STATE frontmatter already optimistically shows completed_phases:2 — that should be confirmed by the verifier, not assumed.
 
 ## Refactor Notes
 
