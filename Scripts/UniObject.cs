@@ -87,6 +87,13 @@ public class UniObject
     public double          RadiusMeters;
 
     /// <summary>
+    /// Absolute luminosity in solar luminosity units (L_sun = 3.828e26 W).
+    /// Drives the magnitude model in SkyboxRenderer (D-26/D-17).
+    /// Default 1.0 = solar luminosity; set to 0.0 for non-emissive bodies.
+    /// </summary>
+    public double          Luminosity = 1.0;
+
+    /// <summary>
     /// Indices into GameWorld.GameObjects of all direct children of this object.
     /// Maintained by GameWorld.AddGameObject / RemoveGameObject.
     /// </summary>
