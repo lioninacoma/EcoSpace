@@ -5,4 +5,9 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
 	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- Exclude the standalone test project from the Godot SDK's auto-glob so
+         dotnet build EcoSpace.sln remains clean (T-02-08 mitigation). -->
+    <Compile Remove="EcoSpace.Tests\**" />
+  </ItemGroup>
 </Project>

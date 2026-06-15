@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- Double3.cs uses `fixed (double* p = &X)` for SIMD loading — unsafe required. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- Suppress Godot-specific MSBuild warnings that appear when GodotSharp is referenced
+         outside the Godot SDK project context. -->
+    <NoWarn>NU1701</NoWarn>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- xUnit test framework (well-known, widely-used, no [ASSUMED] versions). -->
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <!-- VSTest adapter so `dotnet test` can discover and run xUnit tests via the CLI. -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <!-- GodotSharp supplies the Godot.Color / Godot.Mathf types that UniObject references.
+         Pinned to 4.6.2 to match the engine version exactly (already in the local NuGet cache). -->
+    <PackageReference Include="GodotSharp" Version="4.6.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Link-compile the units-under-test directly so no project reference to the Godot SDK
+         project is needed. This keeps the Godot game build completely unaffected. -->
+    <Compile Include="..\Scripts\UniObject.cs" />
+    <Compile Include="..\Scripts\TierClassifier.cs" />
+    <!-- Math types referenced transitively by UniObject (UniVec3 field type). -->
+    <Compile Include="..\Scripts\Math\UniVec3.cs" />
+    <Compile Include="..\Scripts\Math\Double3.cs" />
+    <Compile Include="..\Scripts\Math\Long3.cs" />
+  </ItemGroup>
+
+</Project>
