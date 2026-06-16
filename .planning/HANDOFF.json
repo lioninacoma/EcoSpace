@@ -1,31 +1,35 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-16T17:15:42.214Z",
+  "timestamp": "2026-06-16T20:10:51.141Z",
   "phase": "03",
   "phase_name": "cross-galaxy-travel",
   "phase_dir": ".planning/phases/03-cross-galaxy-travel",
-  "plan": 2,
+  "plan": 3,
   "task": 1,
   "total_tasks": 1,
   "status": "paused",
   "completed_tasks": [
-    {"id": "03-01", "name": "Galaxy Body Model + Procedural Sky Discs", "status": "done", "commit": "cffacc8"}
+    {"id": "03-01", "name": "Galaxy body model + procedural sky discs", "status": "done", "commit": "cffacc8"},
+    {"id": "03-02", "name": "Remove SpeedOfLight cap; raise MaxSpeed to 2e20; IsFinite guard", "status": "done", "commit": "e1c8104"},
+    {"id": "03-03", "name": "Galaxy-tier mesh routing by ObjectType + Star/Galaxy handoff", "status": "done", "commit": "9f21d88"},
+    {"id": "verify", "name": "Phase goal verification (status: human_needed; 7/7 code-level must-haves)", "status": "done", "commit": "7e734c0"},
+    {"id": "debug", "name": "Fix galaxy-sky flood: galaxy distance unit bug + disc projection ring/antipode", "status": "done", "commit": "fef1d91"}
   ],
   "remaining_tasks": [
-    {"id": "03-02", "name": "Remove the SpeedOfLight cap, raise MaxSpeed default, and guard against non-finite motion (intergalactic-flight vertical slice, TRV-02)", "status": "not_started"},
-    {"id": "03-03", "name": "Plan 03-03 (not yet started)", "status": "not_started"}
+    {"id": "uat", "name": "Run /gsd-verify-work 03 — 7 human play-test items in 03-UAT.md (items 1 & 3 already satisfied by the debug fix)", "status": "not_started"},
+    {"id": "phase-complete", "name": "Mark Phase 03 complete after UAT passes (ROADMAP checkbox still unchecked, phase pending)", "status": "not_started"},
+    {"id": "debt-tilt", "name": "Galaxy disc tilt/foreshortening — disc renders face-on for now (.planning/todos/pending/galaxy-disc-tilt-foreshortening.md)", "status": "not_started"},
+    {"id": "debt-thrust", "name": "Thrust drops to zero at galaxy SOI exit (.planning/todos/pending/thrust-zero-at-galaxy-soi-exit.md)", "status": "not_started"}
   ],
-  "blockers": [
-    {"description": "Home-galaxy visibility: the HOME GALAXY is an ancestor of the ship while in-system, so it renders as a large sky disc in its own direction IN ADDITION to the 2 other galaxies. Must-have truth #2 specifies 'the 2 OTHER galaxies'. Open design/routing decision: suppress the home galaxy while ship is inside its SOI, or render it as a Milky-Way-style band? Not a crash.", "type": "technical", "workaround": "Deferred to human check + end-of-phase review per 03-01 SUMMARY line 135. Does not block starting 03-02 (flight tuning), but should be resolved before phase verification."}
-  ],
+  "blockers": [],
   "human_actions_pending": [
-    {"action": "Decide home-galaxy in-SOI rendering behavior (suppress vs. Milky-Way band)", "context": "Conflicts with phase must-have truth #2; deferred from 03-01 verification", "blocking": false},
-    {"action": "Play-test tune GALAXY_DISC_SCALE (80.0) and GALAXY_LOD_THRESHOLD (2e-4) in skybox.gdshader", "context": "Flagged ASSUMED in 03-01 SUMMARY, requires in-game play-test", "blocking": false}
+    {"action": "Play-test Phase 03 via /gsd-verify-work 03", "context": "Godot compiles shaders at runtime; visual + flight correctness (galaxy discs, FTL transit, SOI entry, pop-free Star/Galaxy handoff) can only be confirmed in-game. 7 items tracked in 03-UAT.md.", "blocking": true}
   ],
   "decisions": [
-    {"decision": "Committed uncommitted Main.tscn with this WIP pause", "rationale": "Galaxy shader_parameter/* defaults belong to completed 03-01 work; the scene format 3->4 bump rode along (Godot editor auto-upgrade) and is noted for later review", "phase": "03"}
+    {"decision": "Galaxy positions/SOI authored in metres (Galaxy2_Z=2.4e22, Galaxy3_X/Z=1.27e22, SOI=5e20); constants renamed off the misleading *_UniZ names", "rationale": "AddGameObject takes its Double3 position and soiMeters in metres; the old Universe-unit values placed galaxies ~1e16x too close and flooded the sky", "phase": "03"},
+    {"decision": "Galaxy disc tangent basis built from the galaxy direction + front-hemisphere gate (dot(EYEDIR,gdir)>0); disc_normal tilt dropped (face-on)", "rationale": "disc_normal ~world-up collapsed the disc into a sky-spanning ring and the projection ghosted onto the antipode; a view-direction basis is always well-conditioned. Tilt deferred as tech debt", "phase": "03"}
   ],
-  "uncommitted_files": ["Main.tscn"],
-  "next_action": "Run /gsd-execute-phase 03 to execute plan 03-02 (remove SpeedOfLight cap, raise MaxSpeed to FTL-equivalent, guard non-finite motion). Then 03-03.",
-  "context_notes": "Phase 03 (cross-galaxy-travel) is 1/3 plans complete. 03-01 delivered the galaxy body model + procedural sky discs and is fully committed through cffacc8, including a post-checkpoint NaN fix (90af489) for a degenerate disc-normal that blacked the whole sky. Remaining: 03-02 is a constraint-removal + tuning slice on the existing D-06/07/08 distance->speed curve (NOT a new flight mode) so the player can actually fly between galaxies; 03-03 still to come. One open visual question (home-galaxy in-SOI visibility) is parked for end-of-phase review."
+  "uncommitted_files": [],
+  "next_action": "Run /gsd-verify-work 03 to walk the 7 UAT play-test items; mark items 1 and 3 (galaxy visibility) as passed since the debug fix already addressed them.",
+  "context_notes": "Phase 03 implementation + verification + a debug session are all complete and committed (HEAD d117cf6). Working tree clean except pre-existing untracked .planning/research/.cache/*.json. Phase is NOT yet marked complete — it sits at human-verification (03-UAT.md). The reported sky-flood bug is fixed and user-verified in-game (debug session galaxy-sky-disc-antipode, status paused/fixed-and-verified). Two tech-debt todos were spun off (galaxy disc tilt; thrust-zero at galaxy SOI exit) and live in .planning/todos/pending/. The thrust-zero debt overlaps UAT item 5 (intergalactic transit) — expect it to surface during that play-test."
 }
