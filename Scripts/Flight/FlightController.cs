@@ -38,8 +38,9 @@ namespace Flight
 	{
 		// ── Constants ──────────────────────────────────────────────────────────
 
-		/// <summary>Speed of light in m/s — absolute upper bound for sanity.</summary>
-		private const double SpeedOfLight = 3e8;
+		/// <summary>Speed of light in m/s — reference only; no longer used as a cap on MaxSpeed
+		/// (removed in Plan 03-02 to allow FTL-equivalent intergalactic speeds).</summary>
+		// private const double SpeedOfLight = 3e8;
 
 		// ── Exports (tuning knobs) ──────────────────────────────────────────────
 
@@ -130,16 +131,22 @@ namespace Flight
 			set => _minSpeed = System.Math.Max(0.0, value);
 		}
 
-		private double _maxSpeed = 1e11;
 		/// <summary>
-		/// Maximum context-max speed in m/s.
-		/// Capped at SpeedOfLight for sanity (T-03-02 mitigation).
+		/// Default intergalactic MaxSpeed: ~2e20 m/s gives a ~2-minute full-throttle crossing
+		/// at the ~2.4e22 m home→destination galaxy separation (D-35).
+		/// Play-test tuning knob: raise for faster crossing, lower (e.g. 4e19) for ~10 min.
+		/// </summary>
+		private double _maxSpeed = 2e20;
+		/// <summary>
+		/// Maximum context-max speed in m/s. No SpeedOfLight cap — the distance→speed curve
+		/// (D-06/07/08) decelerates naturally near bodies via RadiusMeters (D-36).
+		/// System.Math.Max(0.0, value) blocks negative and NaN inputs (T-03-04 mitigation).
 		/// </summary>
 		[Export]
 		public double MaxSpeed
 		{
 			get => _maxSpeed;
-			set => _maxSpeed = Mathf.Clamp(value, 0.0, SpeedOfLight);
+			set => _maxSpeed = System.Math.Max(0.0, value);  // no SpeedOfLight cap (Plan 03-02)
 		}
 
 		private double _speedEasing = 1.0;
@@ -451,6 +458,12 @@ namespace Flight
 		/// </summary>
 		private void ApplyMotion(double delta)
 		{
+			// Security mitigation T-03-04 / RESEARCH §V5: guard against non-finite CurrentSpeed
+			// (NaN or Infinity) that could corrupt TranslatePos with invalid position deltas.
+			// With MaxSpeed uncapped, a pathological editor export value could produce Infinity;
+			// this guard ensures such values never reach the position system.
+			if (!double.IsFinite(CurrentSpeed)) return;
+
 			// Skip trivially tiny speeds to avoid unnecessary TranslatePos calls,
 			// but use epsilon guard rather than exact-zero so easing can fully settle.
 			if (System.Math.Abs(CurrentSpeed) < 1e-3) return;
