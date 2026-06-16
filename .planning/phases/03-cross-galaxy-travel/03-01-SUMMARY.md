@@ -129,7 +129,10 @@ Launch the game from the home system. Confirm:
 
 ## Deviations from Plan
 
-None — plan executed exactly as written. The int[] uniform path worked on first attempt; no float-packing fallback was required.
+- **Post-checkpoint fix (commit 90af489): degenerate galaxy disc-normal NaN.** Human verification of Task 2/3 failed — the whole sky rendered black (no stars *and* no galaxies). Root cause: `galaxy_disc_coords` in `skybox.gdshader` called `normalize(cross(disc_normal, (0,1,0)))` and only checked the result's magnitude *after* normalizing. The HOME GALAXY is authored with normal `(0,1,0)` and is classified `NextTierSkybox` (its Universe space is an ancestor of the ship's Planet space) in disc mode, so the cross product was exactly zero → `normalize()` = `NaN`; `NaN < 0.001` is false so the guard never fired; the `NaN` propagated into the shared `col` accumulator and blacked out the entire `sky()` output, stars included. `dotnet build` cannot catch this (Godot compiles shaders at runtime), which is why automated checks passed. Fixed by choosing the cross-axis by magnitude *before* `normalize()`. Shader-only change; C# build/tests unaffected.
+- The int[] uniform path otherwise worked on first attempt; no float-packing fallback was required.
+
+**Open visual question for re-verification / end-of-phase review:** because the HOME GALAXY is an ancestor of the ship while in-system, it now renders as a large sky disc (~MaxDiscAngle across) in its own direction in addition to the 2 other galaxies. Must-have truth #2 specifies "the 2 *other* galaxies." Whether the home galaxy should be suppressed while the ship is inside its SOI (vs. shown as a Milky-Way-style band) is a routing/design decision deferred to the human check + end-of-phase review; it is not a crash.
 
 ---
 
