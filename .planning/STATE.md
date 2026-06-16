@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 03-01 code complete, awaiting human visual verification
-last_updated: "2026-06-16T12:59:24.556Z"
-last_activity: 2026-06-16 -- Phase 03 execution started
+stopped_at: Home-galaxy in-SOI visibility resolved (quick 260616-riw, suppress); ready for Phase 03 plan 03-02
+last_updated: "2026-06-16T17:55:00.000Z"
+last_activity: 2026-06-16 -- Completed quick task 260616-riw (home-galaxy suppression)
 progress:
   total_phases: 4
   completed_phases: 2
@@ -109,12 +109,13 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 | 2026-06-15 | implement-magnitude-model-in-skyboxrende | feat: inverse-square luminosity model (L/D²×LuminosityScale) replaces flat alpha=1.0 in SkyboxRenderer; MinBrightFloor=0.1 floor for faint stars; MinStarSize=3e-6 minimum disc; planets set Luminosity=0 |
 | 2026-06-16 | fix-precision-loss-in-skyboxrenderer-pos | perf: replaced SkyboxRenderer absolute-from-root position math (`AbsolutePositionInRoot`) with an LCA-relative walk (`FindLca` + `PositionRelativeToAncestor` + `RelativePosition`) — ship→body vector is subtracted in the lowest-common-ancestor frame so the large common-ancestor offset is never formed, killing catastrophic cancellation at 1:1 Universe scale. No overflow existed. Outputs identical at MVP scale (LCA=Galaxy@origin); read-only contract preserved; build clean. Commit 83dfce4 |
 | 2026-06-16 | refactor-math-to-maximize-univec3-precis | refactor: new global `UniMath` helper (`Scripts/Math/UniMath.cs`) does hierarchy-aware position math entirely in UniVec3 — `FindLca`/`ToAncestorFrame`/`RelativePosition`/`RelativeMetres`/`Distance`. Accumulates up to the LCA via per-level `Convert+add`, subtracts two SAME-scale UniVec3 (exact integer Units cancellation), collapses to metres via a single `ToDouble3()` on the small delta. SkyboxRenderer + WorldRenderer.ComputeStarRenderPosFromHierarchy refactored onto it (260615-v69's in-file helpers removed); Flight/Hud audited (single-frame, already exact, no change). Added a durable `## Position Math (UniVec3 / UniMath)` convention to CLAUDE.md. 28 tests green (16 TierClassifier + 12 new UniMath incl. a precision-headroom test: 1.0 m gap at 4e16 m recovered to <1e-9 m). Build clean. Commits 0d3795c, 181ca56, f370857, 7567e80 |
+| 2026-06-16 | suppress-the-home-galaxy-in-skyboxrender | feat: read-only `UniMath.FindLca(ship, body, objs) == body.Index` ancestry guard at the top of SkyboxRenderer's galaxy branch suppresses the home galaxy disc while the ship is inside its SOI — only the 2 OTHER galaxies render, satisfying phase-03 must-have truth #2. Resolves the open home-galaxy in-SOI visibility design question deferred from 03-01 (SUMMARY line 135); user-locked decision: suppress (not Milky-Way band). Star branch + `_skyDirs` untouched; no shader/TestSetup change. 30 tests green (28 + 2 ancestry-predicate facts). Build clean. In-game visual confirm DEFERRED to 03-02 play-test (user choice). Commits a94305e, a2588d2 |
 
 ## Session Continuity
 
-Last session: 2026-06-16T12:59:24.547Z
-Stopped at: Phase 03-01 code complete, awaiting human visual verification
-Resume: Re-run `/gsd-execute-phase 02` — discover_plans sees all SUMMARYs and skips straight to the post-execution gates: code-review → regression → verify_phase_goal (gsd-verifier) → mark phase complete (update_roadmap) → transition to Phase 03. Nothing left to implement; this is the verification/completion tail only. Note STATE frontmatter already optimistically shows completed_phases:2 — that should be confirmed by the verifier, not assumed.
+Last session: 2026-06-16 - Completed quick task 260616-riw: home-galaxy suppression
+Stopped at: Home-galaxy in-SOI visibility RESOLVED via quick task 260616-riw (suppress; user-locked). Code on main (a94305e, a2588d2), 30 tests green. Ready to execute Phase 03 plan 03-02.
+Resume: Run `/gsd-execute-phase 03` — resumes at plan 03-02 (only plan without a SUMMARY): remove SpeedOfLight cap, raise MaxSpeed to FTL-equivalent, guard non-finite motion (TRV-02). Then 03-03. NOTE for play-test: visually confirm home-galaxy suppression (exactly 2 galaxy discs, no home-galaxy disc) — deferred from 260616-riw.
 
 ## Refactor Notes
 
