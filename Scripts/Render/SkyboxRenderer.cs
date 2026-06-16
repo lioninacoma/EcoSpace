@@ -48,6 +48,9 @@ namespace Render
 
 		private const int MaxStars = 8;
 
+		/// <summary>Maximum galaxy entries in sky uniform arrays. Matches MAX_GALAXIES in skybox.gdshader.</summary>
+		private const int MaxGalaxies = 4;
+
 		/// <summary>Safety cap on a sky point's angular disc radius (radians, ~28°). Next-tier-out
 		/// bodies are always far so their true angular size is sub-pixel; this only guards against
 		/// a degenerate near body producing a smoothstep edge of 1−cos(θ) → 1 (which breaks the disc).</summary>
@@ -55,6 +58,16 @@ namespace Render
 		private readonly Vector3[] _dirs   = new Vector3[MaxStars];
 		private readonly Color[]   _colors = new Color[MaxStars];
 		private readonly float[]   _sizes  = new float[MaxStars];
+
+		// ── Galaxy sky uniform arrays (D-40) ──────────────────────────────────────────
+		// Partitioned from NextTierSkybox bodies by ObjectType==Galaxy.
+		// galaxy_types[] uses int[] — Task 1 de-risk confirmed int[] path in GLSL uniform.
+		// See 03-01-SUMMARY.md for the int[]-vs-float-packing decision contract.
+		private readonly Vector3[] _galDirs         = new Vector3[MaxGalaxies];
+		private readonly Color[]   _galColors       = new Color[MaxGalaxies];
+		private readonly float[]   _galSizes        = new float[MaxGalaxies];
+		private readonly int[]     _galTypes        = new int[MaxGalaxies];
+		private readonly Vector4[] _galOrientations = new Vector4[MaxGalaxies];
 
 		/// <summary>
 		/// RND-07/D-21 handoff baseline: last-computed world-fixed sky direction per body
@@ -131,9 +144,13 @@ namespace Render
 			// "minimum" and it is a physical resolution limit, not artificial size enhancement.
 			float pixelAngle = PixelAngularSize();
 
-			int count = 0;
-			for (int i = 0; i < objs.Count && count < MaxStars; i++)
+			int count    = 0;
+			int galCount = 0;
+			for (int i = 0; i < objs.Count; i++)
 			{
+				// Early exit once both arrays are full (T-03-01: loop bounded by MaxStars + MaxGalaxies)
+				if (count >= MaxStars && galCount >= MaxGalaxies) break;
+
 				var body = objs[i];
 				if (body == null) continue;
 				if (body.Index == shipIdx) continue;
@@ -146,6 +163,8 @@ namespace Render
 				// called once on the small differenced delta to get metres. Casting only the
 				// normalized unit vector to Vector3 avoids precision loss at interstellar
 				// distances (Pitfall 5 in RESEARCH.md).
+				// MANDATORY for galaxies: at intergalactic distances (~2.4e22 m) naive cross-scale
+				// UniVec3 subtraction catastrophically loses precision — only LCA path is safe (CLAUDE.md).
 				bool hasCommonAncestor = UniMath.RelativePosition(ship, body, objs, out UniVec3 relUni);
 				Double3 delta = hasCommonAncestor ? relUni.ToDouble3() : Double3.Zero;
 
@@ -159,31 +178,52 @@ namespace Render
 					Double3 dir  = delta * (1.0 / len);
 					dir3         = new Vector3((float)dir.X, (float)dir.Y, (float)dir.Z);
 				}
-				_dirs[count] = dir3;
 
-				// Cache world-fixed sky direction per body for RND-07/D-21 handoff baseline.
-				// Phase 3 reads this to align a newly spawned mesh with the sky point's
-				// screen position for a pop-free instant swap.
-				_skyDirs[body.Index] = dir3;
-
-				// SIZE — purely physical: the disc subtends the star's true angular radius
+				// SIZE — purely physical: the disc subtends the body's true angular radius
 				// θ = RadiusMeters / distance (the SAME rule the mesh sphere obeys, so the
 				// handoff cannot pop), floored at the pixel footprint because nothing can render
 				// smaller than one pixel. The smoothstep disc param is (1 − cos θ_eff).
 				double theta = StarRendering.AngularRadius(body.RadiusMeters, len);
 				// Floor at one pixel (resolution limit) and cap at MaxDiscAngle so a degenerate
 				// near body cannot drive 1−cos toward 1 (which collapses the shader smoothstep).
-				// Next-tier-out bodies are always far, so this cap is a safety bound, not a tuning knob.
 				float  eff   = Mathf.Clamp((float)theta, pixelAngle, MaxDiscAngle);
-				_sizes[count] = 1f - Mathf.Cos(eff);
+				float  size  = 1f - Mathf.Cos(eff);
 
 				// BRIGHTNESS — the SAME shared rule the mesh uses: inverse-square flux through a
 				// magnitude (log) curve, shifted by the one global StarRendering.Exposure. Result
-				// is in [0,1] so the star's BaseColor hue is preserved instead of washing out.
+				// is in [0,1] so the body's BaseColor hue is preserved instead of washing out.
+				// Galaxies reuse this identical path so point↔disc brightness auto-matches (D-30).
 				float alpha = StarRendering.ApparentBrightness(body.Luminosity, len);
-				_colors[count] = new Color(body.BaseColor.R, body.BaseColor.G, body.BaseColor.B, alpha);
 
-				count++;
+				// ── Partition by ObjectType (D-40) ────────────────────────────────────
+				if (body.ObjectType == UniObject.Type.Galaxy && galCount < MaxGalaxies)
+				{
+					// Galaxy: route to procedural-disc uniform arrays
+					_galDirs[galCount]         = dir3;
+					_galSizes[galCount]        = size;
+					_galColors[galCount]       = new Color(body.BaseColor.R, body.BaseColor.G, body.BaseColor.B, alpha);
+					_galTypes[galCount]        = body.GalaxyType;
+					_galOrientations[galCount] = new Vector4(
+						body.GalaxyOrientation.X, body.GalaxyOrientation.Y, body.GalaxyOrientation.Z,
+						body.GalaxySeed);
+					galCount++;
+				}
+				else if (body.ObjectType == UniObject.Type.Star && count < MaxStars)
+				{
+					// Star: route to existing star-point uniform arrays
+					_dirs[count]   = dir3;
+					_sizes[count]  = size;
+					_colors[count] = new Color(body.BaseColor.R, body.BaseColor.G, body.BaseColor.B, alpha);
+
+					// Cache world-fixed sky direction per body for RND-07/D-21 handoff baseline.
+					// Phase 3 reads this to align a newly spawned mesh with the sky point's
+					// screen position for a pop-free instant swap. Star branch only — galaxy
+					// bodies are sky-only and have no mesh counterpart (D-28).
+					_skyDirs[body.Index] = dir3;
+
+					count++;
+				}
+				// else: non-Star/Galaxy NextTierSkybox body — skip (future-proof guard)
 			}
 
 			// Push star_count first, then arrays (only if count > 0 to avoid sending empty arrays).
@@ -193,6 +233,17 @@ namespace Render
 				_skyMat.SetShaderParameter("star_dirs",   _dirs);
 				_skyMat.SetShaderParameter("star_colors", _colors);
 				_skyMat.SetShaderParameter("star_sizes",  _sizes);
+			}
+
+			// Push galaxy uniforms (T-03-01: galaxy_count clamped to MaxGalaxies by galCount guard above)
+			_skyMat.SetShaderParameter("galaxy_count", galCount);
+			if (galCount > 0)
+			{
+				_skyMat.SetShaderParameter("galaxy_dirs",         _galDirs);
+				_skyMat.SetShaderParameter("galaxy_colors",       _galColors);
+				_skyMat.SetShaderParameter("galaxy_sizes",        _galSizes);
+				_skyMat.SetShaderParameter("galaxy_types",        _galTypes);
+				_skyMat.SetShaderParameter("galaxy_orientations", _galOrientations);
 			}
 		}
 
