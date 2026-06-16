@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://cu0h3b3qv1uhi"]
+[gd_scene format=4 uid="uid://cu0h3b3qv1uhi"]
 
 [ext_resource type="Script" uid="uid://bjvhy26s7ksln" path="res://Scripts/TestSetup.cs" id="1_glv2v"]
 [ext_resource type="Script" uid="uid://b434isdpy4rh8" path="res://Scripts/Render/PostProcessRenderer.cs" id="3_cm0pq"]
@@ -15,6 +15,12 @@ shader_parameter/star_dirs = PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 shader_parameter/star_colors = PackedColorArray(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 shader_parameter/star_sizes = PackedFloat32Array(0, 0, 0, 0, 0, 0, 0, 0)
 shader_parameter/star_count = 0
+shader_parameter/galaxy_dirs = PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/galaxy_colors = PackedColorArray(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/galaxy_sizes = PackedFloat32Array(0, 0, 0, 0)
+shader_parameter/galaxy_types = PackedInt32Array(0, 0, 0, 0)
+shader_parameter/galaxy_orientations = PackedVector4Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/galaxy_count = 0
 
 [sub_resource type="Sky" id="Sky_main"]
 sky_material = SubResource("ShaderMaterial_sky")
