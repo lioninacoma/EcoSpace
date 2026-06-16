@@ -6,13 +6,27 @@ namespace Render
 	/// <summary>
 	/// Per-frame, read-only sky uniform push: classifies bodies via TierClassifier, computes
 	/// world-space directions from ship to each NextTierSkybox body using a double-precision
-	/// hierarchy walk, applies the inverse-square luminosity magnitude model (D-17/D-19), carries
-	/// each body's BaseColor (D-18), and pushes star_dirs/star_colors/star_sizes/star_count to
-	/// the Sky ShaderMaterial each frame. Brightness values &gt;1 feed the existing WorldEnvironment
-	/// glow for free (D-20). Also maintains a per-body sky-direction cache (_skyDirs) as the
-	/// sky-side of the RND-07/D-21 handoff baseline; see GetSkyDirection.
+	/// LCA-relative hierarchy walk, applies the inverse-square luminosity magnitude model
+	/// (D-17/D-19), carries each body's BaseColor (D-18), and pushes
+	/// star_dirs/star_colors/star_sizes/star_count to the Sky ShaderMaterial each frame.
+	/// Brightness values &gt;1 feed the existing WorldEnvironment glow for free (D-20).
+	/// Also maintains a per-body sky-direction cache (_skyDirs) as the sky-side of the
+	/// RND-07/D-21 handoff baseline; see GetSkyDirection.
 	///
 	/// Read-only consumer of GameWorld state — MUST NOT mutate UniVec3 or call TranslatePos.
+	///
+	/// Precision model (LCA-relative walk):
+	///   The ship→body vector is formed by walking each side up to their lowest-common ancestor
+	///   (LCA) and accumulating metres in the LCA's frame; the final subtraction is a small-vector
+	///   operation bounded by the inter-body separation in that frame. The LCA's (potentially
+	///   enormous) absolute offset from root never enters the arithmetic, eliminating catastrophic
+	///   cancellation of two large nearly-equal vectors at 1:1 Universe scale.
+	///
+	///   WARNING — do NOT replace the LCA walk with a naive UniVec3 operator- across spaces:
+	///   UniVec3.Convert(), operator-, operator+ all route through EnsureSameScale → Convert →
+	///   ToDouble3(), which ZEROES the Long3 Units (folds everything into a single double).
+	///   A naive bodyUni - shipUni across different scales collapses to double and discards the
+	///   precision split, negating the entire point of the LCA approach.
 	/// </summary>
 	public partial class SkyboxRenderer : Node
 	{
@@ -92,6 +106,11 @@ namespace Render
 		/// and pushes the resulting arrays to the sky ShaderMaterial.
 		/// Also updates _skyDirs (RND-07/D-21 handoff cache) for each sky-visible body.
 		/// Strictly read-only — never writes to GameObjects, LocalPos, or ChildIndices.
+		///
+		/// Direction math uses the LCA-relative walk (see RelativePosition). The large
+		/// common-ancestor offset is never formed; subtraction operates on small LCA-frame
+		/// metre vectors bounded by the inter-body separation, not by the absolute distance
+		/// from root.
 		/// </summary>
 		private void SyncSkyPoints()
 		{
@@ -104,9 +123,6 @@ namespace Render
 
 			// Clear stale entries — rebuilt fresh each frame (T-02-05 mitigation).
 			_skyDirs.Clear();
-
-			// Cache ship's root-frame position once — reused for every body's direction.
-			Double3 shipRoot = AbsolutePositionInRoot(ship, objs);
 
 			// Angular size of one screen pixel (radians). A star can never render smaller than
 			// the screen can resolve, so this is the floor on a sky point's disc — the only
@@ -122,16 +138,18 @@ namespace Render
 
 				if (TierClassifier.Classify(body, ship) != SkyTier.NextTierSkybox) continue;
 
-				// Direction and distance: walk hierarchy in double precision using the full
-				// UniVec3 position (Units * Scale + Offset). Casting only the normalized
-				// unit vector to Vector3 avoids precision loss at interstellar distances
-				// (Pitfall 5 in RESEARCH.md).
-				Double3 bodyRoot = AbsolutePositionInRoot(body, objs);
-				Double3 delta    = bodyRoot - shipRoot;
-				double  len      = delta.Magnitude();
+				// Direction and distance: LCA-relative hierarchy walk in double precision.
+				// RelativePosition returns body − ship in metres anchored at their LCA so
+				// the large common-ancestor offset never enters the subtraction
+				// (eliminates catastrophic cancellation at 1:1 Universe scale).
+				// Casting only the normalized unit vector to Vector3 avoids precision loss
+				// at interstellar distances (Pitfall 5 in RESEARCH.md).
+				bool hasCommonAncestor = RelativePosition(body, ship, objs, out Double3 delta);
+
+				double  len  = hasCommonAncestor ? delta.Magnitude() : 0.0;
 
 				Vector3 dir3;
-				if (len < 1e-30)
+				if (!hasCommonAncestor || len < 1e-30)
 					dir3 = Vector3.Up;
 				else
 				{
@@ -214,36 +232,131 @@ namespace Render
 			return fovRad / height;
 		}
 
-		// ----- Hierarchy position math (read-only, double-precision) ------------
+		// ----- Hierarchy position math (read-only, double-precision, LCA-relative) ----
 
 		/// <summary>
-		/// Returns the absolute position of <paramref name="obj"/> in metres, measured from
-		/// the top-level ancestor's origin. Uses the full UniVec3 (Units * Scale + Offset) so
-		/// bodies at interstellar distances (e.g. Galaxy-scale siblings) are not collapsed to
-		/// the origin by a ToDouble3() call that would lose the integer Units part.
+		/// Returns the ship→body vector in metres, computed via the lowest-common ancestor (LCA).
+		/// Each side is accumulated relative to the LCA in metres (stopping the walk at the LCA);
+		/// the final subtraction operates on two small LCA-frame vectors whose magnitude is bounded
+		/// by inter-body separation — the LCA's large absolute offset from root is never formed.
 		///
-		/// Stops walking when a parent's Scale is ≤ 0 (Root object has Scale = −1).
+		/// Returns <c>true</c> and populates <paramref name="delta"/> on success.
+		/// Returns <c>false</c> (delta = Double3.Zero) if no common ancestor is found — callers
+		/// treat this as the coincident/zero-length case (fall back to Vector3.Up).
 		///
-		/// T-02-02 mitigation: loop guarded by (uint) bounds check and null guard; bounded by
-		/// hierarchy depth; coincident/zero-length delta guarded at the call sites.
+		/// T-02-02 mitigation: loops guarded by (uint) bounds check and null guard; bounded
+		/// by hierarchy depth (≤ 5); coincident/zero-length delta guarded at the call site.
+		/// Read-only — MUST NOT mutate any UniObject.
+		///
+		/// WARNING — do NOT replace with a naive UniVec3 operator- across spaces: Convert()
+		/// routes through ToDouble3(), which zeroes the Long3 Units, collapsing everything to
+		/// a single double and throwing away the precision split that this walk preserves.
+		/// </summary>
+		private static bool RelativePosition(
+			UniObject body, UniObject ship, List<UniObject> objs, out Double3 delta)
+		{
+			int lcaIdx = FindLca(body, ship, objs);
+			if (lcaIdx < 0)
+			{
+				delta = Double3.Zero;
+				return false;
+			}
+
+			Double3 bodyFromLca = PositionRelativeToAncestor(body, lcaIdx, objs);
+			Double3 shipFromLca = PositionRelativeToAncestor(ship, lcaIdx, objs);
+
+			// body position relative to ship, both expressed in LCA-frame metres.
+			// Both operands are small (bounded by inter-body separation from the LCA),
+			// so no catastrophic cancellation of large nearly-equal values.
+			delta = bodyFromLca - shipFromLca;
+			return true;
+		}
+
+		/// <summary>
+		/// Finds the lowest-common ancestor index of <paramref name="a"/> and
+		/// <paramref name="b"/> in the object hierarchy. Returns -1 if no common
+		/// ancestor can be found (should be impossible — all objects share Root).
+		///
+		/// Algorithm: build a set of all ancestor indices (including a itself) by
+		/// walking a's ParentIndex chain; then walk b's chain upward until the first
+		/// index that is in that set — that index is the LCA.
+		///
+		/// Every loop step is guarded by (uint)idx &lt; (uint)objs.Count and a null
+		/// check (T-02-02 mitigation). Hierarchy depth is ≤ 5.
 		/// Read-only — MUST NOT mutate any UniObject.
 		/// </summary>
-		private static Double3 AbsolutePositionInRoot(UniObject obj, List<UniObject> objs)
+		private static int FindLca(UniObject a, UniObject b, List<UniObject> objs)
 		{
-			// Full position in metres from the parent's origin: Units * Scale + Offset.
-			double  scale = obj.LocalPos.Scale;
-			var     u     = obj.LocalPos.Units;
-			Double3 pos   = obj.LocalPos.Offset
-							+ new Double3((double)u.X * scale, (double)u.Y * scale, (double)u.Z * scale);
-			int pIdx = obj.ParentIndex;
+			// Build the ancestor set for 'a' (including 'a' itself).
+			// Using a small fixed-size approach — hierarchy depth ≤ 5, so a HashSet is fine.
+			var aAncestors = new HashSet<int>();
+			int idx = a.Index;
+			while ((uint)idx < (uint)objs.Count && objs[idx] != null)
+			{
+				aAncestors.Add(idx);
+				int parentIdx = objs[idx].ParentIndex;
+				if (parentIdx == idx) break;   // cycle guard (Root points to -1 normally)
+				idx = parentIdx;
+			}
 
+			// Walk 'b' upward until we find an index in aAncestors.
+			idx = b.Index;
+			while ((uint)idx < (uint)objs.Count && objs[idx] != null)
+			{
+				if (aAncestors.Contains(idx)) return idx;
+				int parentIdx = objs[idx].ParentIndex;
+				if (parentIdx == idx) break;   // cycle guard
+				idx = parentIdx;
+			}
+
+			return -1;   // no common ancestor found (should not happen in a valid hierarchy)
+		}
+
+		/// <summary>
+		/// Accumulates the position of <paramref name="node"/> relative to the ancestor at
+		/// <paramref name="lcaIdx"/> in metres, walking child→parent and stopping when the
+		/// walk reaches the LCA (or the node IS the LCA — returns Double3.Zero).
+		///
+		/// At each step the node's full position in its own frame is formed as:
+		///   pos = Units * Scale + Offset    (metres in the child frame)
+		/// then added to the running total expressed in the LCA frame. This is the same
+		/// per-step accumulation pattern used in WorldRenderer.ComputeStarRenderPosFromHierarchy,
+		/// generalized to walk to an arbitrary ancestor.
+		///
+		/// The defensive Scale ≤ 0 break ensures Root (Scale = -1) is never multiplied in,
+		/// even though the LCA walk normally stops well above Root.
+		///
+		/// T-02-02 mitigation: loop guarded by (uint) bounds check and null guard; bounded
+		/// by hierarchy depth (≤ 5). Read-only — MUST NOT mutate any UniObject.
+		/// </summary>
+		private static Double3 PositionRelativeToAncestor(
+			UniObject node, int lcaIdx, List<UniObject> objs)
+		{
+			// If the node IS the LCA it contributes zero offset from the LCA frame.
+			if (node.Index == lcaIdx) return Double3.Zero;
+
+			// Full position of 'node' in its own frame (metres from its parent's origin):
+			//   Units * Scale + Offset
+			double  scale = node.LocalPos.Scale;
+			var     u     = node.LocalPos.Units;
+			Double3 pos   = node.LocalPos.Offset
+							+ new Double3((double)u.X * scale, (double)u.Y * scale, (double)u.Z * scale);
+
+			int pIdx = node.ParentIndex;
+
+			// Walk upward, accumulating each parent's in-frame position, until we reach
+			// the LCA. The walk terminates once pIdx becomes the LCA index — at that
+			// point `pos` already contains the node's metres-from-LCA (the LCA's own
+			// position relative to itself is zero, so we do not need to add it).
 			while ((uint)pIdx < (uint)objs.Count && objs[pIdx] != null)
 			{
+				if (pIdx == lcaIdx) break;   // reached the LCA — stop here
+
 				var parent = objs[pIdx];
 				double pScale = parent.LocalPos.Scale;
-				if (pScale <= 0) break;   // Root has Scale = -1; stop before corrupting pos.
+				if (pScale <= 0) break;   // Root has Scale = -1; never multiply Root's position in
 
-				// Accumulate parent's full position in metres and add our metres-from-parent.
+				// Accumulate parent's own in-frame position (metres from its parent's origin).
 				var pu = parent.LocalPos.Units;
 				pos = parent.LocalPos.Offset
 					  + new Double3((double)pu.X * pScale, (double)pu.Y * pScale, (double)pu.Z * pScale)
@@ -251,7 +364,7 @@ namespace Render
 				pIdx = parent.ParentIndex;
 			}
 
-			return pos;   // metres, absolute from the top-level ancestor origin
+			return pos;   // metres from the LCA's origin, in LCA-frame coordinates
 		}
 	}
 }
