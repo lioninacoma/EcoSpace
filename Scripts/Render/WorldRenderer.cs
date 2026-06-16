@@ -326,23 +326,23 @@ namespace Render
 
 		/// <summary>
 		/// Derives the star's render-space position when the star is NOT in the current
-		/// render set (e.g. Planet space). Uses the same cross-frame hierarchy math as
-		/// the former SyncPlanetSunLight, expressed as a render-space Vector3 rather than
-		/// a Godot light orientation.
+		/// render set (e.g. Planet space). Uses UniMath.RelativeMetres for the cross-frame
+		/// hierarchy math — the same LCA-relative UniVec3 strategy as SkyboxRenderer —
+		/// expressed as a render-space Vector3 for star_dir shading.
 		///
-		/// Direction math (all in Star-space metres, scale = 1 m/unit):
-		///   planetInStar = planet.LocalPos.ToDouble3()        (Star-space metres)
-		///   shipInStar   = planetInStar + ship.LocalPos.ToDouble3()
-		///                  (ship.LocalPos is in Planet space, scale=1e-4 m/unit;
-		///                   ToDouble3() gives metres; adding to planet gives Star-frame metres)
-		///   starRenderPos ≈ -shipInStar * factor / ship.LocalPos.Scale
-		///                  (star is at origin of Star frame; ship is at shipInStar;
-		///                   so star relative to ship = -shipInStar in Star-space metres;
-		///                   convert to render units: ÷ ship.LocalPos.Scale → observer units, × factor)
+		/// Sign derivation (why no negation):
+		///   UniMath.RelativeMetres(ship, star, …) returns star − ship in metres via the LCA
+		///   path (from=ship, to=star → result = star position − ship position in LCA frame).
+		///   This is exactly the star-relative-to-ship vector we need as a render-space direction.
+		///   The old code computed shipInStar then applied -shipInStar; UniMath.RelativeMetres
+		///   gives us star-ship directly, so we use +starRelToShip (NO negation).
 		///
 		/// The star is at ~1.5e11 m (1 AU) in Star-space metres, mapping to ~1.5e7 render
 		/// units — far beyond the 1e6 far plane. The DIRECTION is what matters; the vector
 		/// is far out but normalised correctly in SyncBodies.
+		///
+		/// Fallback: returns Vector3.Up * 1e7f when the hierarchy is unexpected (star not found
+		/// above the planet) OR when UniMath.RelativeMetres returns Double3.Zero (no LCA).
 		/// </summary>
 		private Vector3 ComputeStarRenderPosFromHierarchy(
 			UniObject ship, UniObject planet, List<UniObject> gameObjects, float factor)
@@ -353,21 +353,26 @@ namespace Render
 			if (star == null || !IsStarBody(star))
 				return Vector3.Up * 1e7f;   // fallback: point light straight up if hierarchy unexpected
 
-			// Planet position in Star frame (ToDouble3() on a Star-space UniVec3 gives metres directly).
-			Double3 planetInStar = planet.LocalPos.ToDouble3();
+			// LCA-relative cross-frame position: star − ship in metres.
+			// UniMath.RelativeMetres(from=ship, to=star) walks both to their LCA in UniVec3,
+			// subtracts at the same scale for exact integer Units cancellation, then collapses
+			// the small delta to metres via a single ToDouble3(). This is the same precision
+			// strategy used by SkyboxRenderer — the star's enormous absolute-from-root offset
+			// never enters the arithmetic.
+			// Sign: result is already star-relative-to-ship (to − from = star − ship),
+			// so NO negation is needed here. The old code computed -shipInStar; we get +starRelToShip.
+			Double3 starRelToShip = UniMath.RelativeMetres(ship, star, gameObjects);
 
-			// Ship position in Planet frame converted to Star-space metres.
-			// ship.LocalPos.ToDouble3() gives Planet-space metres (scale=1e-4 m/unit × units + offset).
-			// Adding planetInStar gives the ship's absolute position in Star-space metres.
-			Double3 shipInStar = planetInStar + ship.LocalPos.ToDouble3();
+			// Fallback if UniMath found no common ancestor (should not occur in a valid hierarchy).
+			if (starRelToShip.X == 0.0 && starRelToShip.Y == 0.0 && starRelToShip.Z == 0.0)
+				return Vector3.Up * 1e7f;
 
-			// Star is at the origin of Star space → star position relative to ship = -shipInStar metres.
 			// Convert to observer units (÷ ship.LocalPos.Scale) then to render units (× factor).
 			double obsFactor = factor / ship.LocalPos.Scale;
 			return new Vector3(
-				(float)(-shipInStar.X * obsFactor),
-				(float)(-shipInStar.Y * obsFactor),
-				(float)(-shipInStar.Z * obsFactor));
+				(float)(starRelToShip.X * obsFactor),
+				(float)(starRelToShip.Y * obsFactor),
+				(float)(starRelToShip.Z * obsFactor));
 		}
 
 		// ----- Private helpers -----------------------------------------------
