@@ -95,8 +95,14 @@ const float GALAXY_DISC_SCALE    = 80.0;  // angular→UV scale; tune for arm/di
 /// coordinate suitable for use in spiral_galaxy / elliptical_galaxy.
 vec2 galaxy_disc_coords(vec3 eye_dir, vec3 galaxy_dir, vec3 disc_normal) {
     // Build two orthonormal tangent vectors spanning the disc plane.
-    vec3 t1 = normalize(cross(disc_normal, vec3(0.0, 1.0, 0.0)));
-    if (dot(t1, t1) < 0.001) t1 = normalize(cross(disc_normal, vec3(1.0, 0.0, 0.0)));
+    // Guard the degenerate case BEFORE normalize: when disc_normal ∥ (0,1,0) the cross
+    // product is ~zero and normalize() returns NaN, which then propagates through uv →
+    // galaxy_bright → col and blacks out the ENTIRE sky (stars included). The home galaxy
+    // is authored with normal (0,1,0) and is classified NextTierSkybox while the ship is
+    // inside it, so this case is live. Choose the cross-axis by magnitude, then normalize.
+    vec3 c = cross(disc_normal, vec3(0.0, 1.0, 0.0));
+    if (dot(c, c) < 0.001) c = cross(disc_normal, vec3(1.0, 0.0, 0.0));
+    vec3 t1 = normalize(c);
     vec3 t2 = cross(disc_normal, t1);
     // Angular offset from galaxy center in the disc tangent plane.
     vec3 delta = eye_dir - dot(eye_dir, galaxy_dir) * galaxy_dir;
