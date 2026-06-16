@@ -234,10 +234,15 @@ namespace Render
 			// Render the parent body itself (e.g. the planet we orbit) ship-relative.
 			// The parent lives at the ORIGIN of the ship's frame, so its position relative
 			// to the ship is simply the negation of the ship's own offset in that frame.
-			RenderBodyAt(parentIdx, parent, ship, factor, isParent: true, out bool parentIsStar, out Vector3 parentRenderPos);
-			activeIndices.Add(parentIdx);
-			renderPositions[parentIdx] = parentRenderPos;
-			if (parentIsStar) { starRendered = true; starIdx = parentIdx; }
+			// D-28/T-03-06: if the parent is a Galaxy (ship in Universe space) skip mesh render —
+			// galaxies are sky-only and must never appear as world-space sphere meshes.
+			if (parent.ObjectType != UniObject.Type.Galaxy)
+			{
+				RenderBodyAt(parentIdx, parent, ship, factor, isParent: true, out bool parentIsStar, out Vector3 parentRenderPos);
+				activeIndices.Add(parentIdx);
+				renderPositions[parentIdx] = parentRenderPos;
+				if (parentIsStar) { starRendered = true; starIdx = parentIdx; }
+			}
 
 			// Render siblings: all children of parent except the ship itself
 			foreach (int childIdx in parent.ChildIndices)
@@ -246,6 +251,8 @@ namespace Render
 
 				var body = (uint)childIdx < (uint)gameObjects.Count ? gameObjects[childIdx] : null;
 				if (body == null) continue;
+				// D-28/T-03-06: galaxies are sky-only — never render as a mesh (Pitfall 4)
+				if (body.ObjectType == UniObject.Type.Galaxy) continue;
 
 				RenderBodyAt(childIdx, body, ship, factor, isParent: false, out bool siblingIsStar, out Vector3 siblingRenderPos);
 				activeIndices.Add(childIdx);
@@ -378,10 +385,11 @@ namespace Render
 		// ----- Private helpers -----------------------------------------------
 
 		/// <summary>
-		/// Determines whether the given body is the star. Identified by name so
-		/// it works regardless of which CurrentSpace the ship is in.
+		/// Determines whether the given body is a star. Identified by ObjectType (D-38) so
+		/// it works for any star across any galaxy, not just the home-system "STAR" by name.
 		/// </summary>
-		private static bool IsStarBody(UniObject body) => body.Name == "STAR";
+		private static bool IsStarBody(UniObject body) =>
+			body.ObjectType == UniObject.Type.Star;
 
 		/// <summary>
 		/// Ensures a MeshInstance3D exists for <paramref name="bodyIdx"/>, then positions it
