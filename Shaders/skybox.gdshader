@@ -48,6 +48,35 @@ uniform float star_sizes[MAX_STARS];
 /// Number of valid sky bodies in the arrays above. Shader loops only up to this count.
 uniform int   star_count = 0;
 
+// ── Galaxy uniforms (D-40) ────────────────────────────────────────────────
+//
+// MAX_GALAXIES: small fixed array; galaxy_count controls actual loop iterations.
+// galaxy_types[]: GLSL int array — verified at runtime (Task 1 Wave-0 de-risk).
+// If int[] push via SetShaderParameter fails in Godot 4.6, fall back to packing
+// type (0/1) into galaxy_orientations[i].w < 0.5 ? spiral : elliptical.
+// The chosen path is recorded in 03-01-SUMMARY.md as the contract for SkyboxRenderer.
+
+const int MAX_GALAXIES = 4;
+
+/// World-space unit direction to each galaxy center (same EYEDIR frame as star_dirs).
+uniform vec3  galaxy_dirs[MAX_GALAXIES];
+
+/// rgb = BaseColor, a = ApparentBrightness (same StarRendering model as stars, D-30).
+uniform vec4  galaxy_colors[MAX_GALAXIES] : source_color;
+
+/// Angular disc half-size in (1 − cos θ) smoothstep units, same convention as star_sizes.
+/// Sub-pixel galaxies render as star-like points; growing discs switch to structured mode.
+uniform float galaxy_sizes[MAX_GALAXIES];
+
+/// 0 = spiral, 1 = elliptical (D-29). If int[] fails, pack into galaxy_orientations.w.
+uniform int   galaxy_types[MAX_GALAXIES];
+
+/// xyz = disc normal (world-space unit vector), w = procedural arm seed (D-29).
+uniform vec4  galaxy_orientations[MAX_GALAXIES];
+
+/// Number of valid galaxies in the arrays above. Shader loops only up to this count.
+uniform int   galaxy_count = 0;
+
 void sky()
 {
     vec3 col = vec3(0.0);

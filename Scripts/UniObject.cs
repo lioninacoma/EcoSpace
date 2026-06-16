@@ -7,7 +7,13 @@ public class UniObject
 {
     public enum Type
     {
-        Orb, Asteroid, Ship, None
+        Orb, Asteroid, Ship, None,
+        /// <summary>Emissive body: renders as mesh in current tier; sky-point in ancestor tier (D-38).</summary>
+        Star,
+        /// <summary>Procedural sky disc only — WorldRenderer skips entirely (D-28/D-38).</summary>
+        Galaxy,
+        /// <summary>Lit mesh in current tier (D-38).</summary>
+        Planet,
     }
 
     public enum Space
@@ -92,6 +98,21 @@ public class UniObject
     /// Default 1.0 = solar luminosity; set to 0.0 for non-emissive bodies.
     /// </summary>
     public double          Luminosity = 1.0;
+
+    // ── Body type + galaxy presentation fields (D-38/D-29) ───────────────
+
+    /// <summary>Body role: drives renderer routing (D-38). Named ObjectType (not Type) to avoid
+    /// shadowing the Type enum name (CS0118 pitfall — RESEARCH.md Pitfall 1).</summary>
+    public Type            ObjectType = Type.None;
+
+    /// <summary>0 = spiral, 1 = elliptical. Consumed by skybox.gdshader galaxy loop (D-29).</summary>
+    public int             GalaxyType;
+
+    /// <summary>Procedural arm/texture seed packed as float. Consumed by skybox.gdshader spiral_galaxy (D-29).</summary>
+    public float           GalaxySeed;
+
+    /// <summary>Galaxy disc normal in world space; controls orientation of the rendered disc (D-29).</summary>
+    public Vector3         GalaxyOrientation;
 
     /// <summary>
     /// Indices into GameWorld.GameObjects of all direct children of this object.
