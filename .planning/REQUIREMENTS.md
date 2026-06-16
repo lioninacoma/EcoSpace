@@ -41,7 +41,7 @@ Requirements for the initial playable travel-and-rendering milestone. Each maps 
 ### Travel (integration milestones)
 
 - [x] **TRV-01**: Player can fly around a single star system and approach dithered planets and stars (first sequenced milestone — in-system flight + look-and-feel)
-- [ ] **TRV-02**: Player can fly from one galaxy to another, with SOI transitions and the skybox updating correctly along the way (second sequenced milestone — cross-galaxy travel)
+- [x] **TRV-02**: Player can fly from one galaxy to another, with SOI transitions and the skybox updating correctly along the way (second sequenced milestone — cross-galaxy travel)
 
 ## v2 Requirements
 
@@ -93,7 +93,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HUD-03 | Phase 1 | Done (Phase 1 ✓) |
 | HUD-04 | Phase 1 (current-space cycle + edge marker) · Backlog 999.1 (whole-hierarchy tree + world-pinned outline) | Done (Phase 1 scope ✓); extended targeting → Backlog 999.1 |
 | TRV-01 | Phase 1 | Done (Phase 1 ✓) |
-| TRV-02 | Phase 3 | Pending |
+| TRV-02 | Phase 3 | Complete |
 
 **Coverage:**
 

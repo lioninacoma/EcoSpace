@@ -75,7 +75,7 @@ Plans:
 **Plans**: 3 plans (3 waves)Plans:
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Galaxy foundation + headline visual: UniObject.Type/galaxy fields + 3 authored galaxies (home spiral + mirror + elliptical cluster) at true 1:1 distances + procedural galaxy sky shader + SkyboxRenderer Type partition (wave 1)
+- [x] 03-01-PLAN.md — Galaxy foundation + headline visual: UniObject.Type/galaxy fields + 3 authored galaxies (home spiral + mirror + elliptical cluster) at true 1:1 distances + procedural galaxy sky shader + SkyboxRenderer Type partition (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -94,7 +94,7 @@ Plans:
 
   Cross-space constraint to resolve in planning: `WorldRenderer` only renders bodies in the ship's current space, so a cross-space target can show direction + distance (edge marker) but the 3D outline can only be drawn once that body enters the rendered set (i.e. once the ship is in its space).
 **Requirements:** TBD (extends HUD-04 + findability; revisits D-12)
-**Plans:** 3/3 plans complete
+**Plans:** 1/3 plans executed
 
 Plans:
 
@@ -109,4 +109,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. In-System Flight MVP | 4/4 (TRV-01 milestone) | ✓ Complete | 2026-06-14 |
 | 2. Dynamic Skybox | 3/3 | Complete   | 2026-06-15 |
-| 3. Cross-Galaxy Travel | 0/3 | Planned | - |
+| 3. Cross-Galaxy Travel | 1/3 | In Progress|  |
