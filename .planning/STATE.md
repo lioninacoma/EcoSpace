@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Home-galaxy in-SOI visibility resolved (quick 260616-riw, suppress); ready for Phase 03 plan 03-02
-last_updated: "2026-06-16T17:55:00.000Z"
-last_activity: 2026-06-16 -- Completed quick task 260616-riw (home-galaxy suppression)
+stopped_at: "Completed 03-02: SpeedOfLight cap removed, MaxSpeed=2e20, IsFinite guard added. Ready for 03-03."
+last_updated: "2026-06-16T18:21:04.648Z"
+last_activity: 2026-06-16 -- Phase 03 execution started
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 50
 ---
 
@@ -54,6 +54,7 @@ Progress: [██████████] 100% — Phase 01 complete (1 of 3 ph
 *Updated after each plan completion*
 | Phase 02 P03 | 10 min | 1 tasks | 3 files |
 | Phase 03-cross-galaxy-travel P01 | 15 | 3 tasks | 4 files |
+| Phase 03-cross-galaxy-travel P02 | 145 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Recent decisions affecting current work:
 - [Phase ?]: 02-03: xUnit test strategy: xunit-godotsharp-linked — GodotSharp 4.6.2 + linked Compile Include files; TierClassifier full matrix verified green
 - 02-02 POST-CHECKPOINT REDESIGN (play-test feedback, APPROVED 2026-06-15): The 02-02 magnitude model produced huge white star spheres. Reworked star rendering to be physically coherent and unified across mesh + skybox. New `Scripts/Render/StarRendering.cs` is the SINGLE source of truth: a star's appearance derives ONLY from its per-instance Luminosity / RadiusMeters / BaseColor. Size = physical angular radius (R/d), identical for mesh and sky (sky disc floored at one screen pixel). Brightness = inverse-square flux (L/d²) through a magnitude (log10) curve, clamped to [0,1] so BaseColor hue is never washed to white. ONE global knob `StarRendering.Exposure` (editor handle: `WorldRenderer.StarBrightness`, default 0) shifts every star (mesh + sky) together. Star mesh emission set per-frame from the same `ApparentBrightness`. REMOVED all prior global star knobs: SkyboxRenderer LuminosityScale/MinBrightFloor/MaxBright/StarAngularSize/MinStarSize/MaxStarSize/SizePerBright and WorldRenderer StarEmissionEnergy. Rationale: Sun@1AU vs sibling@8ly differ ~1e10 in flux — no single LINEAR scale renders both without one saturating to white; the log curve compresses the range so one exposure works for both and stays in the hue-preserving band. Commits: bf… (point-source), then coherent-refactor, then unify-brightness (3 commits on main after 02-02 SUMMARY).
 - [Phase ?]: 03-01: int[] uniform path confirmed for galaxy_types in Godot 4.6.2 Mono (no float-packing fallback); GALAXY_DISC_SCALE=80.0/LOD_THRESHOLD=2e-4 flagged as play-test tuning knobs; 3 galaxies authored at true 1:1 intergalactic distances
+- [Phase ?]: _maxSpeed default set to 2e20 m/s for ~2-minute intergalactic crossing (D-35 tuning knob; adjust in FlightController.cs)
+- [Phase ?]: SpeedOfLight cap removed from MaxSpeed setter (Plan 03-02); double.IsFinite guard in ApplyMotion closes T-03-04 threat
 
 ### Pending Todos
 
@@ -113,8 +116,8 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-16 - Completed quick task 260616-riw: home-galaxy suppression
-Stopped at: Home-galaxy in-SOI visibility RESOLVED via quick task 260616-riw (suppress; user-locked). Code on main (a94305e, a2588d2), 30 tests green. Ready to execute Phase 03 plan 03-02.
+Last session: 2026-06-16T18:21:04.640Z
+Stopped at: Completed 03-02: SpeedOfLight cap removed, MaxSpeed=2e20, IsFinite guard added. Ready for 03-03.
 Resume: Run `/gsd-execute-phase 03` — resumes at plan 03-02 (only plan without a SUMMARY): remove SpeedOfLight cap, raise MaxSpeed to FTL-equivalent, guard non-finite motion (TRV-02). Then 03-03. NOTE for play-test: visually confirm home-galaxy suppression (exactly 2 galaxy discs, no home-galaxy disc) — deferred from 260616-riw.
 
 ## Refactor Notes
