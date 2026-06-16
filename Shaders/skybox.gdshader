@@ -91,20 +91,20 @@ const float GALAXY_DISC_SCALE    = 80.0;  // angular→UV scale; tune for arm/di
 
 // ── Galaxy helper functions ───────────────────────────────────────────────────
 
-/// Projects EYEDIR into the tangent plane of a galaxy disc and returns a 2D UV
-/// coordinate suitable for use in spiral_galaxy / elliptical_galaxy.
-vec2 galaxy_disc_coords(vec3 eye_dir, vec3 galaxy_dir, vec3 disc_normal) {
-    // Build two orthonormal tangent vectors spanning the disc plane.
-    // Guard the degenerate case BEFORE normalize: when disc_normal ∥ (0,1,0) the cross
-    // product is ~zero and normalize() returns NaN, which then propagates through uv →
-    // galaxy_bright → col and blacks out the ENTIRE sky (stars included). The home galaxy
-    // is authored with normal (0,1,0) and is classified NextTierSkybox while the ship is
-    // inside it, so this case is live. Choose the cross-axis by magnitude, then normalize.
-    vec3 c = cross(disc_normal, vec3(0.0, 1.0, 0.0));
-    if (dot(c, c) < 0.001) c = cross(disc_normal, vec3(1.0, 0.0, 0.0));
-    vec3 t1 = normalize(c);
-    vec3 t2 = cross(disc_normal, t1);
-    // Angular offset from galaxy center in the disc tangent plane.
+/// Returns a 2D disc-plane UV for EYEDIR relative to a galaxy centered at galaxy_dir.
+/// The tangent basis is built from galaxy_dir (the view direction TO the galaxy), NOT
+/// from the disc normal. Building it from the disc normal collapsed the disc to a 1-D
+/// band whenever the normal ≈ world-up (the authored galaxy case: normal ~ (0,1,0)),
+/// because the degenerate-axis guard then aligned a tangent with galaxy_dir and the
+/// perpendicular offset projected to a line — painting a great-circle ring across the
+/// whole sky. A galaxy_dir-aligned basis is always well-conditioned (the seed up-vector
+/// is swapped when galaxy_dir ≈ world-up). The caller MUST gate on
+/// dot(EYEDIR, galaxy_dir) > 0 so the disc never ghosts onto the antipode.
+vec2 galaxy_disc_coords(vec3 eye_dir, vec3 galaxy_dir) {
+    vec3 up0 = abs(galaxy_dir.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 t1  = normalize(cross(up0, galaxy_dir));
+    vec3 t2  = cross(galaxy_dir, t1);
+    // View-plane offset of the eye ray from the galaxy center (perpendicular to galaxy_dir).
     vec3 delta = eye_dir - dot(eye_dir, galaxy_dir) * galaxy_dir;
     return vec2(dot(delta, t1), dot(delta, t2));
 }
@@ -158,11 +158,13 @@ void sky()
         if (size < GALAXY_LOD_THRESHOLD) {
             // Sub-pixel / tiny-apparent-size: render as a colored point identical to star (D-30)
             galaxy_bright = point_disc * galaxy_colors[i].a;
-        } else {
-            // Disc mode: structured procedural rendering (D-31)
-            vec3  disc_normal = galaxy_orientations[i].xyz;
-            float seed        = galaxy_orientations[i].w;
-            vec2  uv          = galaxy_disc_coords(EYEDIR, galaxy_dirs[i], disc_normal);
+        } else if (d > 0.0) {
+            // Disc mode: structured procedural rendering (D-31), FRONT HEMISPHERE ONLY.
+            // The d > 0.0 gate stops the disc from also painting the antipode — the
+            // perpendicular projection in galaxy_disc_coords is symmetric under
+            // EYEDIR → −EYEDIR, which previously ghosted the disc 180° behind the galaxy.
+            float seed = galaxy_orientations[i].w;
+            vec2  uv   = galaxy_disc_coords(EYEDIR, galaxy_dirs[i]);
             // Scale UV: angular-size units → disc-plane [-1..1] approx.
             uv /= max(size * GALAXY_DISC_SCALE, 0.001);
 
@@ -173,6 +175,9 @@ void sky()
                 disc_bright = elliptical_galaxy(uv);
             // Blend: 30% point (center highlight + star-matching handoff) + 70% disc structure
             galaxy_bright = mix(disc_bright, point_disc, 0.3) * galaxy_colors[i].a;
+        } else {
+            // Galaxy center is behind the viewing hemisphere — render nothing for it.
+            galaxy_bright = 0.0;
         }
         col += galaxy_colors[i].rgb * galaxy_bright;
     }
