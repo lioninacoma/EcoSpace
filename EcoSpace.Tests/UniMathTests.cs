@@ -298,6 +298,43 @@ public class UniMathTests
         Assert.Equal(0.0, delta.Z, precision: 12);
     }
 
+    // ── SkyboxRenderer home-galaxy suppression predicate ────────────────────────
+    // These tests prove the exact predicate used by the read-only guard in
+    // SkyboxRenderer.SyncSkyPoints (galaxy branch): "skip this galaxy body when
+    // UniMath.FindLca(ship, body, objs) == body.Index."
+    // Must-have truth #2 (Phase 03): only the 2 OTHER galaxies render as discs from
+    // inside the home system; the home galaxy (an ancestor of the ship) is suppressed.
+
+    [Fact]
+    public void FindLca_HomeGalaxyIsAncestorOfShip_PredicateTrueWouldSuppress()
+    {
+        // Ship (Index 4, Planet space) → PlanetA → Star → Galaxy (Index 1).
+        // Galaxy (Index 1) IS an ancestor of the ship, so the suppression predicate
+        // FindLca(ship, galaxy, objs) == galaxy.Index must return true — the galaxy
+        // would be skipped by SkyboxRenderer's home-galaxy guard.
+        var objs    = BuildHierarchy();
+        var ship    = objs[4];   // Ship
+        var galaxy  = objs[1];   // Home galaxy (ancestor of ship)
+        int lca = UniMath.FindLca(ship, galaxy, objs);
+        Assert.Equal(galaxy.Index, lca);   // lca == body.Index → suppress
+    }
+
+    [Fact]
+    public void FindLca_NonAncestorBodyNotSuppressed_AlphaCenSiblingStar()
+    {
+        // AlphaCen (Index 5, Galaxy space) is a sibling of the home star — NOT an
+        // ancestor of the ship. LCA(ship, AlphaCen) = Galaxy (Index 1), not AlphaCen
+        // (Index 5). So FindLca(ship, alphaCen, objs) != alphaCen.Index → NOT suppressed.
+        // In the real scene the 2 other galaxies are likewise non-ancestors; AlphaCen
+        // stands in as the non-ancestor case the canonical hierarchy already provides.
+        var objs     = BuildHierarchy();
+        var ship     = objs[4];   // Ship
+        var alphaCen = objs[5];   // AlphaCen — not an ancestor of ship
+        int lca = UniMath.FindLca(ship, alphaCen, objs);
+        Assert.NotEqual(alphaCen.Index, lca);   // lca != body.Index → NOT suppressed
+        Assert.Equal(1, lca);                   // LCA is the Galaxy (Index 1) as expected
+    }
+
     // ── Distance ────────────────────────────────────────────────────────────────
 
     [Fact]
