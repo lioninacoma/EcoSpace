@@ -198,6 +198,16 @@ namespace Render
 				// ── Partition by ObjectType (D-40) ────────────────────────────────────
 				if (body.ObjectType == UniObject.Type.Galaxy && galCount < MaxGalaxies)
 				{
+					// ── Home-galaxy suppression guard (must-have truth #2, 03-01-SUMMARY.md line 135) ──
+					// While the ship is inside this galaxy's SOI (i.e. the galaxy is an ancestor of
+					// the ship), the galaxy must NOT render as a disc — only the 2 OTHER (non-ancestor)
+					// galaxies appear from inside the home system.
+					// FindLca(ship, body) == body.Index is exactly "body is an ancestor of (or equal to)
+					// the ship" — the ship-self case is excluded by the body.Index==shipIdx continue above.
+					// This call is strictly read-only: FindLca walks ParentIndex chains without mutation.
+					if (UniMath.FindLca(ship, body, objs) == body.Index)
+						continue;
+
 					// Galaxy: route to procedural-disc uniform arrays
 					_galDirs[galCount]         = dir3;
 					_galSizes[galCount]        = size;
