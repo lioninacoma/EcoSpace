@@ -105,6 +105,7 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 | 2026-06-13 | align-roadmap-state-to-tier-model | Docs: propagated the tier model into ROADMAP Phase 2 (goal/criteria/overview + RND-07); added RND-06 to Phase 1 reqs (ROADMAP + 01-CONTEXT); fixed STATE current-position (01-02 tasks 1-3 done, task-4 human-verify pending) |
 | 2026-06-13 | tiered-rendering-phase-coverage | Docs: marked RND-02/04/05/07 phase-spanning in traceability (in-system early, galaxy tier in Phase 3); gave ROADMAP Phase 3 explicit galaxy-tier rendering coverage + success criterion (closes audit finding #5) |
 | 2026-06-15 | implement-magnitude-model-in-skyboxrende | feat: inverse-square luminosity model (L/D²×LuminosityScale) replaces flat alpha=1.0 in SkyboxRenderer; MinBrightFloor=0.1 floor for faint stars; MinStarSize=3e-6 minimum disc; planets set Luminosity=0 |
+| 2026-06-16 | fix-precision-loss-in-skyboxrenderer-pos | perf: replaced SkyboxRenderer absolute-from-root position math (`AbsolutePositionInRoot`) with an LCA-relative walk (`FindLca` + `PositionRelativeToAncestor` + `RelativePosition`) — ship→body vector is subtracted in the lowest-common-ancestor frame so the large common-ancestor offset is never formed, killing catastrophic cancellation at 1:1 Universe scale. No overflow existed. Outputs identical at MVP scale (LCA=Galaxy@origin); read-only contract preserved; build clean. Commit 83dfce4 |
 
 ## Session Continuity
 
