@@ -95,18 +95,21 @@ public partial class TestSetup : GameWorld
     private static readonly Color Sibling3_Color = new Color(0.70f, 0.85f, 1.0f);
 
     // ----- Galaxy scale constants (D-34) ─────────────────────────────────────────────
-    // Universe space: 1 unit = 1e16 m → GalaxySOI = 5e4 units = 5e20 m (~50 kly radius)
-    // Long3 range ~9.2e18 Universe units — all positions well within range.
-    private const double GalaxySOI           = 5e4;    // Universe units; replaces placeholder 5e3
+    // IMPORTANT: AddGameObject takes its Double3 position and soiMeters in METRES (the
+    // UniVec3 ctor stores them as the metres Offset, then Normalize() splits into Universe
+    // Units at 1e16 m/unit). These MUST be metres, NOT Universe units — authoring them as
+    // units (e.g. 2.4e6) places the galaxies ~1e16× too close, on top of the home system.
+    // Long3 range ~9.2e18 Universe units — 2.4e22 m = 2.4e6 units is well within range.
+    private const double GalaxySOI           = 5e20;   // metres (~50 kly radius = 5e4 Universe units)
     private const double Galaxy_RadiusMeters = 5e20;   // physical radius for speed envelope (D-36/Pitfall 3)
 
-    // Galaxy 2: destination mirror spiral (~Andromeda, 2.4e22 m / 1e16 = 2.4e6 Universe units, D-34)
-    private const double Galaxy2_UniZ        = 2.4e6;
+    // Galaxy 2: destination mirror spiral (~Andromeda), +Z from home galaxy (D-34).
+    private const double Galaxy2_Z           = 2.4e22; // metres (= 2.4e6 Universe units)
 
-    // Galaxy 3: elliptical cluster (~1.8e22 m at 45° offset from Galaxy 2 for distinct sky direction)
-    // √(1.27e6² + 1.27e6²) × 1e16 ≈ 1.8e22 m (D-41)
-    private const double Galaxy3_UniX        = 1.27e6;
-    private const double Galaxy3_UniZ        = 1.27e6;
+    // Galaxy 3: elliptical cluster, ~1.8e22 m at 45° from Galaxy 2 for a distinct sky direction.
+    // √(1.27e22² + 1.27e22²) ≈ 1.8e22 m (D-41).
+    private const double Galaxy3_X           = 1.27e22; // metres
+    private const double Galaxy3_Z           = 1.27e22; // metres
 
     // ----- Public accessors for WorldRenderer / FlightController / HUD ----
 
@@ -203,7 +206,7 @@ public partial class TestSetup : GameWorld
 
         // ── DEST GALAXY — full mirror spiral at ~Andromeda distance (D-33/D-34) ───────
         // 2.4e6 Universe units = 2.4e22 m (2.4e6 * 1e16). In +Z direction from home galaxy.
-        int _galaxy2 = AddGameObject(_root, new Double3(0, 0, Galaxy2_UniZ), GalaxySOI);
+        int _galaxy2 = AddGameObject(_root, new Double3(0, 0, Galaxy2_Z), GalaxySOI);
         GameObjects[_galaxy2].Name              = "DEST GALAXY";
         GameObjects[_galaxy2].ObjectType        = UniObject.Type.Galaxy;
         GameObjects[_galaxy2].RadiusMeters      = Galaxy_RadiusMeters;
@@ -252,7 +255,7 @@ public partial class TestSetup : GameWorld
         // ── ELLIPTICAL CLUSTER — bare star cluster at ~1.8e22 m at 45° (D-41) ─────────
         // x = z = 1.27e6 Universe units → √(2) × 1.27e22 m ≈ 1.80e22 m, 45° from Galaxy 2.
         // Distinct sky direction ensures both galaxies are visible simultaneously from home.
-        int _galaxy3 = AddGameObject(_root, new Double3(Galaxy3_UniX, 0, Galaxy3_UniZ), GalaxySOI);
+        int _galaxy3 = AddGameObject(_root, new Double3(Galaxy3_X, 0, Galaxy3_Z), GalaxySOI);
         GameObjects[_galaxy3].Name              = "ELLIPTICAL CLUSTER";
         GameObjects[_galaxy3].ObjectType        = UniObject.Type.Galaxy;
         GameObjects[_galaxy3].RadiusMeters      = Galaxy_RadiusMeters;
