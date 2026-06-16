@@ -39,6 +39,8 @@
     <Compile Include="..\Scripts\Math\UniVec3.cs" />
     <Compile Include="..\Scripts\Math\Double3.cs" />
     <Compile Include="..\Scripts\Math\Long3.cs" />
+    <!-- UniMath: pure hierarchy-aware position math; no Godot Node types, compiles cleanly. -->
+    <Compile Include="..\Scripts\Math\UniMath.cs" />
   </ItemGroup>
 
 </Project>

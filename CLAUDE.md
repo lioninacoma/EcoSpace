@@ -176,6 +176,19 @@ A first-person retro space sim set in a 1:1-scale universe. The player flies a l
 - Structs for math types (`Double3`, `Long3`, `UniVec3`): immutable value semantics, SIMD friendly
 - Classes for game entities (`UniObject`, `GameWorld`): mutable reference semantics, game state
 
+## Position Math (UniVec3 / UniMath)
+
+- Use `UniVec3` for all position math at galaxy/universe scale. `UniVec3` is the always-present representation for large-distance calculations; treat it as the source of truth for object positions across frames.
+- Subtract and compare in `UniVec3` at the SAME scale (exact integer `Units` cancellation regardless of magnitude). Convert to metres (`ToDouble3()`) ONLY on the final, already-differenced small vector — never form an absolute-from-root metres value and then subtract, as this loses low bits and risks catastrophic cancellation at Universe scale (~1e30 m).
+- Use the `UniMath` helper (global namespace, `Scripts/Math/UniMath.cs`, read-only) for all cross-space distances, body-relative positions, and up/down hierarchy conversions:
+  - `UniMath.RelativePosition(from, to, objs, out UniVec3 result)` — `to − from` as a `UniVec3` in the LCA frame (exact integer Units cancellation; no `ToDouble3` inside).
+  - `UniMath.RelativeMetres(from, to, objs)` — the one sanctioned metres conversion; calls `RelativePosition` then `ToDouble3()` once on the small delta.
+  - `UniMath.Distance(a, b, objs)` — scalar metres distance.
+  - `UniMath.ToAncestorFrame(node, ancestorIdx, objs)` — `node.LocalPos` walked up to an ancestor's child-frame as `UniVec3` via per-level `Convert + LocalPos` steps.
+  - `UniMath.FindLca(a, b, objs)` — lowest-common ancestor index.
+  - Do NOT hand-roll `Units * Scale + Offset` accumulation across frames.
+- Caveat: `UniVec3.Convert()` and cross-scale `operator-/operator+` route through `ToDouble3()`, which zeroes `Long3.Units` and collapses everything to a single double. This is safe for SOI-bounded single `LocalPos` values (each ≤ ~1e17 m), but dangerous for absolute-from-root accumulation. Cross-scale subtraction of large positions loses precision; always go through the LCA path in `UniMath` instead.
+
 <!-- GSD:conventions-end -->
 
 <!-- GSD:architecture-start source:ARCHITECTURE.md -->
