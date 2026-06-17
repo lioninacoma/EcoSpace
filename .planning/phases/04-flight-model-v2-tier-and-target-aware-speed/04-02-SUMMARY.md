@@ -197,6 +197,27 @@ Two further bugs were blocking it:
 - **Files modified:** Scripts/Hud/Hud.cs
 - **Commit:** 40f3bba
 
+### Third post-checkpoint round (refinement — circle should outline the body)
+
+Round 3 confirmed the circle now shows. Play-test refinement request: the fixed
+radius should be smaller when far and grow to outline the body on approach.
+
+**6. [Refinement] Body-size-aware circle radius (D-46 "minimum on-screen radius")**
+- **Found during:** Task 3 play-test round 3 (SC#5 refinement)
+- **Issue:** The circle was a fixed 20px regardless of the body's actual on-screen
+  size — it neither shrank for a distant speck nor grew to outline a body on approach.
+- **Fix:**
+  - `WorldRenderer.GetRenderRadius(idx, out radius)` exposes the body's render-space
+    mesh scale (same value `RenderBodyAt` sets as `mesh.Scale`).
+  - `Hud.UpdateTargetCircle` projects a point offset from the body centre by the
+    render radius, perpendicular to the view direction, and measures the pixel gap to
+    the centre = the body's on-screen radius (grows on approach). Clamped to
+    `[MIN_CIRCLE_RADIUS=6, MAX_CIRCLE_RADIUS=200]`; `CIRCLE_BODY_PADDING=1.15` seats
+    the outline just outside the silhouette. MIN lowered 20→6 so a far speck reads as
+    a tight reticle.
+- **Files modified:** Scripts/Render/WorldRenderer.cs, Scripts/Hud/Hud.cs
+- **Commit:** 691f7ad
+
 ## Known Stubs
 
 None — all new symbols are wired to live data sources. `_worldRenderer` resolves to the scene's `WorldRenderer` node; `GetRenderPosition` is authoritative each frame; `_camera` was already wired in prior plans. The circle is a live read of real frame data, not placeholder logic.
@@ -208,18 +229,22 @@ No new security-relevant surface beyond the plan's threat model:
 - T-04-05 (stale/missing render position): mitigated by `GetRenderPosition` returning false, leaving `_showTargetCircle = false`
 - T-04-06 (per-frame QueueRedraw cost): accepted (negligible, per plan)
 
-## Awaiting: Task 3 Play-test RE-verification (round 3)
+## Awaiting: Task 3 Play-test RE-verification (round 4)
 
 Task 3 is a `checkpoint:human-verify` gate.
 - Round 1: SC#1/#3/#4 approved; SC#2 + SC#5 failed → fixes 1–3 (46892bc).
 - Round 2: SC#2 approved; SC#5 still failed → fixes 4–5 (40f3bba).
-- **Round 3 pending:** re-verify SC#5 (target circle) only.
+- Round 3: circle shows; refinement requested (size to body, grow on approach) → fix 6 (691f7ad).
+- **Round 4 pending:** re-verify SC#5 circle sizing (small when far, grows to outline body).
 
 ## Self-Check: PASSED (Tasks 1–2 + fixes)
 
-- `Scripts/Hud/Hud.cs` — exists with all new symbols + galaxy-skip fixes confirmed
+- `Scripts/Hud/Hud.cs` — exists with all new symbols + galaxy-skip + body-size fixes confirmed
 - `Scripts/Flight/FlightController.cs` — galaxy proximity-damp exclusion confirmed
+- `Scripts/Render/WorldRenderer.cs` — GetRenderRadius accessor confirmed
 - Commit 4a7f9e1 — Task 1 (_worldRenderer + circle-state fields)
 - Commit 2f3e5b4 — Task 2 (UpdateTargetCircle + _Draw + QueueRedraw)
-- Commit 46892bc — Post-checkpoint Rule 1 fixes (galaxy dead zone, default target, flicker)
+- Commit 46892bc — Round 1 fixes (galaxy dead zone, default target, flicker)
+- Commit 40f3bba — Round 2 fixes (RenderBridge node name, local-coord offset)
+- Commit 691f7ad — Round 3 refinement (body-size-aware circle radius)
 - All commits on main branch, build 0/0
