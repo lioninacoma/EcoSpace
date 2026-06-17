@@ -88,6 +88,10 @@ Recent decisions affecting current work:
 - [Phase ?]: SpeedOfLight cap removed from MaxSpeed setter (Plan 03-02); double.IsFinite guard in ApplyMotion closes T-03-04 threat
 - [Phase ?]: 03-03: WorldRenderer.IsStarBody replaced body.Name=="STAR" with body.ObjectType==UniObject.Type.Star (D-38); Type.Galaxy skip guards in both parent and sibling render paths close T-03-06; GalaxyRenderFactor=1e-8f confirmed correct for Galaxy space (D-39); RND-07 handoff aligned by shared per-frame UniMath math (Pattern 7) — no explicit at-transition code needed
 
+### Roadmap Evolution
+
+- 2026-06-17: Phase 4 added — "Flight Model v2 — tier & target-aware speed" (from P1 tech debt `flight-speed-model-tier-and-target-aware`; absorbs cross-SOI targeting + target-circle from backlog 999.1). Phase 3 left at UAT paused (1/7), gated on Phase 4.
+
 ### Pending Todos
 
 From Phase 03 UAT play-test (2026-06-17), priority order:

@@ -15,7 +15,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: In-System Flight MVP** - Fix pre-flight crash, floating-origin rendering, arcade flight, HUD — player can fly a star system and approach dithered bodies (COMPLETE 2026-06-14)
 - [x] **Phase 2: Dynamic Skybox** - Shader-type sky updated on scale-tier transitions; only the next tier out (other systems' stars, then only galaxies) is projected onto a stable spherical skybox, with a visually continuous skybox↔mesh handoff (completed 2026-06-15)
-- [ ] **Phase 3: Cross-Galaxy Travel** - Extend hand-authored data to galaxy/universe scale; full SOI chain validated at intergalactic distances
+- [ ] **Phase 3: Cross-Galaxy Travel** - Extend hand-authored data to galaxy/universe scale; full SOI chain validated at intergalactic distances (UAT paused 1/7 — gated on Phase 4 flight model)
+- [ ] **Phase 4: Flight Model v2 — tier & target-aware speed** - Per-tier speed ceiling + target-distance ease-out replacing the single global MaxSpeed; cross-SOI target selection + world-pinned target outline (minimal 999.1 slice); fixes in-system over-speed and the galaxy-SOI-exit dead zone within one envelope
 
 ## Phase Details
 
@@ -82,6 +83,27 @@ Plans:
 - [x] 03-02-PLAN.md — Intergalactic flight: remove SpeedOfLight cap, raise MaxSpeed to FTL magnitude (D-35), NaN-safe motion guard — fly home→destination galaxy SOI with natural ease-out (wave 2)
 - [x] 03-03-PLAN.md — Galaxy-tier meshes + visible handoff: WorldRenderer routes by ObjectType (emissive Galaxy-space star meshes, skip galaxies), Star↔Galaxy point↔mesh swap visually continuous (RND-02/04/05/07 galaxy tier) (wave 2)
 
+### Phase 4: Flight Model v2 — tier & target-aware speed
+
+**Goal**: Replace the single global-`MaxSpeed` envelope with a context-correct flight model so flight feels good and stays usable across every scale — slow and precise in-system, FTL-equivalent intergalactic — within one auto-scaling envelope, with no separate FTL mode.
+**Depends on**: Phase 3
+**Origin**: Phase 03 UAT — `.planning/todos/pending/flight-speed-model-tier-and-target-aware.md` (supersedes the rejected `thrust-zero-at-galaxy-soi-exit` quick fix; absorbs the deferred cross-SOI half of the HUD target work).
+**Requirements**: refines FLT-02/FLT-03 (context-auto-scaling speed); pulls a minimal slice of backlog 999.1 (cross-SOI target selection overriding D-12; world-pinned target outline).
+**Success Criteria** (what must be TRUE):
+
+  1. In-system travel is usable: the player can approach and stop near a planet/star without overshooting; speeds feel proportional to the current scale tier (no jump to intergalactic speed inside a star system).
+  2. Intergalactic travel still reaches FTL-equivalent speed and eases onto the destination galaxy — and flying OUT of a galaxy's SOI ramps speed back up smoothly (no thrust-zero dead zone at the boundary).
+  3. The speed envelope is tier-aware (per `UniObject.Space`: Planet/Star/Galaxy/Universe) with smooth easing across SOI transitions in both directions — no speed pop.
+  4. When a target is set, thrust/ease-out is governed by distance to that target ("thrust handled by current target"); with no target, speed is bounded by the current space tier.
+  5. The player can select a target in another SOI (cross-space targeting, overriding D-12), and a world-pinned target outline/circle with a minimum on-screen radius marks the active target so it stays findable.
+  6. No separate FTL mode is introduced; the model is a single auto-scaling envelope (D-35/D-36 spirit preserved).
+
+**Out of scope**: the full 999.1 nav-HUD (hierarchy tree selector across the whole universe); procedural content; cockpit art. (Only the minimal "reliable current target + outline" slice of 999.1 is pulled in.)
+
+**Verification**: requires in-game Godot play-test (the speed/feel and SOI behavior are not unit-testable). Unblocks the deferred Phase 03 UAT items (fly-out SOI behavior, intergalactic transit timing).
+
+**Plans**: TBD (run `/gsd-discuss-phase 4` then `/gsd-plan-phase 4`)
+
 ## Backlog
 
 ### Phase 999.1: Targeting & navigation HUD — hierarchy tree selector + world-pinned target outline (BACKLOG)
@@ -103,10 +125,15 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3
+Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. In-System Flight MVP | 4/4 (TRV-01 milestone) | ✓ Complete | 2026-06-14 |
 | 2. Dynamic Skybox | 3/3 | Complete   | 2026-06-15 |
-| 3. Cross-Galaxy Travel | 3/3 | Complete   | 2026-06-16 |
+| 3. Cross-Galaxy Travel | 3/3 | UAT paused (1/7) | — |
+| 4. Flight Model v2 — tier & target-aware speed | 0/? | Not planned | — |
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 4 to break down)
