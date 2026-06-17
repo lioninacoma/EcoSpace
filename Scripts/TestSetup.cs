@@ -29,10 +29,10 @@ using Godot;
 ///   Planet SOI             = 1.0e9  m      (~1 000 000 km, Earth Hill-sphere)
 ///   Galaxy SOI             = 5e4 Universe units = 5e20 m (~50 kly radius) (D-34)
 ///
-/// Sibling star distances in Galaxy space (scale = 1e4 m/unit):
-///   4.2  ly = 3.97e16 m → 3.97e12 Galaxy units  (Alpha Cen-like)
-///   5.96 ly = 5.63e16 m → 5.63e12 Galaxy units  (Barnard's-like)
-///   8.6  ly = 8.13e16 m → 8.13e12 Galaxy units  (Sirius-like, offset in X and Z)
+/// Sibling star distances (in METRES — AddGameObject takes metres, not Galaxy units):
+///   4.2  ly = 3.97e16 m  (Alpha Cen-like)
+///   5.96 ly = 5.63e16 m  (Barnard's-like)
+///   8.6  ly ≈ 8.21e16 m  (Sirius-like, offset in X and Z)
 ///
 /// Galaxy positions in Universe space (scale = 1e16 m/unit):
 ///   DEST GALAXY:         z = 2.4e6 Universe units = 2.4e22 m (~Andromeda scale, D-34)
@@ -74,23 +74,24 @@ public partial class TestSetup : GameWorld
     private static readonly Color Star_Color    = new Color(1.00f, 0.95f, 0.60f);
 
     // ----- Sibling star systems (D-23, Phase 2 skybox test data) --------
-    // Galaxy space: 1 unit = 10 000 m → interstellar distances in Galaxy units.
-    // Sibling1: Alpha Cen A-like (4.2 ly ≈ 3.97e16 m → 3.97e12 Galaxy units)
+    // Positions are in METRES (AddGameObject takes metres; the old "Galaxy units"
+    // authoring placed these ~1e4× too close, inside the home star's SOI — fixed).
+    // Sibling1: Alpha Cen A-like (4.2 ly ≈ 3.97e16 m)
     // Warm G-type, slightly brighter than the Sun.
-    private const double Sibling1_GalX  = 3.97e12;
+    private const double Sibling1_GalX  = 3.97e16;
     private const double Sibling1_Luminosity = 1.519;
     private static readonly Color Sibling1_Color = new Color(1.0f, 0.92f, 0.70f);
 
-    // Sibling2: Barnard's Star-like (5.96 ly ≈ 5.63e16 m → 5.63e12 Galaxy units)
+    // Sibling2: Barnard's Star-like (5.96 ly ≈ 5.63e16 m)
     // Dim M-dwarf red star — tests the minimum-brightness floor (D-19).
-    private const double Sibling2_GalX  = 5.63e12;
+    private const double Sibling2_GalX  = 5.63e16;
     private const double Sibling2_Luminosity = 0.0035;
     private static readonly Color Sibling2_Color = new Color(1.0f, 0.30f, 0.15f);
 
-    // Sibling3: Sirius-like (8.6 ly, bright blue-white A-type)
+    // Sibling3: Sirius-like (8.6 ly ≈ 8.21e16 m, bright blue-white A-type)
     // Positioned at an angle so all three siblings appear in different sky directions.
-    private const double Sibling3_GalX  = -6.0e12;
-    private const double Sibling3_GalZ  =  5.6e12;
+    private const double Sibling3_GalX  = -6.0e16;
+    private const double Sibling3_GalZ  =  5.6e16;
     private const double Sibling3_Luminosity = 25.4;
     private static readonly Color Sibling3_Color = new Color(0.70f, 0.85f, 1.0f);
 
@@ -239,14 +240,14 @@ public partial class TestSetup : GameWorld
         GameObjects[_dPlB].RadiusMeters = PlanetB_RadiusMeters;
         GameObjects[_dPlB].Luminosity   = 0.0;
 
-        int _dSib1 = AddGameObject(_galaxy2, new Double3(-3.2e12, 0, 0), StarSOI);
+        int _dSib1 = AddGameObject(_galaxy2, new Double3(-3.2e16, 0, 0), StarSOI);
         GameObjects[_dSib1].Name         = "DEST SIB 1";
         GameObjects[_dSib1].ObjectType   = UniObject.Type.Star;
         GameObjects[_dSib1].BaseColor    = new Color(1.0f, 0.70f, 0.35f);  // orange M-type
         GameObjects[_dSib1].RadiusMeters = Star_RadiusMeters;
         GameObjects[_dSib1].Luminosity   = 0.2;
 
-        int _dSib2 = AddGameObject(_galaxy2, new Double3(4.5e12, 0, 3.1e12), StarSOI);
+        int _dSib2 = AddGameObject(_galaxy2, new Double3(4.5e16, 0, 3.1e16), StarSOI);
         GameObjects[_dSib2].Name         = "DEST SIB 2";
         GameObjects[_dSib2].ObjectType   = UniObject.Type.Star;
         GameObjects[_dSib2].BaseColor    = new Color(0.75f, 0.88f, 1.0f);  // blue-white F-type
@@ -267,21 +268,21 @@ public partial class TestSetup : GameWorld
         GameObjects[_galaxy3].GalaxyOrientation = new Vector3(0.3f, 0.95f, 0.1f); // modest tilt
 
         // Elliptical cluster member stars — 3 stars, no planets (D-41)
-        int _cSib1 = AddGameObject(_galaxy3, new Double3(1.5e12, 0, 0), StarSOI);
+        int _cSib1 = AddGameObject(_galaxy3, new Double3(1.5e16, 0, 0), StarSOI);
         GameObjects[_cSib1].Name         = "CLUSTER STAR 1";
         GameObjects[_cSib1].ObjectType   = UniObject.Type.Star;
         GameObjects[_cSib1].BaseColor    = new Color(1.0f, 0.82f, 0.55f);  // warm K-giant
         GameObjects[_cSib1].RadiusMeters = Star_RadiusMeters;
         GameObjects[_cSib1].Luminosity   = 0.6;
 
-        int _cSib2 = AddGameObject(_galaxy3, new Double3(-2.1e12, 0, 1.2e12), StarSOI);
+        int _cSib2 = AddGameObject(_galaxy3, new Double3(-2.1e16, 0, 1.2e16), StarSOI);
         GameObjects[_cSib2].Name         = "CLUSTER STAR 2";
         GameObjects[_cSib2].ObjectType   = UniObject.Type.Star;
         GameObjects[_cSib2].BaseColor    = new Color(1.0f, 0.92f, 0.75f);  // yellow G-type
         GameObjects[_cSib2].RadiusMeters = Star_RadiusMeters;
         GameObjects[_cSib2].Luminosity   = 1.2;
 
-        int _cSib3 = AddGameObject(_galaxy3, new Double3(0.8e12, 0, -2.5e12), StarSOI);
+        int _cSib3 = AddGameObject(_galaxy3, new Double3(0.8e16, 0, -2.5e16), StarSOI);
         GameObjects[_cSib3].Name         = "CLUSTER STAR 3";
         GameObjects[_cSib3].ObjectType   = UniObject.Type.Star;
         GameObjects[_cSib3].BaseColor    = new Color(0.95f, 0.70f, 0.40f);  // orange-red M-type
