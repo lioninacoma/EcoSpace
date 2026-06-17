@@ -332,6 +332,27 @@ namespace Render
 		}
 
 		/// <summary>
+		/// Returns the render-space radius (mesh scale, in render units) of the body's mesh
+		/// as last positioned by SyncBodies. This is the value used as <c>mesh.Scale</c>
+		/// (true RadiusMeters → observer units → × per-space factor), so the HUD can project
+		/// it to an on-screen pixel radius and outline the body (D-46). Returns <c>false</c>
+		/// (radius=0) when the body is not currently a rendered mesh.
+		/// </summary>
+		/// <param name="bodyIdx">The body index (UniObject.Index / GameObjects list key).</param>
+		/// <param name="radius">Receives the render-space radius if the body is a current mesh.</param>
+		/// <returns>True if the body has a live mesh this frame.</returns>
+		public bool GetRenderRadius(int bodyIdx, out float radius)
+		{
+			if (_meshes.TryGetValue(bodyIdx, out var mesh) && mesh.Visible)
+			{
+				radius = mesh.Scale.X;   // uniform scale set in RenderBodyAt
+				return true;
+			}
+			radius = 0f;
+			return false;
+		}
+
+		/// <summary>
 		/// Derives the star's render-space position when the star is NOT in the current
 		/// render set (e.g. Planet space). Uses UniMath.RelativeMetres for the cross-frame
 		/// hierarchy math — the same LCA-relative UniVec3 strategy as SkyboxRenderer —

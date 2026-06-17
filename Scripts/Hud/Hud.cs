@@ -347,10 +347,14 @@ namespace Hud
 
         // ── Target circle draw (D-46) ─────────────────────────────────────────
 
-        // Minimum on-screen radius so a distant target is never sub-pixel (D-46 tuning knob).
-        private const float MIN_CIRCLE_RADIUS = 20f;
+        // Minimum on-screen radius so a distant target is never sub-pixel (D-46 floor).
+        // Small enough that a far speck reads as a tight reticle, not a big bubble.
+        private const float MIN_CIRCLE_RADIUS = 6f;
         // Maximum on-screen radius so a close target doesn't fill the screen.
         private const float MAX_CIRCLE_RADIUS = 200f;
+        // Padding multiplier so the outline sits just OUTSIDE the body's projected edge
+        // (1.0 = exactly on the rim; 1.15 leaves a small gap so the body stays visible).
+        private const float CIRCLE_BODY_PADDING = 1.15f;
 
         /// <summary>
         /// Computes per-frame circle state (_showTargetCircle, _targetCirclePos, _targetCircleRadius).
@@ -360,7 +364,8 @@ namespace Hud
         ///   3. Render-set gate: WorldRenderer.GetRenderPosition (D-46) — off if not a current-space mesh
         ///   4. Behind-camera guard (camLocal.Z > 0, mirrors UpdateDirectionMarker, Pitfall 6)
         ///   5. Off-screen bounds check — both suppressed cases fall back to the edge marker
-        ///   6. Clamp radius to [MIN_CIRCLE_RADIUS, MAX_CIRCLE_RADIUS] (D-46 minimum floor)
+        ///   6. Size the circle to the body's projected on-screen radius (grows on approach),
+        ///      clamped to [MIN_CIRCLE_RADIUS, MAX_CIRCLE_RADIUS] (D-46 min floor / max cap)
         ///
         /// This method is a read-only consumer — it MUST NOT mutate _targetIndex or any GameObjects element.
         /// </summary>
@@ -398,10 +403,35 @@ namespace Hud
             if (screenPos.X < 0 || screenPos.X > vpSize.X || screenPos.Y < 0 || screenPos.Y > vpSize.Y)
                 return;  // off-screen → edge marker fallback
 
-            // All guards passed — compute circle and enable draw
-            // Guard 6: minimum-radius floor for findability (D-46 "never a sub-pixel speck")
+            // All guards passed — compute the on-screen radius so the circle OUTLINES the body.
+            // Project a second point offset from the body centre by the body's render-space
+            // radius, perpendicular to the view direction, and measure the pixel gap to the
+            // centre. As you approach, the projected radius grows; clamp it to a small minimum
+            // floor (so a distant speck stays findable, D-46) and a maximum cap. The body's
+            // render radius is the same mesh.Scale WorldRenderer applied this frame.
+            float bodyPixelRadius = MIN_CIRCLE_RADIUS;
+            if (_worldRenderer.GetRenderRadius(tgtIdx, out float renderRadius) && renderRadius > 0f)
+            {
+                // Pick an axis perpendicular to the camera→body direction in WORLD space, so
+                // the offset point lies on the body's silhouette regardless of view angle.
+                Vector3 viewDir = (globalPos - _camera.GlobalPosition).Normalized();
+                Vector3 up = _camera.GlobalTransform.Basis.Y;
+                Vector3 perp = viewDir.Cross(up);
+                if (perp.LengthSquared() < 1e-12f) perp = _camera.GlobalTransform.Basis.X;
+                perp = perp.Normalized();
+
+                Vector3 edgeWorld = globalPos + perp * renderRadius;
+                // Only meaningful if the edge point is also in front of the camera.
+                Vector3 edgeCamLocal = _camera.GlobalTransform.AffineInverse() * (edgeWorld - _camera.GlobalPosition);
+                if (edgeCamLocal.Z < 0)
+                {
+                    Vector2 edgeScreen = _camera.UnprojectPosition(edgeWorld);
+                    bodyPixelRadius = edgeScreen.DistanceTo(screenPos) * CIRCLE_BODY_PADDING;
+                }
+            }
+
             _targetCirclePos    = screenPos;
-            _targetCircleRadius = Mathf.Clamp(MIN_CIRCLE_RADIUS, MIN_CIRCLE_RADIUS, MAX_CIRCLE_RADIUS);
+            _targetCircleRadius = Mathf.Clamp(bodyPixelRadius, MIN_CIRCLE_RADIUS, MAX_CIRCLE_RADIUS);
             _showTargetCircle   = true;
         }
 
