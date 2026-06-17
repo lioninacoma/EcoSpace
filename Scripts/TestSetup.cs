@@ -138,6 +138,7 @@ public partial class TestSetup : GameWorld
     private void SetupScene()
     {
         _root    = AddGameObject(-1, new Double3(0, 0, 0), double.MaxValue);
+        GameObjects[_root].Name = "ROOT";   // prevents null → "?" in HUD when ship is in Universe space
 
         // ── HOME GALAXY (spiral, at origin — Universe space under Root) ───────────────
         // SOI replaces the 5e3 placeholder with the real galaxy-scale value (D-34/Pitfall 2).

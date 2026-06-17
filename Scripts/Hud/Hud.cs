@@ -20,9 +20,9 @@ namespace Hud
     ///   • All index lookups null-guarded via (uint)i cast trick
     ///
     /// Targetable set = parent body (at SOI origin) + siblings (other children of parent).
-    /// The parent's ship-relative position cannot use UniVec3 subtraction (wrong frame);
-    /// instead it is ship.LocalPos.ToDouble3() * -1.0 (the ship's own offset, negated).
-    /// Sibling positions use body.LocalPos.ToLocalDouble(ship.LocalPos) as normal.
+    /// All ship-relative distances and vectors use UniMath.RelativeMetres / UniMath.Distance
+    /// (LCA-based path) so that bodies at the parent-frame origin do not produce identical
+    /// distances to the parent itself, preventing per-frame nearest-winner flicker.
     /// </summary>
     public partial class Hud : Control
     {
@@ -65,14 +65,13 @@ namespace Hud
 
         /// <summary>
         /// Represents one entry in the targetable body list.
-        /// IsParent=true means this body is the ship's parent frame origin;
-        /// its ship-relative position must use the parent-frame special path.
+        /// All distance math routes through UniMath.RelativeMetres (LCA path),
+        /// so no IsParent flag is needed — parent and siblings are treated uniformly.
         /// </summary>
         private readonly struct TargetEntry
         {
-            public readonly int   Index;
-            public readonly bool  IsParent;
-            public TargetEntry(int index, bool isParent) { Index = index; IsParent = isParent; }
+            public readonly int Index;
+            public TargetEntry(int index) { Index = index; }
         }
 
         /// <summary>Current index into the targetable body list (parent + siblings).</summary>
@@ -157,7 +156,10 @@ namespace Hud
             string tier = SpaceTierName(ship.CurrentSpace);
 
             // Find nearest body: scan parent + siblings (the same targetable set as D-12).
-            // The parent body uses the special origin path; siblings use normal delta math.
+            // UniMath.RelativeMetres uses the LCA path for all bodies — avoids the
+            // identical-magnitude tie that occurs when a sibling sits at the parent-frame
+            // origin (body at 0,0,0 and parent-body produce the same distance via the old
+            // ship.LocalPos.ToDouble3() formula, causing per-frame nearest-winner flicker).
             var targets = BuildTargetableList(ship.ParentIndex, shipIndex, gameObjects);
             string nearestName = "---";
             double minDist = double.MaxValue;
@@ -167,8 +169,7 @@ namespace Hud
                 var body = gameObjects[entry.Index];
                 if (body == null) continue;
 
-                Double3 rel = GetRelativeMeters(ship, body, entry.IsParent);
-                double dist = rel.Magnitude();
+                double dist = UniMath.Distance(ship, body, gameObjects);
                 if (dist < minDist)
                 {
                     minDist = dist;
@@ -206,8 +207,8 @@ namespace Hud
                 return;
             }
 
-            // Ship-relative vector in metres — uses the correct path for parent vs sibling.
-            Double3 relMeters = GetRelativeMeters(ship, targetObj, entry.IsParent);
+            // Ship-relative vector in metres — LCA path handles parent and sibling uniformly.
+            Double3 relMeters = UniMath.RelativeMetres(ship, targetObj, gameObjects);
             double distM = relMeters.Magnitude();
             if (_targetLabel != null)
                 _targetLabel.Text = $"TGT  {targetObj.Name ?? "?"} · {FormatDistance(distM)}";
@@ -220,8 +221,7 @@ namespace Hud
 
         /// <summary>
         /// Positions the off-screen marker using the precomputed ship-relative vector
-        /// (metres). The caller already applied the parent/sibling branch via
-        /// GetRelativeMeters, so this method never touches LocalPos directly.
+        /// (metres) from UniMath.RelativeMetres. This method never touches LocalPos directly.
         /// </summary>
         private void UpdateDirectionMarker(Double3 relD)
         {
@@ -294,8 +294,11 @@ namespace Hud
 
         public override void _Input(InputEvent @event)
         {
-            // cycle_target must be read in _Input (not _UnhandledInput) so it
-            // is not swallowed by Controls with mouse_filter != Ignore.
+            // cycle_target (Tab) must be read in _Input — _Input runs BEFORE the GUI
+            // focus system, so we see Tab before Godot's built-in ui_focus_next (also
+            // Tab) can consume it. After handling, we mark the event handled so focus
+            // navigation does not also fire. (_UnhandledInput would be too late — the
+            // focus system runs before it and would swallow Tab.)
             if (@event.IsActionPressed("cycle_target"))
             {
                 if (_world == null) return;
@@ -308,18 +311,24 @@ namespace Hud
                 var targets = BuildTargetableList(ship.ParentIndex, shipIndex, gameObjects);
                 if (targets.Count > 0)
                     _targetIndex = (_targetIndex + 1) % targets.Count;
+
+                // Consume so ui_focus_next does not also act on this Tab press.
+                GetViewport().SetInputAsHandled();
             }
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Builds the ordered targetable body list: parent body first (IsParent=true),
-        /// then each sibling child of the parent (ship excluded, null/out-of-range-skipped).
+        /// Builds the ordered targetable body list: parent body first, then each sibling
+        /// child of the parent (ship excluded, null/out-of-range-skipped).
         ///
         /// The parent is always listed first so Tab-cycling has a stable order.
         /// Count ≥ 1 whenever the ship has a valid parent (which it always does in the
         /// current scene hierarchy).
+        ///
+        /// All distance math uses UniMath.RelativeMetres (LCA path), so all entries are
+        /// treated uniformly — no IsParent flag is needed.
         /// </summary>
         private System.Collections.Generic.List<TargetEntry> BuildTargetableList(
             int parentIdx, int shipIndex,
@@ -331,7 +340,7 @@ namespace Hud
             if (parent == null) return result;
 
             // Parent body is always targetable (it is visible as the SOI origin).
-            result.Add(new TargetEntry(parentIdx, isParent: true));
+            result.Add(new TargetEntry(parentIdx));
 
             // Siblings: other children of parent, excluding the ship itself.
             foreach (int idx in parent.ChildIndices)
@@ -339,29 +348,9 @@ namespace Hud
                 if (idx == shipIndex) continue;
                 if ((uint)idx >= (uint)gameObjects.Count) continue;
                 if (gameObjects[idx] == null) continue;
-                result.Add(new TargetEntry(idx, isParent: false));
+                result.Add(new TargetEntry(idx));
             }
             return result;
-        }
-
-        /// <summary>
-        /// Returns the ship-relative position of <paramref name="body"/> in metres,
-        /// choosing the correct path based on whether the body is the ship's parent.
-        ///
-        /// Parent body: sits at the ORIGIN of the ship's own coordinate frame.
-        /// Its LocalPos is expressed in the GRANDPARENT frame and must NOT be
-        /// subtracted from ship.LocalPos (mismatched scale/frame). Instead, the
-        /// ship's own offset (in metres) negated gives the parent's render position:
-        ///   relMeters = ship.LocalPos.ToDouble3() * -1.0
-        ///
-        /// Sibling body: shares the ship's parent frame — standard delta is valid:
-        ///   relMeters = body.LocalPos.ToLocalDouble(ship.LocalPos)
-        /// </summary>
-        private static Double3 GetRelativeMeters(UniObject ship, UniObject body, bool isParent)
-        {
-            if (isParent)
-                return ship.LocalPos.ToDouble3() * -1.0;
-            return body.LocalPos.ToLocalDouble(ship.LocalPos);
         }
 
         /// <summary>Maps UniObject.Space to a display string for the context label.</summary>
