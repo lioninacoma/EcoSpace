@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 4 context gathered (flight model v2 — tier/target-aware speed)
-last_updated: "2026-06-17T14:18:59.933Z"
-last_activity: 2026-06-16 -- Phase 03 all plans complete
+status: completed
+stopped_at: Session resumed — Phase 04 plan-phase paused at task 5/8 (before gsd-planner spawn). RESEARCH + PATTERNS done & committed (e6d7a55). Proceeding to re-run /gsd-plan-phase 04.
+last_updated: "2026-06-17T17:20:25.203Z"
+last_activity: 2026-06-17 -- Phase 04 context gathered
 progress:
   total_phases: 5
   completed_phases: 3
@@ -134,9 +134,10 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-17T14:18:59.925Z
-Stopped at: Phase 4 context gathered (flight model v2 — tier/target-aware speed)
-Resume: Decision locked — (1) revert done; (2) fix target/HUD bugs first via /gsd-debug (P3 hud-target-nearest-galaxy-space + P4 hud-cycle-target-not-working, same target subsystem); (3) then flight speed model v2 as a discussed phase (P1, per-tier ceiling + target ease-out, minimal slice of backlog 999.1); (4) then galaxy-visibility-in-universe-space (P2, blocks intergalactic UAT 5-7). Phase 03 stays open at UAT until the flight model is reworked.
+Last session: 2026-06-17 (resumed)
+Stopped at: Session resumed — Phase 04 plan-phase paused at task 5/8 (before gsd-planner spawn). RESEARCH + PATTERNS done & committed (e6d7a55). Proceeding to re-run /gsd-plan-phase 04.
+Resume file: .planning/phases/04-flight-model-v2-tier-and-target-aware-speed/.continue-here.md (carries the 2 locked rulings: D-45 cross-SOI scope, skip UI-SPEC gate)
+Prior resume note: Decision locked — (1) revert done; (2) fix target/HUD bugs first via /gsd-debug; (3) then flight speed model v2 as a discussed phase (P1, per-tier ceiling + target ease-out, minimal slice of backlog 999.1); (4) then galaxy-visibility-in-universe-space (P2, blocks intergalactic UAT 5-7). Phase 03 stays open at UAT until the flight model is reworked.
 
 ## Refactor Notes
 
