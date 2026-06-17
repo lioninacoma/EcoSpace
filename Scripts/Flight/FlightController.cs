@@ -376,18 +376,6 @@ namespace Flight
 		///   would give huge speed near the planet surface (inverted envelope).
 		///   Ship's distance from its parent body = ship.LocalPos.Magnitude() because
 		///   the parent is the origin of the ship's coordinate frame.
-		///
-		/// Direction-aware proximity clamp (tech-debt fix: thrust-zero-at-galaxy-soi-exit):
-		///   During the scan we track the SINGLE nearest body and the unit direction from
-		///   the ship TOWARD that body's centre (towardNearestUnit). After the scan we
-		///   compute the radial closing velocity: closing = Dot(motionDir, towardNearestUnit).
-		///   • closing > 0  → APPROACHING  → apply the proximity clamp as before.
-		///   • closing ≤ 0  → RECEDING     → exempt the clamp (targetMax = _maxSpeed) so
-		///                                    the existing _contextMax lerp ramps speed back
-		///                                    up smoothly after passing a galaxy SOI edge.
-		///   Throttle ≈ 0 or degenerate case (no toward-direction recorded) → treat as
-		///   APPROACHING so the clamp is safe and the zero-throttle guard stays consistent.
-		///   Both the _contextMax and _easedSpeed lerps run on every path (D-07 / Bug 4).
 		/// </summary>
 		private void UpdateSpeedEnvelope(double delta)
 		{
@@ -409,11 +397,6 @@ namespace Flight
 
 			double nearest = double.MaxValue;
 
-			// towardNearestUnit: unit direction from ship TOWARD the nearest body's centre,
-			// expressed in the parent meters frame. Valid only when nearest < double.MaxValue.
-			Double3 towardNearestUnit = Double3.Zero;
-			bool hasTowardDir = false;
-
 			// ── ALWAYS include the parent body itself (Bug 3 fix) ──────────────
 			// The parent is the origin of the ship's coordinate frame, so the ship's
 			// distance from it is just the magnitude of ship.LocalPos (in meters).
@@ -422,20 +405,7 @@ namespace Flight
 			{
 				double distToParentCentre = ship.LocalPos.Magnitude();
 				double distToParentSurface = System.Math.Max(0.0, distToParentCentre - parent.RadiusMeters);
-				if (distToParentSurface < nearest)
-				{
-					nearest = distToParentSurface;
-					// Toward-parent direction = opposite of the ship's position from parent origin.
-					// ship.LocalPos.ToDouble3() is the meters vector from parent centre to ship;
-					// negate it to point from ship toward parent centre, then normalize.
-					Double3 shipPosMet = ship.LocalPos.ToDouble3();
-					double mag = shipPosMet.Magnitude();
-					if (mag > 1e-9)
-					{
-						towardNearestUnit = -shipPosMet * (1.0 / mag);
-						hasTowardDir = true;
-					}
-				}
+				nearest = System.Math.Min(nearest, distToParentSurface);
 			}
 
 			// ── Scan same-space siblings ────────────────────────────────────────
@@ -453,59 +423,15 @@ namespace Flight
 				// are in the same coordinate space, so Distance is safe here.
 				double centreDist = UniVec3.Distance(ship.LocalPos, body.LocalPos);
 				double surfaceDist = System.Math.Max(0.0, centreDist - body.RadiusMeters);
-				if (surfaceDist < nearest)
-				{
-					nearest = surfaceDist;
-					// Toward-sibling direction: delta from ship to body centre in meters.
-					// Form the delta UniVec3 then collapse to meters with a single ToDouble3().
-					Double3 deltaMeters = (body.LocalPos - ship.LocalPos).ToDouble3();
-					double mag = deltaMeters.Magnitude();
-					if (mag > 1e-9)
-					{
-						towardNearestUnit = deltaMeters * (1.0 / mag);
-						hasTowardDir = true;
-					}
-					else
-					{
-						hasTowardDir = false;
-					}
-				}
+				nearest = System.Math.Min(nearest, surfaceDist);
 			}
 
 			// If still no bodies found, open space: allow max speed.
 			if (nearest == double.MaxValue)
 				nearest = _maxSpeed / System.Math.Max(_speedPerMeter, 1.0);
 
-			// ── Direction-aware proximity clamp ────────────────────────────────
-			// Derive the ship's motion direction in the parent meters frame.
-			// forward = -_shipBasis.Z (Godot −Z forward convention, same as ApplyMotion).
-			// Sign by throttle01 so reverse thrust produces a +Z motion direction.
-			// Throttle ~0 → treat as approaching (clamp stays; speed is ~0 anyway).
-			double targetMax;
-			if (!hasTowardDir || System.Math.Abs(_throttle01) < 1e-6)
-			{
-				// Degenerate/open-space or zero throttle → keep proximity clamp (safe default).
-				targetMax = Mathf.Clamp(nearest * _speedPerMeter, _minSpeed, _maxSpeed);
-			}
-			else
-			{
-				Vector3 fwd = -_shipBasis.Z;
-				double tSign = System.Math.Sign(_throttle01);  // +1 forward, -1 reverse
-				var motionDir = new Double3(fwd.X * tSign, fwd.Y * tSign, fwd.Z * tSign);
-
-				double closing = Double3.Dot(motionDir, towardNearestUnit);
-
-				if (closing > 0.0)
-				{
-					// Approaching — apply proximity clamp (ease-in preserved, D-06).
-					targetMax = Mathf.Clamp(nearest * _speedPerMeter, _minSpeed, _maxSpeed);
-				}
-				else
-				{
-					// Receding — exempt proximity clamp so throttle ramps back to max speed.
-					targetMax = _maxSpeed;
-				}
-			}
+			// Compute target context max; clamp to [MinSpeed, MaxSpeed] (T-03-02).
+			double targetMax = Mathf.Clamp(nearest * _speedPerMeter, _minSpeed, _maxSpeed);
 
 			// Ease contextMax toward target to hide SOI-boundary discontinuities (D-07, Pitfall 9).
 			_contextMax = Mathf.Lerp(_contextMax, targetMax, Mathf.Clamp(_speedEasing * delta, 0.0, 1.0));
