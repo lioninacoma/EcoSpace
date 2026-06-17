@@ -1,11 +1,19 @@
 ---
 type: tech-debt
-status: pending
+status: superseded
 created: 2026-06-16
 area: flight
 origin: phase-03 play-test (cross-galaxy travel)
 tags: [tech-debt, flight, speed-envelope, soi]
+superseded_by: flight-speed-model-tier-and-target-aware
 ---
+
+> **SUPERSEDED 2026-06-17.** The direction-aware (receding-exempt) quick fix
+> (260617-j6b, commit f343cc3) was play-test REJECTED: exempting the proximity clamp
+> jumps to the global intergalactic `MaxSpeed`, making in-system travel unusable (ship
+> flies past the home star). The galaxy-SOI-exit dead zone must be solved inside a
+> tier/target-aware speed model — see [[flight-speed-model-tier-and-target-aware]].
+> f343cc3 is pending revert.
 
 # Thrust drops to zero when exiting a galaxy's SOI
 
