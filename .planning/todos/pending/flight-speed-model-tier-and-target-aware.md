@@ -50,11 +50,28 @@ Candidate model:
 
 ## Dependencies
 
-- A working target system is a prerequisite for the target-aware variant
-  ([[hud-cycle-target-not-working]], [[hud-target-nearest-galaxy-space]]).
+- A working target system is a prerequisite for the target-aware variant. The in-SOI
+  target HUD now works ([[hud-cycle-target-not-working]] Tab fix; [[hud-target-nearest-galaxy-space]]
+  flicker fix) — but it is scoped to the current SOI (D-12).
 - Supersedes the rejected [[thrust-zero-at-galaxy-soi-exit]] quick fix (commit f343cc3)
   — the galaxy-SOI-exit dead zone must be solved inside this model, not by a global
   recede-exemption.
+
+## Folded-in scope (cross-space targeting — the D-12 override / 999.1 slice)
+
+These belong with the target-aware flight model and are pulled from backlog 999.1
+(minimal slice, NOT the full nav-HUD):
+
+- **Cross-SOI nearest / targeting** — let the player target a body in another SOI (e.g.
+  another star while inside the home star's SOI). Overrides D-12 (current-SOI-only). This
+  is the deferred half of [[hud-target-nearest-galaxy-space]] symptom 2 and the "fly to
+  another star" intent.
+- **World-pinned target outline (circle)** — a ring drawn around the active target that
+  holds a minimum on-screen radius so a distant target is always findable (user request
+  2026-06-17). Pairs with the existing off-screen edge marker. Already described in
+  ROADMAP backlog 999.1.
+- These also unblock the "thrust handled by current target" model — you must be able to
+  pick and hold a meaningful target before thrust can ease onto it.
 
 ## What "done" looks like
 

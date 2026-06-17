@@ -1,55 +1,41 @@
 ---
 type: tech-debt
-status: pending
+status: partially-resolved
 priority: P3
 created: 2026-06-17
+resolved: 2026-06-17
 area: hud
 origin: phase-03 UAT play-test
 tags: [tech-debt, hud, target, nearest, galaxy-space, precision]
 related: [hud-cycle-target-not-working, flight-speed-model-tier-and-target-aware]
+debug-session: .planning/debug/hud-target-galaxy-space.md
 ---
+
+> **PARTIALLY RESOLVED 2026-06-17** (debug session `hud-target-galaxy-space`, user-verified).
+> - **Flicker — FIXED.** Root cause was not precision but an identical-vector tie:
+>   `Hud.GetRelativeMeters` computed the parent-body distance and a sibling-at-origin
+>   distance as the SAME vector, so the parent (HOME GALAXY / ROOT) and a body at (0,0,0)
+>   (home STAR / HOME GALAXY) always tied and the nearest-winner flipped per frame. Replaced
+>   all ship-relative distance math with `UniMath.Distance` / `UniMath.RelativeMetres` (LCA
+>   path, per CLAUDE.md Position Math); removed `GetRelativeMeters` + the `IsParent` flag.
+>   Also set `GameObjects[_root].Name = "ROOT"` (TestSetup) so Universe-space nearest shows
+>   "ROOT", not "?". Verified stable in-game. Build 0/0, tests 30/30.
+> - **"Galaxy-member stars not recognized as nearest" — DEFERRED (by design).** This is the
+>   D-12 single-SOI targeting scope: while in the home star's SOI, the other stars (children
+>   of the galaxy) are not in scope. Targeting bodies across SOI levels is the cross-space
+>   targeting feature → folded into [[flight-speed-model-tier-and-target-aware]] (D-12
+>   override / backlog 999.1). A separate data bug (sibling stars 1e4× too close, SOIs
+>   overlapping) is also tracked as its own focused step.
 
 # "nearest" label flickers + galaxy-member stars not recognized as nearest
 
 ## What
 
-Two related defects in the HUD context/target logic (`Scripts/Hud/Hud.cs`), seen in
-Galaxy space:
+Two defects in the HUD context/target logic (`Scripts/Hud/Hud.cs`), seen in Galaxy space:
 
-1. **Flickering nearest label** — the context label `"{tier} · nearest: {name}"`
-   switches between `"?"` and `"home galaxy"` every frame.
-2. **Galaxy stars not nearest** — in Galaxy space the newly authored galaxy-member
-   stars (e.g. ALPHA CEN, BARNARD, SIRIUS) are never recognized as nearest; only the
-   home star (or the galaxy itself) ever shows.
-
-## Why (suspected)
-
-- The flicker between `"?"` and a name implies the min-distance scan
-  (`UpdateContextLabel`) is alternating between two bodies whose computed distances
-  jitter frame-to-frame, and one of them has a null `Name` (rendered as `"?"` via
-  `body.Name ?? "?"`). Likely a precision problem in `GetRelativeMeters`: the parent
-  path uses `ship.LocalPos.ToDouble3()` which collapses `Long3.Units` (see CLAUDE.md
-  "Position Math" caveat) — at Galaxy scale this can produce unstable/!nearest values.
-  The body-relative distances should go through `UniMath` (LCA-relative) rather than
-  raw `ToDouble3()` / `ToLocalDouble`.
-- "Galaxy stars not nearest" suggests `BuildTargetableList` (parent + `parent
-  .ChildIndices`) isn't returning the galaxy's member stars in Galaxy space, or their
-  distances are computed in the wrong frame so they never win the min. Verify the
-  Phase-3 galaxy-member stars are actually children of the galaxy node and have
-  non-null `Name`.
-
-## What "done" looks like
-
-- The nearest label is stable (no per-frame flicker) and names a real body.
-- In Galaxy space, the galaxy's member stars are correctly considered for "nearest"
-  and targeting, with correct distances.
-- Body-relative distance math routes through `UniMath` (LCA-relative), per the CLAUDE.md
-  Position Math convention — no raw absolute-from-frame `ToDouble3()` at Galaxy/Universe
-  scale.
-
-## Notes
-
-- Prerequisite for the target-aware flight model
-  ([[flight-speed-model-tier-and-target-aware]]).
-- Pairs with [[hud-cycle-target-not-working]] (same target subsystem).
-- Good candidate for `/gsd-debug` (precision + hierarchy investigation).
+1. **Flickering nearest label** — context label switches between "?" and "home galaxy"
+   every frame. → **FIXED** (UniMath LCA distances + ROOT name).
+2. **Galaxy stars not nearest** — galaxy-member stars never recognized as nearest. →
+   **DEFERRED**: this is the D-12 single-SOI scope; cross-space targeting is owned by
+   [[flight-speed-model-tier-and-target-aware]]. (Compounded by the separate
+   sibling-star-distance data bug — stars authored 1e4× too close.)
