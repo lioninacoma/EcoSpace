@@ -134,8 +134,15 @@ namespace Hud
             else
                 _camera = GetTree().Root.FindChild("Camera3D", true, false) as Camera3D;
 
-            // Resolve world renderer (for target circle render-set gate, D-46)
-            _worldRenderer = GetTree().Root.FindChild("WorldRenderer", true, false) as Render.WorldRenderer;
+            // Resolve world renderer (for target circle render-set gate, D-46).
+            // The WorldRenderer script lives on the scene node still named "RenderBridge"
+            // (legacy name retained after the RenderBridge.cs → WorldRenderer.cs rename).
+            // FindChild matches by NODE NAME, not type — searching "WorldRenderer" returned
+            // null and silently disabled the target circle (04-02 play-test SC#5 failure).
+            // Try the actual node name first, then fall back to a type-based search so the
+            // lookup is resilient to any future node rename.
+            _worldRenderer = GetTree().Root.FindChild("RenderBridge", true, false) as Render.WorldRenderer
+                           ?? FindNodeByType<Render.WorldRenderer>(GetTree().Root);
 
             // Resolve child label nodes
             _speedLabel   = GetNodeOrNull<Label>("SpeedLabel");
@@ -406,9 +413,15 @@ namespace Hud
         public override void _Draw()
         {
             if (!_showTargetCircle) return;
+            // _targetCirclePos is a VIEWPORT-ABSOLUTE screen position (from UnprojectPosition),
+            // but _Draw / DrawArc operate in this Control's LOCAL coordinate space. The Hud
+            // Control is a small top-left box (offset 5,30 — not full-screen), so drawing the
+            // absolute position directly placed the circle offset from the target (04-02 SC#5).
+            // Convert to Control-local by subtracting the Control's global position.
+            Vector2 localPos = _targetCirclePos - GlobalPosition;
             // DrawArc(center, radius, startAngle, endAngle, pointCount, color, lineWidth)
             // Unfilled outline — DrawArc not DrawCircle (retro aesthetic, D-46)
-            DrawArc(_targetCirclePos, _targetCircleRadius, 0f, Mathf.Tau, 32, PhosphorGreen, 1.5f);
+            DrawArc(localPos, _targetCircleRadius, 0f, Mathf.Tau, 32, PhosphorGreen, 1.5f);
         }
 
         // ── Input: cycle target ───────────────────────────────────────────────
@@ -496,6 +509,23 @@ namespace Hud
         private void ApplyPhosphorGreen(Label label)
         {
             if (label != null) label.Modulate = PhosphorGreen;
+        }
+
+        /// <summary>
+        /// Recursively searches the scene subtree for the first node of type T.
+        /// Used as a name-independent fallback when a node has been renamed (the
+        /// WorldRenderer script sits on a node still named "RenderBridge"), so the
+        /// target-circle render-set gate resolves regardless of the node name.
+        /// </summary>
+        private static T FindNodeByType<T>(Node root) where T : class
+        {
+            if (root is T match) return match;
+            foreach (Node child in root.GetChildren())
+            {
+                var found = FindNodeByType<T>(child);
+                if (found != null) return found;
+            }
+            return null;
         }
 
         // ── Public formatting API (HUD-01 / D-10) ────────────────────────────
