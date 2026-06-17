@@ -77,6 +77,34 @@ namespace Hud
         /// <summary>Current index into the targetable body list (parent + siblings).</summary>
         private int _targetIndex = 0;
 
+        /// <summary>
+        /// Index into GameObjects of the active target, or -1 if none is available.
+        /// Read-only — never mutates _targetIndex or any sim state (Hud is a read-only
+        /// consumer; HUD mutating sim state is an anti-pattern). Returns -1 when:
+        ///   • _world is null (scene not yet ready)
+        ///   • ship index is out of range or ship object is null
+        ///   • the targetable list is empty (no parent / all siblings null)
+        /// Rebuilds the targetable list fresh each call (cheap — ≤ ~10 children)
+        /// so a stale _targetIndex after an SOI transition is always clamped to
+        /// the live list bounds (T-04-03 mitigation, D-45 / D-12 preserved).
+        /// </summary>
+        public int ActiveTargetIndex
+        {
+            get
+            {
+                if (_world == null) return -1;
+                var objs = _world.GameObjects;
+                int shipIdx = _world.ShipIndex;
+                if ((uint)shipIdx >= (uint)(objs?.Count ?? 0)) return -1;
+                var ship = objs[shipIdx];
+                if (ship == null) return -1;
+                var targets = BuildTargetableList(ship.ParentIndex, shipIdx, objs);
+                if (targets.Count == 0) return -1;
+                int clamped = Mathf.Clamp(_targetIndex, 0, targets.Count - 1);
+                return targets[clamped].Index;
+            }
+        }
+
         // ── Godot callbacks ───────────────────────────────────────────────────
 
         public override void _Ready()
