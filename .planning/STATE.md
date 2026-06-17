@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Phase 04 COMPLETE — 04-02 target circle approved (5 play-test rounds). Session paused at user request.
-last_updated: "2026-06-17T19:42:55.364Z"
+stopped_at: "PAUSED 2026-06-17 — Phase 04 COMPLETE (2/2 plans, all 6 SC verified in-game). Clean tree on main. Next: close Phase 3 UAT items, then promote backlog 999.2/999.3/999.4."
+last_updated: "2026-06-17T19:45:56.254Z"
 last_activity: 2026-06-17 -- Phase 04 execution started
 progress:
   total_phases: 8
@@ -146,8 +146,8 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-17T19:42:48.720Z
-Stopped at: Phase 04 COMPLETE — 04-02 target circle approved (5 play-test rounds). Session paused at user request.
+Last session: 2026-06-17T19:45:56.246Z
+Stopped at: PAUSED 2026-06-17 — Phase 04 COMPLETE (2/2 plans, all 6 SC verified in-game). Clean tree on main. Next: close Phase 3 UAT items, then promote backlog 999.2/999.3/999.4.
 Resume file: None
 Prior resume note: Decision locked — (1) revert done; (2) fix target/HUD bugs first via /gsd-debug; (3) then flight speed model v2 as a discussed phase (P1, per-tier ceiling + target ease-out, minimal slice of backlog 999.1); (4) then galaxy-visibility-in-universe-space (P2, blocks intergalactic UAT 5-7). Phase 03 stays open at UAT until the flight model is reworked.
 
