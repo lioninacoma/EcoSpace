@@ -161,6 +161,33 @@ namespace Flight
 			set => _speedEasing = System.Math.Max(0.0, value);
 		}
 
+		private double _tierSpeedFactor = 1e-5;
+		/// <summary>
+		/// Per-tier speed ceiling factor (D-40): tierCeiling = parent.SOIMeters × k.
+		/// Default 1e-5 → StarSOI 1.5e15 m × 1e-5 = 1.5e10 m/s (≈50 AU/s in-system).
+		/// Play-test tuning knob — raise for faster in-system flight, lower for more precision.
+		/// System.Math.Max(0.0, value) blocks negative and NaN inspector inputs (T-04-02 mitigation).
+		/// </summary>
+		[Export]
+		public double TierSpeedFactor
+		{
+			get => _tierSpeedFactor;
+			set => _tierSpeedFactor = System.Math.Max(0.0, value);
+		}
+
+		private double _speedPerTarget = 0.1;
+		/// <summary>
+		/// Target ease-out factor (D-43): targetEaseMax = distToTarget × k'.
+		/// Default 0.1 → at 1 AU distance (1.5e11 m) → 1.5e10 m/s max. Tune by feel.
+		/// System.Math.Max(0.0, value) blocks negative and NaN inspector inputs (T-04-02 mitigation).
+		/// </summary>
+		[Export]
+		public double SpeedPerTarget
+		{
+			get => _speedPerTarget;
+			set => _speedPerTarget = System.Math.Max(0.0, value);
+		}
+
 		// ── Private flight state ────────────────────────────────────────────────
 
 		/// <summary>Accumulated software steering cursor in pixels (D-01).</summary>
@@ -189,6 +216,7 @@ namespace Flight
 
 		private TestSetup _world;
 		private Camera3D _camera;
+		private Hud.Hud _hud;
 
 		// Reticle Control nodes (optional — set if nodes exist in the scene).
 		private Control _steeringReticle;
@@ -226,6 +254,11 @@ namespace Flight
 
 			// Resolve optional reticle node (added in Task 3)
 			_steeringReticle = GetTree().Root.FindChild("SteeringReticle", true, false) as Control;
+
+			// Resolve Hud reference for reading active target index (D-43 target ease-out).
+			// No [Export] NodePath — mirrors _steeringReticle no-export style.
+			// Callers use ?. so a missing Hud node is safe (target ease-out simply disabled).
+			_hud = GetTree().Root.FindChild("Hud", true, false) as Hud.Hud;
 
 			// Compute viewport center for reticle positioning
 			var viewport = GetViewport();
