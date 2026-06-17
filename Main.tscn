@@ -171,7 +171,6 @@ offset_bottom = 16.0
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1364607324]
 environment = SubResource("Environment_r0du0")
-far = 1000000.0
 
 [node name="RenderBridge" type="Node3D" parent="." unique_id=792530993]
 script = ExtResource("4_rendbrg")
@@ -181,6 +180,8 @@ WorldPath = NodePath("..")
 script = ExtResource("6_flight")
 WorldPath = NodePath("..")
 CameraPath = NodePath("../Camera3D")
+TierSpeedFactor = 20.0
+SpeedPerTarget = 1.0
 
 [node name="SkyboxRenderer" type="Node" parent="." unique_id=-1293967282]
 script = ExtResource("7_skybox")
