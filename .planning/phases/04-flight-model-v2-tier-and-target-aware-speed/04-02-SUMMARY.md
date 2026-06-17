@@ -124,7 +124,49 @@ Behavioral verification (on-screen circle, min-radius findability, edge-marker f
 
 ## Deviations from Plan
 
-None — plan executed exactly as written. `DrawArc` API (A1/A2 medium-confidence assumption) confirmed correct by 0-error build; no fallback to `DrawPolyline` was needed. `const float` used for MIN_R/MAX_R rather than `[Export]` — simpler and sufficient for the minimal D-46 slice; can be promoted to `[Export]` during the play-test tuning session if the inspector adjustment is preferred.
+### Implementation (Tasks 1–2)
+
+`DrawArc` API (A1/A2 medium-confidence assumption) confirmed correct by 0-error build; no fallback to `DrawPolyline` was needed. `const float` used for MIN_R/MAX_R rather than `[Export]` — simpler and sufficient for the minimal D-46 slice.
+
+### Post-checkpoint fixes (Rule 1 — bugs found in play-test)
+
+The first play-test approved SC#1, SC#3, SC#4 but FAILED SC#2 and SC#5. Both
+shared one root cause: the **Galaxy parent's `RadiusMeters == SOIMeters` (5e20)**
+and it **sits at the frame origin** (same as the home star).
+
+**1. [Rule 1 - Bug] Galaxy-SOI-exit dead zone (Failure 2, partial)**
+- **Found during:** Task 3 play-test (SC#2)
+- **Issue:** In Galaxy space the proximity-damp scan included the galaxy parent,
+  whose full-SOI `RadiusMeters` (5e20) made `nearest` collapse to ~0 at the
+  SOI-exit boundary → `targetMax` clamped to `MinSpeed` (10 m/s). The exact dead
+  zone D-42 was meant to remove.
+- **Fix:** Exclude `Type.Galaxy` parents from the proximity-damp scan in
+  `FlightController.UpdateSpeedEnvelope`. In-galaxy damp now comes from sibling
+  stars; receding past them lets speed ramp to `tierCeiling`.
+- **Files modified:** Scripts/Flight/FlightController.cs
+- **Commit:** 46892bc
+
+**2. [Rule 1 - Bug] Default target = galaxy crushed ease-out + blocked circle (Failures 2 & 5)**
+- **Found during:** Task 3 play-test (SC#2 + SC#5)
+- **Issue:** `BuildTargetableList` put the parent first, so in Galaxy space the
+  DEFAULT target (`_targetIndex=0`) was the home galaxy. (a) Its near-zero
+  at-origin distance crushed the D-43 target ease-out to MinSpeed (second half of
+  Failure 2). (b) A galaxy is never mesh-rendered (D-28), so `GetRenderPosition`
+  returned false and the D-46 circle could never draw (Failure 5).
+- **Fix:** Skip a `Type.Galaxy` parent in `BuildTargetableList`. The home STAR is
+  now the default target — a real mesh the circle pins to and a sensible body to
+  ease onto. Galaxy SIBLINGS (Universe space) stay targetable for edge-marker nav.
+- **Files modified:** Scripts/Hud/Hud.cs
+- **Commit:** 46892bc
+
+**3. [Rule 1 - Bug] Nearest-body label flicker (Failure 2 symptom)**
+- **Found during:** Task 3 play-test (SC#2)
+- **Issue:** The HUD context label flickered between STAR and HOME GALAXY each
+  frame — both sit at the frame origin so their distances tied.
+- **Fix:** Skip `Type.Galaxy` bodies as "nearest" candidates in
+  `UpdateContextLabel`.
+- **Files modified:** Scripts/Hud/Hud.cs
+- **Commit:** 46892bc
 
 ## Known Stubs
 
@@ -137,13 +179,17 @@ No new security-relevant surface beyond the plan's threat model:
 - T-04-05 (stale/missing render position): mitigated by `GetRenderPosition` returning false, leaving `_showTargetCircle = false`
 - T-04-06 (per-frame QueueRedraw cost): accepted (negligible, per plan)
 
-## Awaiting: Task 3 Play-test Checkpoint
+## Awaiting: Task 3 Play-test RE-verification
 
-Task 3 is a `checkpoint:human-verify` gate — the complete Phase 04 behavior must be verified in-game. See checkpoint message below.
+Task 3 is a `checkpoint:human-verify` gate. First play-test: SC#1/#3/#4 approved;
+SC#2 and SC#5 failed. Fixes committed (46892bc); **re-verification of SC#2 and SC#5
+required** before the plan is marked complete.
 
-## Self-Check: PASSED (Tasks 1–2)
+## Self-Check: PASSED (Tasks 1–2 + fixes)
 
-- `Scripts/Hud/Hud.cs` — exists with all new symbols confirmed
+- `Scripts/Hud/Hud.cs` — exists with all new symbols + galaxy-skip fixes confirmed
+- `Scripts/Flight/FlightController.cs` — galaxy proximity-damp exclusion confirmed
 - Commit 4a7f9e1 — Task 1 (_worldRenderer + circle-state fields)
 - Commit 2f3e5b4 — Task 2 (UpdateTargetCircle + _Draw + QueueRedraw)
-- Both commits on main branch, build 0/0
+- Commit 46892bc — Post-checkpoint Rule 1 fixes (galaxy dead zone, default target, flicker)
+- All commits on main branch, build 0/0
