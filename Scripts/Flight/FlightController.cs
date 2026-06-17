@@ -428,6 +428,15 @@ namespace Flight
 				return;
 			}
 
+			// ── Tier ceiling (D-40) ────────────────────────────────────────────
+			// Derived from the ship's current SOI radius × tuning factor k.
+			// Guard double.MaxValue (Root SOI = double.MaxValue sentinel in TestSetup)
+			// to prevent Infinity from the multiply (T-04-01 mitigation, Pitfall 1).
+			// Existing double.IsFinite guard in ApplyMotion is the last-resort catch.
+			double tierCeiling = (parent.SOIMeters < double.MaxValue / 2.0)
+				? Mathf.Clamp(parent.SOIMeters * _tierSpeedFactor, _minSpeed, _maxSpeed)
+				: _maxSpeed;   // Root/open-universe: use authored MaxSpeed
+
 			double nearest = double.MaxValue;
 
 			// ── ALWAYS include the parent body itself (Bug 3 fix) ──────────────
@@ -443,6 +452,10 @@ namespace Flight
 
 			// ── Scan same-space siblings ────────────────────────────────────────
 			// Snapshot ChildIndices to avoid mutation issues during scan.
+			// Uses UniVec3.Distance — ship and all siblings share the same parent
+			// frame (same-frame path; CLAUDE.md §Position Math). NOT UniMath.Distance
+			// here because that is the cross-frame LCA path (reserved for the target
+			// ease-out below where the target may be in a different frame).
 			int[] siblings = [.. parent.ChildIndices];
 
 			foreach (int idx in siblings)
@@ -452,19 +465,44 @@ namespace Flight
 				var body = (uint)idx < (uint)gameObjects.Count ? gameObjects[idx] : null;
 				if (body == null || body.RadiusMeters <= 0.0) continue;
 
-				// Both ship and sibling share the same parent frame — LocalPos values
-				// are in the same coordinate space, so Distance is safe here.
+				// Same-frame sibling: LocalPos values share the parent coordinate space.
 				double centreDist = UniVec3.Distance(ship.LocalPos, body.LocalPos);
 				double surfaceDist = System.Math.Max(0.0, centreDist - body.RadiusMeters);
 				nearest = System.Math.Min(nearest, surfaceDist);
 			}
 
-			// If still no bodies found, open space: allow max speed.
+			// If still no bodies found, open space: use tierCeiling as the speed target.
+			// (Previously _maxSpeed; updated to tierCeiling for consistency — D-42.)
 			if (nearest == double.MaxValue)
-				nearest = _maxSpeed / System.Math.Max(_speedPerMeter, 1.0);
+				nearest = tierCeiling / System.Math.Max(_speedPerMeter, 1.0);
 
-			// Compute target context max; clamp to [MinSpeed, MaxSpeed] (T-03-02).
-			double targetMax = Mathf.Clamp(nearest * _speedPerMeter, _minSpeed, _maxSpeed);
+			// ── Proximity damp + tier ceiling (D-42) ──────────────────────────
+			// Symmetric damp: speed is bounded by nearest-surface distance × SpeedPerMeter,
+			// clamped to tierCeiling (NOT _maxSpeed). This is the core fix vs 260617-j6b:
+			// when the ship recedes from a body, targetMax returns to tierCeiling — a
+			// contextually appropriate value, never the global intergalactic _maxSpeed.
+			double targetMax = Mathf.Clamp(nearest * _speedPerMeter, _minSpeed, tierCeiling);
+
+			// ── Target-aware ease-out (D-43, only when a target is set) ────────
+			// When active, further clamps targetMax to distToTarget × k' so the ship
+			// decelerates naturally onto the target.
+			// MUST use UniMath.Distance here (LCA path, CLAUDE.md §Position Math) —
+			// the target may be in a different coordinate frame from the ship (e.g. after
+			// an SOI transition). Do NOT use UniVec3.Distance or raw ToDouble3() for this.
+			// tierCeiling still caps the ease-out (a target never makes you faster than
+			// the current tier allows — D-44).
+			int tgtIdx = _hud?.ActiveTargetIndex ?? -1;
+			if (tgtIdx >= 0 && (uint)tgtIdx < (uint)gameObjects.Count && gameObjects[tgtIdx] != null)
+			{
+				// Cross-frame distance: UniMath.Distance uses the LCA path (CLAUDE.md).
+				double distToTarget = UniMath.Distance(ship, gameObjects[tgtIdx], gameObjects);
+				double targetEaseMax = Mathf.Clamp(distToTarget * _speedPerTarget, _minSpeed, tierCeiling);
+				targetMax = System.Math.Min(targetMax, targetEaseMax);
+			}
+
+			// ── Easing lerps — ALWAYS run on EVERY path (D-07 / D-41 / Bug 4 fix) ─
+			// No early return may be inserted between here and CurrentSpeed = _easedSpeed.
+			// Both lerps must execute regardless of whether a target is set (Pitfall 2).
 
 			// Ease contextMax toward target to hide SOI-boundary discontinuities (D-07, Pitfall 9).
 			_contextMax = Mathf.Lerp(_contextMax, targetMax, Mathf.Clamp(_speedEasing * delta, 0.0, 1.0));
