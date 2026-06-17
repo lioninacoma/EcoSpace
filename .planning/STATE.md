@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
+status: verifying
 stopped_at: Completed 04-01-PLAN.md — tier+target-aware speed envelope delivered
-last_updated: "2026-06-17T18:36:16.808Z"
+last_updated: "2026-06-17T18:41:47.840Z"
 last_activity: 2026-06-17 -- Phase 04 execution started
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 11
-  percent: 60
+  completed_plans: 12
+  percent: 80
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 
 Phase: 04 (flight-model-v2-tier-and-target-aware-speed) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-17 -- Phase 04 execution started
 
 Plans:
@@ -64,6 +64,7 @@ model lands. HUD target bugs + sibling-star-distance bug fixed & verified this s
 | Phase 03-cross-galaxy-travel P02 | 145 | 1 tasks | 1 files |
 | Phase 03-cross-galaxy-travel P03 | 3 | 1 tasks | 1 files |
 | Phase 04 P01 | 5 | 3 tasks | 2 files |
+| Phase 04 P02 | 110 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,7 @@ Recent decisions affecting current work:
 - [Phase ?]: D-40: tierCeiling = parent.SOIMeters x TierSpeedFactor; no per-tier switch table
 - [Phase ?]: D-42: symmetric proximity damp capped at tierCeiling, not global _maxSpeed — core fix for Phase-03 in-system over-speed and galaxy-SOI-exit dead zone
 - [Phase ?]: D-43/D-44: target ease-out uses UniMath.Distance (LCA path); tier ceiling still caps; Hud.ActiveTargetIndex is read-only (D-45/D-12 preserved)
+- [Phase ?]: D-46: world-pinned phosphor-green outline in Hud._Draw gated on WorldRenderer.GetRenderPosition; DrawArc not DrawCircle (unfilled outline); MIN_CIRCLE_RADIUS=20f floor
 
 ### Roadmap Evolution
 
@@ -143,7 +145,7 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-17T18:36:16.800Z
+Last session: 2026-06-17T18:41:07.799Z
 Stopped at: Completed 04-01-PLAN.md — tier+target-aware speed envelope delivered
 Resume file: None
 Prior resume note: Decision locked — (1) revert done; (2) fix target/HUD bugs first via /gsd-debug; (3) then flight speed model v2 as a discussed phase (P1, per-tier ceiling + target ease-out, minimal slice of backlog 999.1); (4) then galaxy-visibility-in-universe-space (P2, blocks intergalactic UAT 5-7). Phase 03 stays open at UAT until the flight model is reworked.
