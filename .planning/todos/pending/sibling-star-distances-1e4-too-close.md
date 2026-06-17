@@ -1,13 +1,25 @@
 ---
 type: tech-debt
-status: pending
+status: resolved
 priority: P2
 created: 2026-06-17
+resolved: 2026-06-17
 area: data
 origin: phase-03 UAT play-test (found while debugging hud-target-galaxy-space)
 tags: [tech-debt, test-data, soi, units, render, skybox]
 related: [hud-target-nearest-galaxy-space, galaxy-visibility-in-universe-space]
+quick-task: .planning/quick/260617-lip-fix-sibling-star-distance-data-bug-scale
 ---
+
+> **RESOLVED 2026-06-17** (quick task 260617-lip). Scaled all within-galaxy star offsets
+> ×1e4 to true metres: ALPHA CEN 3.97e16 (4.2 ly), BARNARD 5.63e16 (5.96 ly), SIRIUS
+> (-6.0e16, 5.6e16) (8.68 ly); DEST SIB 1/2 + CLUSTER STAR 1/2/3 e12→e16. Each member star
+> is now ~26× the StarSOI radius from its primary — SOIs no longer overlap (by construction).
+> Stale "Galaxy units" doc-comments corrected to metres. Build 0/0, tests 30/30.
+> User-verified in-game: sibling sky-points still visible at correct relative brightness, no
+> Phase 2/3 regression. NOTE: the fly-out SOI-transition behavior (item 2) was NOT play-testable
+> with the current flight controller (too slow to exit usably) — deferred to the P1 flight model
+> ([[flight-speed-model-tier-and-target-aware]]); the no-overlap property holds mathematically.
 
 # Sibling/cluster/dest stars authored ~1e4× too close (SOIs overlap)
 

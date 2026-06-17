@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Phase 03 UAT play-test surfaced flight + render + HUD issues. Quick fix 260617-j6b (direction-aware speed clamp) REJECTED at play-test and REVERTED (f343cc3 → 76f6b3b) — in-system baseline restored. 4 tech debts spun off. Next: /gsd-debug the target/HUD bugs (P3+P4)."
-last_updated: "2026-06-17T12:30:00Z"
-last_activity: 2026-06-17 -- Phase 03 UAT: 1/7 passed, flight quick-fix rejected+reverted, 4 tech debts created
+stopped_at: "Phase 03 UAT in progress. HUD target bugs FIXED (debug session hud-target-galaxy-space: flicker via UniMath, ROOT name, Tab keybinding Escape→Tab) — user-verified. Sibling-star-distance data bug FIXED (quick 260617-lip: positions ×1e4 to true ly metres, SOIs no longer overlap) — user-verified. Next: P1 flight speed model (tier/target-aware) as a discussed phase; then P2 galaxy visibility in Universe space."
+last_updated: "2026-06-17T14:00:00Z"
+last_activity: 2026-06-17 -- HUD target bugs + sibling-star-distance bug fixed & verified; flight model (P1) is next
 progress:
   total_phases: 4
   completed_phases: 2
@@ -92,12 +92,13 @@ Recent decisions affecting current work:
 
 From Phase 03 UAT play-test (2026-06-17), priority order:
 
-- **P1** `flight-speed-model-tier-and-target-aware` — single global MaxSpeed across all tiers; needs per-tier ceiling + optional target-distance ease-out. Supersedes `thrust-zero-at-galaxy-soi-exit`. Phase-sized.
-- **P2** `galaxy-visibility-in-universe-space` — galaxies vanish in Universe space (D-28 skips galaxy meshes; skybox only carries next-tier-out). Blocks intergalactic confirm. Needs design decision.
-- **P3** `hud-target-nearest-galaxy-space` — "nearest" label flickers (?/home galaxy); galaxy-member stars not recognized as nearest. Likely UniMath/precision + hierarchy.
-- **P4** `hud-cycle-target-not-working` — Tab (cycle_target, bound) doesn't cycle target. Same subsystem as P3.
+- **P1** `flight-speed-model-tier-and-target-aware` — OPEN. Single global MaxSpeed across all tiers; needs per-tier ceiling + optional target-distance ease-out. Now also absorbs cross-SOI targeting (D-12 override) + world-pinned target circle (999.1 slice). Supersedes `thrust-zero-at-galaxy-soi-exit`. Phase-sized → **next up**.
+- **P2** `galaxy-visibility-in-universe-space` — OPEN. Galaxies vanish in Universe space (D-28 skips galaxy meshes; skybox only carries next-tier-out). Blocks intergalactic confirm. Needs design decision.
+- ~~P3 `hud-target-nearest-galaxy-space`~~ — flicker FIXED (UniMath + ROOT name); cross-SOI-nearest part folded into P1.
+- ~~P4 `hud-cycle-target-not-working`~~ — RESOLVED (Tab keybinding Escape→Tab + _Input/SetInputAsHandled).
+- ~~`sibling-star-distances-1e4-too-close`~~ — RESOLVED (quick 260617-lip; positions ×1e4 to true ly metres).
 
-Plan: revert done → fix P3+P4 (one /gsd-debug) → flight model v2 phase (P1, pulls minimal target slice of backlog 999.1) → galaxy visibility (P2).
+Plan: ✅ revert done · ✅ HUD bugs fixed (/gsd-debug) · ✅ star-distance fixed (quick) → **P1 flight model v2 as a discussed phase** (per-tier ceiling + target ease-out + minimal 999.1 targeting slice) → P2 galaxy visibility.
 
 ### Blockers/Concerns
 
@@ -123,6 +124,7 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 | 2026-06-16 | refactor-math-to-maximize-univec3-precis | refactor: new global `UniMath` helper (`Scripts/Math/UniMath.cs`) does hierarchy-aware position math entirely in UniVec3 — `FindLca`/`ToAncestorFrame`/`RelativePosition`/`RelativeMetres`/`Distance`. Accumulates up to the LCA via per-level `Convert+add`, subtracts two SAME-scale UniVec3 (exact integer Units cancellation), collapses to metres via a single `ToDouble3()` on the small delta. SkyboxRenderer + WorldRenderer.ComputeStarRenderPosFromHierarchy refactored onto it (260615-v69's in-file helpers removed); Flight/Hud audited (single-frame, already exact, no change). Added a durable `## Position Math (UniVec3 / UniMath)` convention to CLAUDE.md. 28 tests green (16 TierClassifier + 12 new UniMath incl. a precision-headroom test: 1.0 m gap at 4e16 m recovered to <1e-9 m). Build clean. Commits 0d3795c, 181ca56, f370857, 7567e80 |
 | 2026-06-16 | suppress-the-home-galaxy-in-skyboxrender | feat: read-only `UniMath.FindLca(ship, body, objs) == body.Index` ancestry guard at the top of SkyboxRenderer's galaxy branch suppresses the home galaxy disc while the ship is inside its SOI — only the 2 OTHER galaxies render, satisfying phase-03 must-have truth #2. Resolves the open home-galaxy in-SOI visibility design question deferred from 03-01 (SUMMARY line 135); user-locked decision: suppress (not Milky-Way band). Star branch + `_skyDirs` untouched; no shader/TestSetup change. 30 tests green (28 + 2 ancestry-predicate facts). Build clean. In-game visual confirm DEFERRED to 03-02 play-test (user choice). Commits a94305e, a2588d2 |
 | 2026-06-17 | 260617-j6b-fix-thrust-zero-at-galaxy-soi-exit | REJECTED + REVERTED: direction-aware (receding-exempt) speed clamp built (f343cc3, build 0/0, 30/30) but play-test failed — exempting the clamp jumps to global intergalactic MaxSpeed, making in-system travel unusable. Reverted (76f6b3b). Exposed root issue: single global MaxSpeed across all tiers. Superseded thrust-zero-at-galaxy-soi-exit; spun off 4 tech debts (flight speed model P1, galaxy visibility P2, HUD nearest/target P3, target cycling P4). |
+| 2026-06-17 | 260617-lip-fix-sibling-star-distance-data-bug-scale | COMPLETE: within-galaxy star positions were authored in "Galaxy units" (1e4 m/unit) but AddGameObject takes metres → stars 1e4× too close (~26 AU), SOIs overlapping. Scaled all sibling/cluster/dest-sib offsets ×1e4 to true metres (ALPHA CEN 4.2 ly, etc.); now ~26× StarSOI radius apart, no overlap. Build 0/0, 30/30. User-verified: sky-points still visible, no regression; fly-out SOI re-test deferred to P1 flight model. |
 
 ## Session Continuity
 
