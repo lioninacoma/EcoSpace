@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 03-03: WorldRenderer ObjectType routing — emissive Galaxy-space star meshes, D-28 galaxy-mesh skip, RND-07 handoff confirmed by math (Pattern 7). Phase 3 all plans complete; human play-test pending."
-last_updated: "2026-06-16T18:24:00Z"
-last_activity: 2026-06-16 -- Phase 03 execution started
+stopped_at: "Phase 03 UAT play-test surfaced flight + render + HUD issues. Quick fix 260617-j6b (direction-aware speed clamp) REJECTED at play-test and REVERTED (f343cc3 → 76f6b3b) — in-system baseline restored. 4 tech debts spun off. Next: /gsd-debug the target/HUD bugs (P3+P4)."
+last_updated: "2026-06-17T12:30:00Z"
+last_activity: 2026-06-17 -- Phase 03 UAT: 1/7 passed, flight quick-fix rejected+reverted, 4 tech debts created
 progress:
   total_phases: 4
   completed_phases: 2
@@ -90,7 +90,14 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+From Phase 03 UAT play-test (2026-06-17), priority order:
+
+- **P1** `flight-speed-model-tier-and-target-aware` — single global MaxSpeed across all tiers; needs per-tier ceiling + optional target-distance ease-out. Supersedes `thrust-zero-at-galaxy-soi-exit`. Phase-sized.
+- **P2** `galaxy-visibility-in-universe-space` — galaxies vanish in Universe space (D-28 skips galaxy meshes; skybox only carries next-tier-out). Blocks intergalactic confirm. Needs design decision.
+- **P3** `hud-target-nearest-galaxy-space` — "nearest" label flickers (?/home galaxy); galaxy-member stars not recognized as nearest. Likely UniMath/precision + hierarchy.
+- **P4** `hud-cycle-target-not-working` — Tab (cycle_target, bound) doesn't cycle target. Same subsystem as P3.
+
+Plan: revert done → fix P3+P4 (one /gsd-debug) → flight model v2 phase (P1, pulls minimal target slice of backlog 999.1) → galaxy visibility (P2).
 
 ### Blockers/Concerns
 
@@ -115,12 +122,13 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 | 2026-06-16 | fix-precision-loss-in-skyboxrenderer-pos | perf: replaced SkyboxRenderer absolute-from-root position math (`AbsolutePositionInRoot`) with an LCA-relative walk (`FindLca` + `PositionRelativeToAncestor` + `RelativePosition`) — ship→body vector is subtracted in the lowest-common-ancestor frame so the large common-ancestor offset is never formed, killing catastrophic cancellation at 1:1 Universe scale. No overflow existed. Outputs identical at MVP scale (LCA=Galaxy@origin); read-only contract preserved; build clean. Commit 83dfce4 |
 | 2026-06-16 | refactor-math-to-maximize-univec3-precis | refactor: new global `UniMath` helper (`Scripts/Math/UniMath.cs`) does hierarchy-aware position math entirely in UniVec3 — `FindLca`/`ToAncestorFrame`/`RelativePosition`/`RelativeMetres`/`Distance`. Accumulates up to the LCA via per-level `Convert+add`, subtracts two SAME-scale UniVec3 (exact integer Units cancellation), collapses to metres via a single `ToDouble3()` on the small delta. SkyboxRenderer + WorldRenderer.ComputeStarRenderPosFromHierarchy refactored onto it (260615-v69's in-file helpers removed); Flight/Hud audited (single-frame, already exact, no change). Added a durable `## Position Math (UniVec3 / UniMath)` convention to CLAUDE.md. 28 tests green (16 TierClassifier + 12 new UniMath incl. a precision-headroom test: 1.0 m gap at 4e16 m recovered to <1e-9 m). Build clean. Commits 0d3795c, 181ca56, f370857, 7567e80 |
 | 2026-06-16 | suppress-the-home-galaxy-in-skyboxrender | feat: read-only `UniMath.FindLca(ship, body, objs) == body.Index` ancestry guard at the top of SkyboxRenderer's galaxy branch suppresses the home galaxy disc while the ship is inside its SOI — only the 2 OTHER galaxies render, satisfying phase-03 must-have truth #2. Resolves the open home-galaxy in-SOI visibility design question deferred from 03-01 (SUMMARY line 135); user-locked decision: suppress (not Milky-Way band). Star branch + `_skyDirs` untouched; no shader/TestSetup change. 30 tests green (28 + 2 ancestry-predicate facts). Build clean. In-game visual confirm DEFERRED to 03-02 play-test (user choice). Commits a94305e, a2588d2 |
+| 2026-06-17 | 260617-j6b-fix-thrust-zero-at-galaxy-soi-exit | REJECTED + REVERTED: direction-aware (receding-exempt) speed clamp built (f343cc3, build 0/0, 30/30) but play-test failed — exempting the clamp jumps to global intergalactic MaxSpeed, making in-system travel unusable. Reverted (76f6b3b). Exposed root issue: single global MaxSpeed across all tiers. Superseded thrust-zero-at-galaxy-soi-exit; spun off 4 tech debts (flight speed model P1, galaxy visibility P2, HUD nearest/target P3, target cycling P4). |
 
 ## Session Continuity
 
-Last session: 2026-06-16T18:24:00Z
-Stopped at: Completed 03-03: WorldRenderer ObjectType routing done. Phase 3 all 3 plans complete. Human play-test checkpoint pending.
-Resume: Phase 3 complete. Human play-test required — launch game, fly to Galaxy space, verify: (1) member stars appear as emissive meshes, (2) Galaxy-space sky shows only 2 other galaxies (no star points), (3) no galaxy appears as a sphere mesh, (4) Star↔Galaxy swap is pop-free. Then fly to DEST GALAXY to verify full cross-galaxy chain. NOTE: also confirm home-galaxy suppression (exactly 2 galaxy discs, no home-galaxy disc) — deferred from 260616-riw.
+Last session: 2026-06-17T12:30:00Z
+Stopped at: Phase 03 UAT in progress (paused, status partial). Test 1 (2 galaxy discs, home suppressed) PASSED. Test 2 blocked. Play-test of the rest surfaced flight/render/HUD issues. Quick fix 260617-j6b (direction-aware speed clamp) was REJECTED at play-test and REVERTED (HEAD 76f6b3b) — in-system flight baseline restored, build clean 0/0.
+Resume: Decision locked — (1) revert done; (2) fix target/HUD bugs first via /gsd-debug (P3 hud-target-nearest-galaxy-space + P4 hud-cycle-target-not-working, same target subsystem); (3) then flight speed model v2 as a discussed phase (P1, per-tier ceiling + target ease-out, minimal slice of backlog 999.1); (4) then galaxy-visibility-in-universe-space (P2, blocks intergalactic UAT 5-7). Phase 03 stays open at UAT until the flight model is reworked.
 
 ## Refactor Notes
 
