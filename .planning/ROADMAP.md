@@ -102,7 +102,16 @@ Plans:
 
 **Verification**: requires in-game Godot play-test (the speed/feel and SOI behavior are not unit-testable). Unblocks the deferred Phase 03 UAT items (fly-out SOI behavior, intergalactic transit timing).
 
-**Plans**: TBD (run `/gsd-discuss-phase 4` then `/gsd-plan-phase 4`)
+**Plans**: 2 plans (2 waves)
+Plans:
+
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Tier- & target-aware speed envelope: per-tier ceiling (parent.SOIMeters x k), symmetric proximity damp capped at tier ceiling, target-distance ease-out; + read-only Hud.ActiveTargetIndex accessor (wave 1)
+
+**Wave 2** *(blocked on Wave 1 — shares Hud.cs)*
+
+- [ ] 04-02-PLAN.md — World-pinned target circle: Hud._Draw outline gated on WorldRenderer.GetRenderPosition with minimum on-screen radius + edge-marker fallback; full-phase play-test checkpoint (wave 2)
 
 ## Backlog
 
@@ -132,8 +141,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. In-System Flight MVP | 4/4 (TRV-01 milestone) | ✓ Complete | 2026-06-14 |
 | 2. Dynamic Skybox | 3/3 | Complete   | 2026-06-15 |
 | 3. Cross-Galaxy Travel | 3/3 | UAT paused (1/7) | — |
-| 4. Flight Model v2 — tier & target-aware speed | 0/? | Not planned | — |
+| 4. Flight Model v2 — tier & target-aware speed | 0/2 | Planned (2 waves) | — |
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 4 to break down)
+- [ ] 04-01-PLAN.md — Tier- & target-aware speed envelope + Hud.ActiveTargetIndex (wave 1)
+- [ ] 04-02-PLAN.md — World-pinned target circle + full-phase play-test (wave 2)
