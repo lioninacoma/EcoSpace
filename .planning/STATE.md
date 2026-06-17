@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: "Phase 03 UAT in progress. HUD target bugs FIXED (debug session hud-target-galaxy-space: flicker via UniMath, ROOT name, Tab keybinding Escape→Tab) — user-verified. Sibling-star-distance data bug FIXED (quick 260617-lip: positions ×1e4 to true ly metres, SOIs no longer overlap) — user-verified. Next: P1 flight speed model (tier/target-aware) as a discussed phase; then P2 galaxy visibility in Universe space."
-last_updated: "2026-06-17T14:00:00Z"
-last_activity: 2026-06-17 -- HUD target bugs + sibling-star-distance bug fixed & verified; flight model (P1) is next
+status: verifying
+stopped_at: Phase 4 context gathered (flight model v2 — tier/target-aware speed)
+last_updated: "2026-06-17T14:18:59.933Z"
+last_activity: 2026-06-16 -- Phase 03 all plans complete
 progress:
-  total_phases: 4
-  completed_phases: 2
+  total_phases: 5
+  completed_phases: 3
   total_plans: 10
   completed_plans: 10
-  percent: 100
+  percent: 60
 ---
 
 # Project State
@@ -132,8 +132,8 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-17T12:30:00Z
-Stopped at: Phase 03 UAT in progress (paused, status partial). Test 1 (2 galaxy discs, home suppressed) PASSED. Test 2 blocked. Play-test of the rest surfaced flight/render/HUD issues. Quick fix 260617-j6b (direction-aware speed clamp) was REJECTED at play-test and REVERTED (HEAD 76f6b3b) — in-system flight baseline restored, build clean 0/0.
+Last session: 2026-06-17T14:18:59.925Z
+Stopped at: Phase 4 context gathered (flight model v2 — tier/target-aware speed)
 Resume: Decision locked — (1) revert done; (2) fix target/HUD bugs first via /gsd-debug (P3 hud-target-nearest-galaxy-space + P4 hud-cycle-target-not-working, same target subsystem); (3) then flight speed model v2 as a discussed phase (P1, per-tier ceiling + target ease-out, minimal slice of backlog 999.1); (4) then galaxy-visibility-in-universe-space (P2, blocks intergalactic UAT 5-7). Phase 03 stays open at UAT until the flight model is reworked.
 
 ## Refactor Notes
