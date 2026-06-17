@@ -218,6 +218,29 @@ radius should be smaller when far and grow to outline the body on approach.
 - **Files modified:** Scripts/Render/WorldRenderer.cs, Scripts/Hud/Hud.cs
 - **Commit:** 691f7ad
 
+### Fourth post-checkpoint round (Rule 1 — FOV-dependent projection error)
+
+Round 4: radius sizing approved in principle, but the circle over-grew near the
+screen EDGE (bigger than the body there, matched only when centred) and the error
+scaled with FOV.
+
+**7. [Rule 1 - Bug] Circle radius inflated at frustum edge (FOV-dependent)**
+- **Found during:** Task 3 play-test round 4 (SC#5) — also visible on galaxies
+- **Issue:** The radius was measured by projecting ONE perpendicular-offset point
+  and taking its pixel gap from the centre. Near the frustum edge the perspective
+  projection stretches non-linearly, inflating that gap, while the GPU rasterizes
+  the mesh with the full per-vertex projection matrix (no inflation). So the circle
+  was larger than the body at the edge, matched only when centred, and the error
+  shrank at narrower FOV (~40°).
+- **Fix:** Compute the radius analytically from the body's DEPTH along the camera
+  forward axis (`-camLocal.Z`):
+  `pixelRadius = refExtent · (renderRadius / depth) / tan(fov/2)`, where `refExtent`
+  is half the viewport height (`KeepHeight`) or width (`KeepWidth`) to match
+  `Camera3D.Fov`'s axis. Position-independent → tracks the mesh evenly everywhere,
+  any FOV.
+- **Files modified:** Scripts/Hud/Hud.cs
+- **Commit:** 6f01d99
+
 ## Known Stubs
 
 None — all new symbols are wired to live data sources. `_worldRenderer` resolves to the scene's `WorldRenderer` node; `GetRenderPosition` is authoritative each frame; `_camera` was already wired in prior plans. The circle is a live read of real frame data, not placeholder logic.
@@ -229,13 +252,14 @@ No new security-relevant surface beyond the plan's threat model:
 - T-04-05 (stale/missing render position): mitigated by `GetRenderPosition` returning false, leaving `_showTargetCircle = false`
 - T-04-06 (per-frame QueueRedraw cost): accepted (negligible, per plan)
 
-## Awaiting: Task 3 Play-test RE-verification (round 4)
+## Awaiting: Task 3 Play-test RE-verification (round 5)
 
 Task 3 is a `checkpoint:human-verify` gate.
 - Round 1: SC#1/#3/#4 approved; SC#2 + SC#5 failed → fixes 1–3 (46892bc).
 - Round 2: SC#2 approved; SC#5 still failed → fixes 4–5 (40f3bba).
 - Round 3: circle shows; refinement requested (size to body, grow on approach) → fix 6 (691f7ad).
-- **Round 4 pending:** re-verify SC#5 circle sizing (small when far, grows to outline body).
+- Round 4: radius sizing OK but inflated at screen edge (FOV-dependent) → fix 7 (6f01d99).
+- **Round 5 pending:** re-verify SC#5 — circle hugs the body evenly across the whole view, any FOV.
 
 ## Self-Check: PASSED (Tasks 1–2 + fixes)
 
