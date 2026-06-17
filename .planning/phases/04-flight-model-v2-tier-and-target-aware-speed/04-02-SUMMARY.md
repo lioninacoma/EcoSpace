@@ -168,6 +168,35 @@ and it **sits at the frame origin** (same as the home star).
 - **Files modified:** Scripts/Hud/Hud.cs
 - **Commit:** 46892bc
 
+### Second post-checkpoint round (Rule 1 — SC#5 still failed after round 1)
+
+The second play-test approved SC#2 but SC#5 (target circle) STILL showed no circle.
+Two further bugs were blocking it:
+
+**4. [Rule 1 - Bug] `_worldRenderer` always null — wrong node name (Failure 5, primary)**
+- **Found during:** Task 3 play-test round 2 (SC#5)
+- **Issue:** `FindChild("WorldRenderer", ...)` matches by node NAME, but the
+  `WorldRenderer.cs` script sits on the scene node still named **"RenderBridge"**
+  (legacy name retained after the `RenderBridge.cs → WorldRenderer.cs` rename).
+  So `_worldRenderer` was always null and guard 1 of `UpdateTargetCircle`
+  suppressed the circle every frame.
+- **Fix:** Resolve `FindChild("RenderBridge", ...)` first, with a name-independent
+  `FindNodeByType<Render.WorldRenderer>` recursive fallback for rename resilience.
+- **Files modified:** Scripts/Hud/Hud.cs
+- **Commit:** 40f3bba
+
+**5. [Rule 1 - Bug] `_Draw` used viewport-absolute coordinates (Failure 5, latent)**
+- **Found during:** Task 3 play-test round 2 (SC#5) — code review while fixing #4
+- **Issue:** `_targetCirclePos` is a viewport-absolute screen position (from
+  `UnprojectPosition`), but `DrawArc` in `_Draw` operates in the Control's LOCAL
+  space. The `Hud` Control is a small top-left box (offset 5,30 — not full-screen),
+  so the circle would have been offset from the target even once #4 was fixed.
+- **Fix:** `_Draw` converts to Control-local: `localPos = _targetCirclePos - GlobalPosition`.
+  `clip_contents` is unset (false) everywhere in Main.tscn, so the circle is not
+  clipped to the small Hud rect.
+- **Files modified:** Scripts/Hud/Hud.cs
+- **Commit:** 40f3bba
+
 ## Known Stubs
 
 None — all new symbols are wired to live data sources. `_worldRenderer` resolves to the scene's `WorldRenderer` node; `GetRenderPosition` is authoritative each frame; `_camera` was already wired in prior plans. The circle is a live read of real frame data, not placeholder logic.
@@ -179,11 +208,12 @@ No new security-relevant surface beyond the plan's threat model:
 - T-04-05 (stale/missing render position): mitigated by `GetRenderPosition` returning false, leaving `_showTargetCircle = false`
 - T-04-06 (per-frame QueueRedraw cost): accepted (negligible, per plan)
 
-## Awaiting: Task 3 Play-test RE-verification
+## Awaiting: Task 3 Play-test RE-verification (round 3)
 
-Task 3 is a `checkpoint:human-verify` gate. First play-test: SC#1/#3/#4 approved;
-SC#2 and SC#5 failed. Fixes committed (46892bc); **re-verification of SC#2 and SC#5
-required** before the plan is marked complete.
+Task 3 is a `checkpoint:human-verify` gate.
+- Round 1: SC#1/#3/#4 approved; SC#2 + SC#5 failed → fixes 1–3 (46892bc).
+- Round 2: SC#2 approved; SC#5 still failed → fixes 4–5 (40f3bba).
+- **Round 3 pending:** re-verify SC#5 (target circle) only.
 
 ## Self-Check: PASSED (Tasks 1–2 + fixes)
 
