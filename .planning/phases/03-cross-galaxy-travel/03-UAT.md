@@ -1,29 +1,26 @@
 ---
-status: testing
+status: partial
 phase: 03-cross-galaxy-travel
 source: [03-VERIFICATION.md]
 started: 2026-06-16T00:00:00Z
-updated: 2026-06-16T00:00:00Z
+updated: 2026-06-17T00:00:00Z
 ---
 
 ## Current Test
 
-number: 1
-name: From the home system, confirm exactly 2 galaxy discs visible (home galaxy suppressed), world-fixed
-expected: |
-  Two colored procedural discs (one warm orange-gold spiral, one warm golden elliptical) visible in
-  different sky directions. No HOME GALAXY disc. Discs are world-fixed — rotating the ship does not move them.
-awaiting: user response
+[testing paused — 6 items outstanding; blocked on thrust-zero-at-galaxy-soi-exit tech debt]
 
 ## Tests
 
 ### 1. Exactly 2 galaxy discs visible from home system, world-fixed
 expected: Two colored procedural discs (warm orange-gold spiral + warm golden elliptical) in two distinct sky directions. No HOME GALAXY disc. Discs do not drift on ship rotation.
-result: [pending]
+result: pass
 
 ### 2. Home-galaxy stars become emissive meshes in Galaxy space
 expected: Flying outward past the home star SOI into Galaxy space, the home galaxy's stars (STAR, ALPHA CEN, BARNARD, SIRIUS) render as emissive sphere meshes — not sky points. No home-galaxy star sky-points remain in Galaxy space.
-result: [pending]
+result: blocked
+blocked_by: other
+reason: "Cannot fly out into Galaxy space to confirm — thrust drops to zero at galaxy SOI exit (tech debt: thrust-zero-at-galaxy-soi-exit). Fixing first."
 
 ### 3. Galaxy-space sky shows only the 2 other galaxies; no galaxy is a sphere mesh
 expected: Zero star-point dots in the Galaxy-space sky. The two other galaxies appear as sky discs. No opaque sphere geometry for any galaxy object (D-28).
@@ -48,10 +45,10 @@ result: [pending]
 ## Summary
 
 total: 7
-passed: 0
+passed: 1
 issues: 0
-pending: 7
+pending: 5
 skipped: 0
-blocked: 0
+blocked: 1
 
 ## Gaps
