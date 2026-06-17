@@ -1,35 +1,34 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-16T20:10:51.141Z",
-  "phase": "03",
-  "phase_name": "cross-galaxy-travel",
-  "phase_dir": ".planning/phases/03-cross-galaxy-travel",
-  "plan": 3,
-  "task": 1,
-  "total_tasks": 1,
+  "timestamp": "2026-06-17T15:20:25.638Z",
+  "phase": "04",
+  "phase_name": "flight-model-v2-tier-and-target-aware-speed",
+  "phase_dir": ".planning/phases/04-flight-model-v2-tier-and-target-aware-speed",
+  "plan": 0,
+  "task": 5,
+  "total_tasks": 8,
   "status": "paused",
+  "workflow": "gsd-plan-phase 04",
   "completed_tasks": [
-    {"id": "03-01", "name": "Galaxy body model + procedural sky discs", "status": "done", "commit": "cffacc8"},
-    {"id": "03-02", "name": "Remove SpeedOfLight cap; raise MaxSpeed to 2e20; IsFinite guard", "status": "done", "commit": "e1c8104"},
-    {"id": "03-03", "name": "Galaxy-tier mesh routing by ObjectType + Star/Galaxy handoff", "status": "done", "commit": "9f21d88"},
-    {"id": "verify", "name": "Phase goal verification (status: human_needed; 7/7 code-level must-haves)", "status": "done", "commit": "7e734c0"},
-    {"id": "debug", "name": "Fix galaxy-sky flood: galaxy distance unit bug + disc projection ring/antipode", "status": "done", "commit": "fef1d91"}
+    {"id": 1, "name": "Init + load CONTEXT.md (exists, committed)", "status": "done"},
+    {"id": 2, "name": "Research decision (chose: research first)", "status": "done"},
+    {"id": 3, "name": "gsd-phase-researcher -> 04-RESEARCH.md", "status": "done", "commit": "c90bf6d"},
+    {"id": 4, "name": "gsd-pattern-mapper -> 04-PATTERNS.md", "status": "done", "note": "written but NOT yet committed (uncommitted on disk at pause time)"}
   ],
   "remaining_tasks": [
-    {"id": "uat", "name": "Run /gsd-verify-work 03 — 7 human play-test items in 03-UAT.md (items 1 & 3 already satisfied by the debug fix)", "status": "not_started"},
-    {"id": "phase-complete", "name": "Mark Phase 03 complete after UAT passes (ROADMAP checkbox still unchecked, phase pending)", "status": "not_started"},
-    {"id": "debt-tilt", "name": "Galaxy disc tilt/foreshortening — disc renders face-on for now (.planning/todos/pending/galaxy-disc-tilt-foreshortening.md)", "status": "not_started"},
-    {"id": "debt-thrust", "name": "Thrust drops to zero at galaxy SOI exit (.planning/todos/pending/thrust-zero-at-galaxy-soi-exit.md)", "status": "not_started"}
+    {"id": 5, "name": "Spawn gsd-planner (opus) -> PLAN.md files", "status": "not_started"},
+    {"id": 6, "name": "Spawn gsd-plan-checker (sonnet) + revision loop (max 3)", "status": "not_started"},
+    {"id": 7, "name": "Requirements + Decision coverage gates (sec 13/13a)", "status": "not_started"},
+    {"id": 8, "name": "Record planning in STATE.md, annotate ROADMAP, commit plans (sec 13b-d)", "status": "not_started"}
   ],
   "blockers": [],
-  "human_actions_pending": [
-    {"action": "Play-test Phase 03 via /gsd-verify-work 03", "context": "Godot compiles shaders at runtime; visual + flight correctness (galaxy discs, FTL transit, SOI entry, pop-free Star/Galaxy handoff) can only be confirmed in-game. 7 items tracked in 03-UAT.md.", "blocking": true}
-  ],
+  "human_actions_pending": [],
   "decisions": [
-    {"decision": "Galaxy positions/SOI authored in metres (Galaxy2_Z=2.4e22, Galaxy3_X/Z=1.27e22, SOI=5e20); constants renamed off the misleading *_UniZ names", "rationale": "AddGameObject takes its Double3 position and soiMeters in metres; the old Universe-unit values placed galaxies ~1e16x too close and flooded the sky", "phase": "03"},
-    {"decision": "Galaxy disc tangent basis built from the galaxy direction + front-hemisphere gate (dot(EYEDIR,gdir)>0); disc_normal tilt dropped (face-on)", "rationale": "disc_normal ~world-up collapsed the disc into a sky-spanning ring and the projection ghosted onto the antipode; a view-direction basis is always well-conditioned. Tilt deferred as tech debt", "phase": "03"}
+    {"decision": "Cross-SOI scope: Phase 4 follows CONTEXT.md D-45, NOT ROADMAP Success Criterion #5", "rationale": "ROADMAP SC#5 ('select a target in another SOI, overriding D-12') contradicts the more-recent discuss-phase decision D-45 (targeting stays current-tier; D-12 preserved; true cross-SOI deferred to backlog 999.1). Operator chose to honor CONTEXT D-45. The world-pinned target circle (D-46) IS in scope. ROADMAP SC#5 should be amended to match the narrowed scope.", "phase": "04"},
+    {"decision": "Research first (not skipped)", "rationale": "Confirmed tier-distance source, proximity-damp reshape, target coupling, and target-circle camera projection before planning.", "phase": "04"},
+    {"decision": "Skip UI-SPEC gate (false positive)", "rationale": "ui-safety-gate fired on HUD/circle/marker keywords, but this is a Godot game HUD with the visual contract already locked in CONTEXT D-46. A gsd-ui-phase UI-SPEC (web design tokens/CSS) is the wrong tool. Operator chose skip-and-proceed.", "phase": "04"}
   ],
-  "uncommitted_files": [],
-  "next_action": "Run /gsd-verify-work 03 to walk the 7 UAT play-test items; mark items 1 and 3 (galaxy visibility) as passed since the debug fix already addressed them.",
-  "context_notes": "Phase 03 implementation + verification + a debug session are all complete and committed (HEAD d117cf6). Working tree clean except pre-existing untracked .planning/research/.cache/*.json. Phase is NOT yet marked complete — it sits at human-verification (03-UAT.md). The reported sky-flood bug is fixed and user-verified in-game (debug session galaxy-sky-disc-antipode, status paused/fixed-and-verified). Two tech-debt todos were spun off (galaxy disc tilt; thrust-zero at galaxy SOI exit) and live in .planning/todos/pending/. The thrust-zero debt overlaps UAT item 5 (intergalactic transit) — expect it to surface during that play-test."
+  "uncommitted_files": [".planning/phases/04-flight-model-v2-tier-and-target-aware-speed/04-PATTERNS.md"],
+  "next_action": "Re-run /gsd-plan-phase 04. It reuses committed 04-RESEARCH.md + on-disk 04-PATTERNS.md. When prompted choose 'use existing research'; re-apply the two locked rulings (D-45 scope, skip UI-SPEC). Then it spawns the gsd-planner (opus) with CONTEXT + RESEARCH + PATTERNS.",
+  "context_notes": "Research + pattern-map findings (HIGH confidence): NO new files - three existing files change. (1) FlightController.UpdateSpeedEnvelope (lines 380-449): change the clamp at line 434 from _maxSpeed to a per-tier ceiling = parent.SOIMeters * k (guard Root sentinel double.MaxValue with < double.MaxValue/2.0); keep BOTH lerps (_contextMax, _easedSpeed) running on every path (the one correct property of the reverted 260617-j6b fix); proximity damp stays symmetric, receding returns to tier ceiling not global max. (2) Add [Export] knobs TierSpeedFactor (k) and SpeedPerTarget (k') following the private-backing-field + System.Math.Max(0.0,value) setter pattern (lines 113-162). (3) Target coupling: Hud.ActiveTargetIndex thin getter calling existing private BuildTargetableList, returns targets[clamped].Index with -1 sentinel (no visibility change); FlightController + Hud resolve _hud/_worldRenderer via FindChild(name,true,false) as Type in _Ready (same idiom as _camera); use UniMath.Distance for target distance (NOT LocalPos arithmetic). (4) Target circle in Hud._Draw, gated on WorldRenderer.GetRenderPosition(idx, out pos)==true; reuse UpdateDirectionMarker's cameraLocal.Z>0 behind-camera guard + _camera.UnprojectPosition verbatim; QueueRedraw() in _Process. MEDIUM-confidence item to verify on first build: Godot 4.6 DrawArc/QueueRedraw API. Models: planner=opus, checker=sonnet. Verification of this phase needs an in-game Godot play-test (speed feel + SOI behavior not unit-testable)."
 }
