@@ -21,16 +21,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-12)
 
 **Core value:** The player can fly seamlessly through a massive 1:1-scale universe — from a planet's surroundings out to interstellar and intergalactic distances — with rendering and flight that stay correct and feel good across every scale.
-**Current focus:** Phase 03 — cross-galaxy-travel
+**Current focus:** Phase 04 — Flight Model v2 (tier & target-aware speed)
 
 ## Current Position
 
-Phase: 03 (cross-galaxy-travel) — EXECUTING
-Plan: 3 of 3 (COMPLETE)
-Status: Human play-test pending (visual verification of Galaxy-space star meshes + RND-07 handoff)
-Last activity: 2026-06-16 -- Phase 03 all plans complete
+Phase: 04 (flight-model-v2-tier-and-target-aware-speed) — CONTEXT GATHERED, ready to plan
+Plan: 0 of ? (not planned yet)
+Status: Discussion complete (04-CONTEXT.md). Next: /gsd-plan-phase 4.
+Last activity: 2026-06-17 -- Phase 04 context gathered
 
-Progress: [██████████] 100% — Phase 01 complete (1 of 3 phases)
+Note: Phase 03 is at UAT paused (1/7), intentionally gated on Phase 04 — its deferred
+UAT items (fly-out SOI behavior, intergalactic transit) get re-tested once the flight
+model lands. HUD target bugs + sibling-star-distance bug fixed & verified this session.
 
 ## Performance Metrics
 
