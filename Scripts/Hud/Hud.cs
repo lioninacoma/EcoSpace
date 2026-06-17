@@ -173,6 +173,8 @@ namespace Hud
             UpdateSpeedLabel();
             UpdateContextLabel(ship, gameObjects, shipIndex);
             UpdateTargetReadout(ship, gameObjects, shipIndex);
+            UpdateTargetCircle(ship, gameObjects);
+            QueueRedraw();  // triggers _Draw each frame — required (D-46, Pitfall 4)
         }
 
         // ── Speed label ───────────────────────────────────────────────────────
@@ -326,6 +328,79 @@ namespace Hud
         private void HideMarker()
         {
             if (_dirMarker != null) _dirMarker.Visible = false;
+        }
+
+        // ── Target circle draw (D-46) ─────────────────────────────────────────
+
+        // Minimum on-screen radius so a distant target is never sub-pixel (D-46 tuning knob).
+        private const float MIN_CIRCLE_RADIUS = 20f;
+        // Maximum on-screen radius so a close target doesn't fill the screen.
+        private const float MAX_CIRCLE_RADIUS = 200f;
+
+        /// <summary>
+        /// Computes per-frame circle state (_showTargetCircle, _targetCirclePos, _targetCircleRadius).
+        /// Sets _showTargetCircle = false at the top; only sets it true after ALL guards pass:
+        ///   1. _worldRenderer + _camera null-guard
+        ///   2. Resolve active target via BuildTargetableList (current-tier reach, D-45/D-12)
+        ///   3. Render-set gate: WorldRenderer.GetRenderPosition (D-46) — off if not a current-space mesh
+        ///   4. Behind-camera guard (camLocal.Z > 0, mirrors UpdateDirectionMarker, Pitfall 6)
+        ///   5. Off-screen bounds check — both suppressed cases fall back to the edge marker
+        ///   6. Clamp radius to [MIN_CIRCLE_RADIUS, MAX_CIRCLE_RADIUS] (D-46 minimum floor)
+        ///
+        /// This method is a read-only consumer — it MUST NOT mutate _targetIndex or any GameObjects element.
+        /// </summary>
+        private void UpdateTargetCircle(UniObject ship, System.Collections.Generic.List<UniObject> gameObjects)
+        {
+            _showTargetCircle = false;
+
+            // Guard 1: require world renderer and camera
+            if (_worldRenderer == null || _camera == null) return;
+
+            // Guard 2: resolve active target via current-tier targetable list (D-45 / D-12)
+            var targets = BuildTargetableList(ship.ParentIndex, _world.ShipIndex, gameObjects);
+            if (targets.Count == 0) return;
+            int clamped = Mathf.Clamp(_targetIndex, 0, targets.Count - 1);
+            int tgtIdx = targets[clamped].Index;
+
+            // Guard 3: render-set gate — is the body a mesh in the current space? (D-46)
+            // Returns false when the target is in a different SOI space → edge marker handles findability.
+            if (!_worldRenderer.GetRenderPosition(tgtIdx, out Vector3 renderPos)) return;
+
+            // Convert render-space position to global (Pitfall 5 / A3 — explicit GlobalPosition is safe
+            // regardless of WorldRenderer's actual world position, unlike assuming Vector3.Zero).
+            Vector3 globalPos = _worldRenderer.GlobalPosition + renderPos;
+
+            // Guard 4: behind-camera check — mirrors UpdateDirectionMarker (Pitfall 6)
+            // Godot uses -Z-forward; cameraLocal.Z > 0 means the point is behind the camera.
+            Vector3 camLocal = _camera.GlobalTransform.AffineInverse() * (globalPos - _camera.GlobalPosition);
+            if (camLocal.Z > 0) return;  // behind camera → edge marker fallback
+
+            // Guard 5: project to screen and check viewport bounds
+            var viewport = GetViewport();
+            if (viewport == null) return;
+            Vector2 vpSize = viewport.GetVisibleRect().Size;
+            Vector2 screenPos = _camera.UnprojectPosition(globalPos);
+            if (screenPos.X < 0 || screenPos.X > vpSize.X || screenPos.Y < 0 || screenPos.Y > vpSize.Y)
+                return;  // off-screen → edge marker fallback
+
+            // All guards passed — compute circle and enable draw
+            // Guard 6: minimum-radius floor for findability (D-46 "never a sub-pixel speck")
+            _targetCirclePos    = screenPos;
+            _targetCircleRadius = Mathf.Clamp(MIN_CIRCLE_RADIUS, MIN_CIRCLE_RADIUS, MAX_CIRCLE_RADIUS);
+            _showTargetCircle   = true;
+        }
+
+        /// <summary>
+        /// Draws the world-pinned target outline (D-46) when _showTargetCircle is set.
+        /// Draws an unfilled arc (outline only — retro aesthetic) using the existing PhosphorGreen color.
+        /// Called by Godot each frame when QueueRedraw() is invoked in _Process.
+        /// </summary>
+        public override void _Draw()
+        {
+            if (!_showTargetCircle) return;
+            // DrawArc(center, radius, startAngle, endAngle, pointCount, color, lineWidth)
+            // Unfilled outline — DrawArc not DrawCircle (retro aesthetic, D-46)
+            DrawArc(_targetCirclePos, _targetCircleRadius, 0f, Mathf.Tau, 32, PhosphorGreen, 1.5f);
         }
 
         // ── Input: cycle target ───────────────────────────────────────────────
