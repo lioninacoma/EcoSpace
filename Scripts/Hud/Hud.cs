@@ -53,6 +53,13 @@ namespace Hud
         private TestSetup _world;
         private Flight.FlightController _flight;
         private Camera3D _camera;
+        private Render.WorldRenderer _worldRenderer;
+
+        // ── Target circle state (D-46) ────────────────────────────────────────
+
+        private bool    _showTargetCircle;
+        private Vector2 _targetCirclePos;
+        private float   _targetCircleRadius;
 
         // ── HUD label nodes ───────────────────────────────────────────────────
 
@@ -126,6 +133,9 @@ namespace Hud
                 _camera = GetNode<Camera3D>(CameraPath);
             else
                 _camera = GetTree().Root.FindChild("Camera3D", true, false) as Camera3D;
+
+            // Resolve world renderer (for target circle render-set gate, D-46)
+            _worldRenderer = GetTree().Root.FindChild("WorldRenderer", true, false) as Render.WorldRenderer;
 
             // Resolve child label nodes
             _speedLabel   = GetNodeOrNull<Label>("SpeedLabel");
