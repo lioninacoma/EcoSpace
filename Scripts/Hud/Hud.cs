@@ -209,6 +209,14 @@ namespace Hud
                 var body = gameObjects[entry.Index];
                 if (body == null) continue;
 
+                // Skip Galaxy bodies as "nearest" candidates (04-02 play-test fix):
+                // the galaxy parent sits at the frame origin alongside the home star,
+                // so both produced near-identical distances and the nearest label
+                // flickered between STAR and HOME GALAXY each frame. A galaxy is a
+                // diffuse sky body, not a flyable body you are "near" — exclude it
+                // (mirrors the FlightController proximity-damp galaxy exclusion).
+                if (body.ObjectType == UniObject.Type.Galaxy) continue;
+
                 double dist = UniMath.Distance(ship, body, gameObjects);
                 if (dist < minDist)
                 {
@@ -452,8 +460,17 @@ namespace Hud
             var parent = gameObjects[parentIdx];
             if (parent == null) return result;
 
-            // Parent body is always targetable (it is visible as the SOI origin).
-            result.Add(new TargetEntry(parentIdx));
+            // Parent body is targetable (it is visible as the SOI origin) — EXCEPT a Galaxy
+            // parent (04-02 play-test fix). When the ship is in Galaxy space the parent is the
+            // home galaxy, a diffuse sky body that: (a) is never rendered as a mesh (D-28),
+            // so GetRenderPosition returns false and the target circle can never draw on it;
+            // and (b) sits at the frame origin alongside the home star, so as the DEFAULT
+            // target (_targetIndex=0) its near-zero distance crushed the target ease-out
+            // (D-43) to MinSpeed. Skipping it makes the home STAR the default target — a real
+            // mesh the circle can pin to and a sensible body to ease onto. Galaxy SIBLINGS
+            // (in Universe space) stay targetable below for edge-marker navigation.
+            if (parent.ObjectType != UniObject.Type.Galaxy)
+                result.Add(new TargetEntry(parentIdx));
 
             // Siblings: other children of parent, excluding the ship itself.
             foreach (int idx in parent.ChildIndices)

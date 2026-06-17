@@ -443,7 +443,17 @@ namespace Flight
 			// The parent is the origin of the ship's coordinate frame, so the ship's
 			// distance from it is just the magnitude of ship.LocalPos (in meters).
 			// Using UniVec3.Distance(ship, parent) would mix coordinate frames.
-			if (parent.RadiusMeters > 0.0)
+			//
+			// EXCEPTION (04-02 play-test fix): a Galaxy parent is a diffuse sky body
+			// whose RadiusMeters equals its full SOIMeters (5e20), NOT a solid surface.
+			// Including it makes the proximity damp treat the entire galaxy SOI as a
+			// body surface, so `nearest` collapses to ~0 at the SOI-exit boundary and
+			// crushes targetMax to MinSpeed (the galaxy-SOI-exit dead zone) — and ties
+			// with the home star at the frame origin (HUD nearest flicker). Galaxies are
+			// never rendered as meshes (D-28/T-03-06); they should not damp speed either.
+			// In-galaxy proximity damp comes from sibling stars below; receding past them
+			// lets `nearest` grow so speed ramps to tierCeiling (the intended D-42 behavior).
+			if (parent.RadiusMeters > 0.0 && parent.ObjectType != UniObject.Type.Galaxy)
 			{
 				double distToParentCentre = ship.LocalPos.Magnitude();
 				double distToParentSurface = System.Math.Max(0.0, distToParentCentre - parent.RadiusMeters);
