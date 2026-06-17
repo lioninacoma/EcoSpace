@@ -42,7 +42,13 @@ metrics:
 
 ## Status
 
-Tasks 1 and 2 complete. Paused at Task 3 (checkpoint:human-verify — in-game play-test). Awaiting human verification before plan is marked complete.
+COMPLETE. Tasks 1 and 2 implemented; Task 3 (checkpoint:human-verify in-game play-test)
+APPROVED after five play-test rounds (SC#1–#5 all pass). The target circle radius now
+matches the body's projected size analytically. One known cosmetic limitation accepted
+for v1: at wide FOV the body projects to an ellipse ("egg shape") near the screen edge
+while the circle stays round — this is correct rectilinear-perspective renderer behavior,
+not a code defect. A future phase (backlog) replaces the 2D circle with a shader-rendered
+target-sphere outline that matches the body's projected distortion.
 
 ## Tasks Completed
 
@@ -252,23 +258,38 @@ No new security-relevant surface beyond the plan's threat model:
 - T-04-05 (stale/missing render position): mitigated by `GetRenderPosition` returning false, leaving `_showTargetCircle = false`
 - T-04-06 (per-frame QueueRedraw cost): accepted (negligible, per plan)
 
-## Awaiting: Task 3 Play-test RE-verification (round 5)
+## Task 3 Play-test — APPROVED (5 rounds)
 
-Task 3 is a `checkpoint:human-verify` gate.
+Task 3 is a `checkpoint:human-verify` gate. APPROVED 2026-06-17.
 - Round 1: SC#1/#3/#4 approved; SC#2 + SC#5 failed → fixes 1–3 (46892bc).
 - Round 2: SC#2 approved; SC#5 still failed → fixes 4–5 (40f3bba).
 - Round 3: circle shows; refinement requested (size to body, grow on approach) → fix 6 (691f7ad).
 - Round 4: radius sizing OK but inflated at screen edge (FOV-dependent) → fix 7 (6f01d99).
-- **Round 5 pending:** re-verify SC#5 — circle hugs the body evenly across the whole view, any FOV.
+- Round 5: **APPROVED.** Circle hugs the body evenly across the view, any FOV. SC#1–#5 pass.
 
-## Self-Check: PASSED (Tasks 1–2 + fixes)
+**Accepted v1 limitation:** at wide FOV the body projects to an ellipse near the screen
+edge (rectilinear-perspective renderer behaviour) while the 2D circle stays round — they
+diverge off-axis. A shader-rendered target-sphere outline that distorts WITH the body is
+deferred to backlog **Phase 999.2**.
 
-- `Scripts/Hud/Hud.cs` — exists with all new symbols + galaxy-skip + body-size fixes confirmed
+**Follow-on backlog captured this session (user request 2026-06-17):**
+- **999.2** — shader-rendered target-sphere outline (matches body distortion).
+- **999.3** — distance-based cross-space target selection + autopilot "warp drive"
+  (free roam capped to km/s; warp = autopilot-only, intergalactic in minutes).
+- **999.4** — warp-drive visual effects.
+
+## Self-Check: PASSED (all tasks + 5 fix rounds, checkpoint approved)
+
+- `Scripts/Hud/Hud.cs` — all new symbols + galaxy-skip + body-size + analytic-radius confirmed
 - `Scripts/Flight/FlightController.cs` — galaxy proximity-damp exclusion confirmed
 - `Scripts/Render/WorldRenderer.cs` — GetRenderRadius accessor confirmed
 - Commit 4a7f9e1 — Task 1 (_worldRenderer + circle-state fields)
 - Commit 2f3e5b4 — Task 2 (UpdateTargetCircle + _Draw + QueueRedraw)
 - Commit 46892bc — Round 1 fixes (galaxy dead zone, default target, flicker)
+- Commit 40f3bba — Round 2 fixes (RenderBridge node name, local-coord offset)
+- Commit 691f7ad — Round 3 refinement (body-size-aware radius)
+- Commit 6f01d99 — Round 4 fix (FOV-correct analytic radius)
+- All commits on main, build 0/0, Task 3 checkpoint APPROVED
 - Commit 40f3bba — Round 2 fixes (RenderBridge node name, local-coord offset)
 - Commit 691f7ad — Round 3 refinement (body-size-aware circle radius)
 - All commits on main branch, build 0/0

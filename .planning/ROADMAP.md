@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: In-System Flight MVP** - Fix pre-flight crash, floating-origin rendering, arcade flight, HUD — player can fly a star system and approach dithered bodies (COMPLETE 2026-06-14)
 - [x] **Phase 2: Dynamic Skybox** - Shader-type sky updated on scale-tier transitions; only the next tier out (other systems' stars, then only galaxies) is projected onto a stable spherical skybox, with a visually continuous skybox↔mesh handoff (completed 2026-06-15)
 - [x] **Phase 3: Cross-Galaxy Travel** - Extend hand-authored data to galaxy/universe scale; full SOI chain validated at intergalactic distances (UAT paused 1/7 — gated on Phase 4 flight model) (completed 2026-06-17)
-- [ ] **Phase 4: Flight Model v2 — tier & target-aware speed** - Per-tier speed ceiling + target-distance ease-out replacing the single global MaxSpeed; cross-SOI target selection + world-pinned target outline (minimal 999.1 slice); fixes in-system over-speed and the galaxy-SOI-exit dead zone within one envelope
+- [x] **Phase 4: Flight Model v2 — tier & target-aware speed** - Per-tier speed ceiling + target-distance ease-out replacing the single global MaxSpeed; world-pinned target outline (minimal 999.1 slice); fixes in-system over-speed and the galaxy-SOI-exit dead zone within one envelope (COMPLETE 2026-06-17)
 
 ## Phase Details
 
@@ -131,6 +131,72 @@ Plans:
 
 - [ ] TBD (promote with /gsd-review-backlog when ready)
 
+### Phase 999.2: Shader-rendered target-sphere outline (BACKLOG)
+
+**Origin:** Phase 04 play-test (2026-06-17). The 04-02 target circle is a flat 2D
+`DrawArc` sized analytically from the body's projected depth. It matches the body's
+size when centred, but a perspective camera projects a sphere to an ELLIPSE off-axis,
+so at wide FOV the body looks egg-shaped near the screen edge while the round circle
+does not match (accepted as a known cosmetic limitation for v1 — correct rectilinear
+renderer behaviour, not a defect).
+
+**Goal:** Replace the 2D circle with a target marker that is a true 3D **sphere
+encapsulating the target body**, rendered by a **shader that draws ONLY the silhouette
+outline** of that sphere. Because the outline is computed in the same projection as the
+body mesh, it distorts identically — hugging the egg-shaped body at the screen edge.
+
+**Notes for planning:**
+  - Likely a per-target sphere mesh (radius = body render radius × padding) with an
+    unlit outline/fresnel shader (rim where view·normal ≈ 0), or a screen-space
+    signed-distance pass. Must stay phosphor-green and read-only of sim state.
+  - Replaces `Hud._Draw`/`UpdateTargetCircle` (04-02) — the 2D path is the fallback /
+    can be retired once the shader path ships.
+  - Keep the minimum-on-screen-size findability guarantee (D-46) for distant specks.
+
+**Requirements:** TBD (supersedes the 2D D-46 circle with a projection-matched outline)
+**Plans:** TBD
+
+### Phase 999.3: Distance-based cross-space target traversal + autopilot ("warp drive") (BACKLOG)
+
+**Origin:** Phase 04 play-test (2026-06-17). Folds/extends the deferred cross-SOI
+half of 999.1 and supersedes the current-tier targeting constraint (D-12 / D-45).
+
+**Goal:** Two coupled capabilities:
+
+  1. **Distance-based, space-independent target selection** — select ANY target within
+     a given distance regardless of which SOI/space it (or the ship) occupies. Refactors
+     `Hud.BuildTargetableList` (currently parent + same-frame siblings only) into a
+     distance-ranked, cross-space candidate set using `UniMath.Distance` (LCA path).
+     Overrides D-12/D-45 (current-tier-only targeting).
+  2. **Autopilot traversal ("warp drive")** — selecting a target starts an automatic
+     route that eases IN and OUT to arrive at the target in a reasonable, bounded time,
+     traversing SOI boundaries automatically (planet ↔ star ↔ galaxy ↔ intergalactic).
+
+**Speed model split (locked intent from user, 2026-06-17):**
+  - **Free roaming** (manual flight) is bounded to **km/s** — slow, precise, hands-on.
+  - The **warp drive is autopilot-only**: the large auto-scaling speeds (up to FTL-equivalent)
+    live ONLY in the autopilot path, not manual thrust. Intergalactic transit completes in
+    **minutes**.
+  - This re-shapes the Phase-04 envelope: the per-tier ceiling (D-40) becomes the AUTOPILOT
+    ceiling; manual `MaxSpeed` is clamped to km/s scale. Planning must reconcile D-42/D-43
+    (manual ease-out) with the new manual km/s cap.
+
+**Requirements:** TBD (supersedes D-12/D-45; reshapes D-40/D-42/D-43/D-47 manual-vs-autopilot split)
+**Plans:** TBD
+
+### Phase 999.4: Warp-drive visual effects (BACKLOG)
+
+**Origin:** Phase 04 play-test (2026-06-17). Pairs with 999.3.
+
+**Goal:** Visual FX for the autopilot "warp drive" traversal — the look/feel of engaging
+warp, sustained intergalactic transit, and arrival. (e.g. starfield streaking / tunnel,
+speed-line dithered post-process consistent with the 8-bit CRT aesthetic, engage/disengage
+transitions). Read-only consumer of the autopilot state from 999.3.
+
+**Depends on:** 999.3 (autopilot/warp drive must exist first).
+**Requirements:** TBD (visual only; no sim-state mutation)
+**Plans:** TBD
+
 ## Progress
 
 **Execution Order:**
@@ -146,4 +212,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 Plans:
 
 - [x] 04-01-PLAN.md — Tier- & target-aware speed envelope + Hud.ActiveTargetIndex (wave 1)
-- [ ] 04-02-PLAN.md — World-pinned target circle + full-phase play-test (wave 2)
+- [x] 04-02-PLAN.md — World-pinned target circle + full-phase play-test (wave 2)

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-stopped_at: Completed 04-01-PLAN.md — tier+target-aware speed envelope delivered
-last_updated: "2026-06-17T18:41:47.840Z"
+stopped_at: Phase 04 COMPLETE — 04-02 target circle approved (5 play-test rounds). Session paused at user request.
+last_updated: "2026-06-17T19:42:55.364Z"
 last_activity: 2026-06-17 -- Phase 04 execution started
 progress:
-  total_phases: 5
+  total_phases: 8
   completed_phases: 4
   total_plans: 12
   completed_plans: 12
-  percent: 80
+  percent: 50
 ---
 
 # Project State
@@ -100,6 +100,7 @@ Recent decisions affecting current work:
 - [Phase ?]: D-42: symmetric proximity damp capped at tierCeiling, not global _maxSpeed — core fix for Phase-03 in-system over-speed and galaxy-SOI-exit dead zone
 - [Phase ?]: D-43/D-44: target ease-out uses UniMath.Distance (LCA path); tier ceiling still caps; Hud.ActiveTargetIndex is read-only (D-45/D-12 preserved)
 - [Phase ?]: D-46: world-pinned phosphor-green outline in Hud._Draw gated on WorldRenderer.GetRenderPosition; DrawArc not DrawCircle (unfilled outline); MIN_CIRCLE_RADIUS=20f floor
+- [Phase ?]: Phase 04 follow-ons captured as backlog (user 2026-06-17): 999.2 shader target-sphere outline (matches body distortion); 999.3 distance-based cross-space targeting + autopilot warp drive (free roam km/s only, warp autopilot-only, intergalactic in minutes); 999.4 warp-drive visual FX
 
 ### Roadmap Evolution
 
@@ -145,8 +146,8 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-17T18:41:07.799Z
-Stopped at: Completed 04-01-PLAN.md — tier+target-aware speed envelope delivered
+Last session: 2026-06-17T19:42:48.720Z
+Stopped at: Phase 04 COMPLETE — 04-02 target circle approved (5 play-test rounds). Session paused at user request.
 Resume file: None
 Prior resume note: Decision locked — (1) revert done; (2) fix target/HUD bugs first via /gsd-debug; (3) then flight speed model v2 as a discussed phase (P1, per-tier ceiling + target ease-out, minimal slice of backlog 999.1); (4) then galaxy-visibility-in-universe-space (P2, blocks intergalactic UAT 5-7). Phase 03 stays open at UAT until the flight model is reworked.
 
