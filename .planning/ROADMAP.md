@@ -107,7 +107,7 @@ Plans:
 
 **Wave 1**
 
-- [ ] 04-01-PLAN.md — Tier- & target-aware speed envelope: per-tier ceiling (parent.SOIMeters x k), symmetric proximity damp capped at tier ceiling, target-distance ease-out; + read-only Hud.ActiveTargetIndex accessor (wave 1)
+- [x] 04-01-PLAN.md — Tier- & target-aware speed envelope: per-tier ceiling (parent.SOIMeters x k), symmetric proximity damp capped at tier ceiling, target-distance ease-out; + read-only Hud.ActiveTargetIndex accessor (wave 1)
 
 **Wave 2** *(blocked on Wave 1 — shares Hud.cs)*
 
@@ -125,7 +125,7 @@ Plans:
 
   Cross-space constraint to resolve in planning: `WorldRenderer` only renders bodies in the ship's current space, so a cross-space target can show direction + distance (edge marker) but the 3D outline can only be drawn once that body enters the rendered set (i.e. once the ship is in its space).
 **Requirements:** TBD (extends HUD-04 + findability; revisits D-12)
-**Plans:** 2/3 plans executed
+**Plans:** 1/2 plans executed
 
 Plans:
 
@@ -141,7 +141,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. In-System Flight MVP | 4/4 (TRV-01 milestone) | ✓ Complete | 2026-06-14 |
 | 2. Dynamic Skybox | 3/3 | Complete   | 2026-06-15 |
 | 3. Cross-Galaxy Travel | 3/3 | UAT paused (1/7) | — |
-| 4. Flight Model v2 — tier & target-aware speed | 0/2 | Planned (2 waves) | — |
+| 4. Flight Model v2 — tier & target-aware speed | 1/2 | In Progress|  |
 
 Plans:
 
