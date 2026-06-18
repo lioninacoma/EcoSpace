@@ -8,8 +8,8 @@ namespace Render
 	/// world-space directions from ship to each NextTierSkybox body using the UniMath
 	/// LCA-relative UniVec3 walk (UniMath.RelativePosition), applies the inverse-square
 	/// luminosity magnitude model (D-17/D-19), carries each body's BaseColor (D-18), and
-	/// pushes star_dirs/star_colors/star_sizes/star_count to the Sky ShaderMaterial each frame.
-	/// Brightness values &gt;1 feed the existing WorldEnvironment glow for free (D-20).
+	/// pushes galaxy_dirs/galaxy_colors/galaxy_sizes/galaxy_types/galaxy_count/galaxy_orientations
+	/// to the Sky ShaderMaterial each frame (D-56: star points are now handled by StarPointRenderer).
 	/// Also maintains a per-body sky-direction cache (_skyDirs) as the sky-side of the
 	/// RND-07/D-21 handoff baseline; see GetSkyDirection.
 	///
@@ -46,8 +46,6 @@ namespace Render
 		private ShaderMaterial _skyMat;
 		private Camera3D       _cam;
 
-		private const int MaxStars = 8;
-
 		/// <summary>Maximum galaxy entries in sky uniform arrays. Matches MAX_GALAXIES in skybox.gdshader.</summary>
 		private const int MaxGalaxies = 4;
 
@@ -55,9 +53,6 @@ namespace Render
 		/// bodies are always far so their true angular size is sub-pixel; this only guards against
 		/// a degenerate near body producing a smoothstep edge of 1−cos(θ) → 1 (which breaks the disc).</summary>
 		private const float MaxDiscAngle = 0.5f;
-		private readonly Vector3[] _dirs   = new Vector3[MaxStars];
-		private readonly Color[]   _colors = new Color[MaxStars];
-		private readonly float[]   _sizes  = new float[MaxStars];
 
 		// ── Galaxy sky uniform arrays (D-40) ──────────────────────────────────────────
 		// Partitioned from NextTierSkybox bodies by ObjectType==Galaxy.
@@ -144,18 +139,20 @@ namespace Render
 			// "minimum" and it is a physical resolution limit, not artificial size enhancement.
 			float pixelAngle = PixelAngularSize();
 
-			int count    = 0;
 			int galCount = 0;
 			for (int i = 0; i < objs.Count; i++)
 			{
-				// Early exit once both arrays are full (T-03-01: loop bounded by MaxStars + MaxGalaxies)
-				if (count >= MaxStars && galCount >= MaxGalaxies) break;
+				// Early exit once galaxy array is full (T-03-01: loop bounded by MaxGalaxies)
+				if (galCount >= MaxGalaxies) break;
 
 				var body = objs[i];
 				if (body == null) continue;
 				if (body.Index == shipIdx) continue;
 
 				if (TierClassifier.Classify(body, ship) != SkyTier.NextTierSkybox) continue;
+
+				// Stars are now drawn by StarPointRenderer (D-56) — skip non-galaxy bodies here.
+				if (body.ObjectType != UniObject.Type.Galaxy) continue;
 
 				// Direction and distance: LCA-relative UniVec3 walk via UniMath.
 				// RelativePosition(ship, body) returns body − ship as a UniVec3 in the LCA
@@ -195,54 +192,25 @@ namespace Render
 				// Galaxies reuse this identical path so point↔disc brightness auto-matches (D-30).
 				float alpha = StarRendering.ApparentBrightness(body.Luminosity, len);
 
-				// ── Partition by ObjectType (D-40) ────────────────────────────────────
-				if (body.ObjectType == UniObject.Type.Galaxy && galCount < MaxGalaxies)
-				{
-					// ── Home-galaxy suppression guard (must-have truth #2, 03-01-SUMMARY.md line 135) ──
-					// While the ship is inside this galaxy's SOI (i.e. the galaxy is an ancestor of
-					// the ship), the galaxy must NOT render as a disc — only the 2 OTHER (non-ancestor)
-					// galaxies appear from inside the home system.
-					// FindLca(ship, body) == body.Index is exactly "body is an ancestor of (or equal to)
-					// the ship" — the ship-self case is excluded by the body.Index==shipIdx continue above.
-					// This call is strictly read-only: FindLca walks ParentIndex chains without mutation.
-					if (UniMath.FindLca(ship, body, objs) == body.Index)
-						continue;
+				// ── Home-galaxy suppression guard (must-have truth #2, 03-01-SUMMARY.md line 135) ──
+				// While the ship is inside this galaxy's SOI (i.e. the galaxy is an ancestor of
+				// the ship), the galaxy must NOT render as a disc — only the 2 OTHER (non-ancestor)
+				// galaxies appear from inside the home system.
+				// FindLca(ship, body) == body.Index is exactly "body is an ancestor of (or equal to)
+				// the ship" — the ship-self case is excluded by the body.Index==shipIdx continue above.
+				// This call is strictly read-only: FindLca walks ParentIndex chains without mutation.
+				if (UniMath.FindLca(ship, body, objs) == body.Index)
+					continue;
 
-					// Galaxy: route to procedural-disc uniform arrays
-					_galDirs[galCount]         = dir3;
-					_galSizes[galCount]        = size;
-					_galColors[galCount]       = new Color(body.BaseColor.R, body.BaseColor.G, body.BaseColor.B, alpha);
-					_galTypes[galCount]        = body.GalaxyType;
-					_galOrientations[galCount] = new Vector4(
-						body.GalaxyOrientation.X, body.GalaxyOrientation.Y, body.GalaxyOrientation.Z,
-						body.GalaxySeed);
-					galCount++;
-				}
-				else if (body.ObjectType == UniObject.Type.Star && count < MaxStars)
-				{
-					// Star: route to existing star-point uniform arrays
-					_dirs[count]   = dir3;
-					_sizes[count]  = size;
-					_colors[count] = new Color(body.BaseColor.R, body.BaseColor.G, body.BaseColor.B, alpha);
-
-					// Cache world-fixed sky direction per body for RND-07/D-21 handoff baseline.
-					// Phase 3 reads this to align a newly spawned mesh with the sky point's
-					// screen position for a pop-free instant swap. Star branch only — galaxy
-					// bodies are sky-only and have no mesh counterpart (D-28).
-					_skyDirs[body.Index] = dir3;
-
-					count++;
-				}
-				// else: non-Star/Galaxy NextTierSkybox body — skip (future-proof guard)
-			}
-
-			// Push star_count first, then arrays (only if count > 0 to avoid sending empty arrays).
-			_skyMat.SetShaderParameter("star_count", count);
-			if (count > 0)
-			{
-				_skyMat.SetShaderParameter("star_dirs",   _dirs);
-				_skyMat.SetShaderParameter("star_colors", _colors);
-				_skyMat.SetShaderParameter("star_sizes",  _sizes);
+				// Galaxy: route to procedural-disc uniform arrays
+				_galDirs[galCount]         = dir3;
+				_galSizes[galCount]        = size;
+				_galColors[galCount]       = new Color(body.BaseColor.R, body.BaseColor.G, body.BaseColor.B, alpha);
+				_galTypes[galCount]        = body.GalaxyType;
+				_galOrientations[galCount] = new Vector4(
+					body.GalaxyOrientation.X, body.GalaxyOrientation.Y, body.GalaxyOrientation.Z,
+					body.GalaxySeed);
+				galCount++;
 			}
 
 			// Push galaxy uniforms (T-03-01: galaxy_count clamped to MaxGalaxies by galCount guard above)
