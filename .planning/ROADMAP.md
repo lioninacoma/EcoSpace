@@ -17,6 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Dynamic Skybox** - Shader-type sky updated on scale-tier transitions; only the next tier out (other systems' stars, then only galaxies) is projected onto a stable spherical skybox, with a visually continuous skybox↔mesh handoff (completed 2026-06-15)
 - [x] **Phase 3: Cross-Galaxy Travel** - Extend hand-authored data to galaxy/universe scale; full SOI chain validated at intergalactic distances (UAT paused 1/7 — gated on Phase 4 flight model) (completed 2026-06-17)
 - [x] **Phase 4: Flight Model v2 — tier & target-aware speed** - Per-tier speed ceiling + target-distance ease-out replacing the single global MaxSpeed; world-pinned target outline (minimal 999.1 slice); fixes in-system over-speed and the galaxy-SOI-exit dead zone within one envelope (COMPLETE 2026-06-17)
+- [ ] **Phase 5: Outer-tier body findability & galaxy visibility** - Make distant tier-member bodies visible/findable at 1:1 scale (galaxy-space star meshes + Universe-space galaxies) with a min on-screen size/brightness floor and continuous tier handoffs; closes the Phase 03 UAT rendering gaps (revisits D-28)
 
 ## Phase Details
 
@@ -146,11 +147,14 @@ outline** of that sphere. Because the outline is computed in the same projection
 body mesh, it distorts identically — hugging the egg-shaped body at the screen edge.
 
 **Notes for planning:**
+
   - Likely a per-target sphere mesh (radius = body render radius × padding) with an
     unlit outline/fresnel shader (rim where view·normal ≈ 0), or a screen-space
     signed-distance pass. Must stay phosphor-green and read-only of sim state.
+
   - Replaces `Hud._Draw`/`UpdateTargetCircle` (04-02) — the 2D path is the fallback /
     can be retired once the shader path ships.
+
   - Keep the minimum-on-screen-size findability guarantee (D-46) for distant specks.
 
 **Requirements:** TBD (supersedes the 2D D-46 circle with a projection-matched outline)
@@ -168,15 +172,18 @@ half of 999.1 and supersedes the current-tier targeting constraint (D-12 / D-45)
      `Hud.BuildTargetableList` (currently parent + same-frame siblings only) into a
      distance-ranked, cross-space candidate set using `UniMath.Distance` (LCA path).
      Overrides D-12/D-45 (current-tier-only targeting).
+
   2. **Autopilot traversal ("warp drive")** — selecting a target starts an automatic
      route that eases IN and OUT to arrive at the target in a reasonable, bounded time,
      traversing SOI boundaries automatically (planet ↔ star ↔ galaxy ↔ intergalactic).
 
 **Speed model split (locked intent from user, 2026-06-17):**
+
   - **Free roaming** (manual flight) is bounded to **km/s** — slow, precise, hands-on.
   - The **warp drive is autopilot-only**: the large auto-scaling speeds (up to FTL-equivalent)
     live ONLY in the autopilot path, not manual thrust. Intergalactic transit completes in
     **minutes**.
+
   - This re-shapes the Phase-04 envelope: the per-tier ceiling (D-40) becomes the AUTOPILOT
     ceiling; manual `MaxSpeed` is clamped to km/s scale. Planning must reconcile D-42/D-43
     (manual ease-out) with the new manual km/s cap.
@@ -200,16 +207,45 @@ transitions). Read-only consumer of the autopilot state from 999.3.
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. In-System Flight MVP | 4/4 (TRV-01 milestone) | ✓ Complete | 2026-06-14 |
 | 2. Dynamic Skybox | 3/3 | Complete   | 2026-06-15 |
-| 3. Cross-Galaxy Travel | 3/3 | UAT paused (1/7) | — |
+| 3. Cross-Galaxy Travel | 3/3 | UAT partial (3/7 pass) — gated on Phase 5 | — |
 | 4. Flight Model v2 — tier & target-aware speed | 2/2 | Complete   | 2026-06-17 |
+| 5. Outer-tier body findability & galaxy visibility | 0/0 | Not planned | — |
 
 Plans:
 
 - [x] 04-01-PLAN.md — Tier- & target-aware speed envelope + Hud.ActiveTargetIndex (wave 1)
 - [x] 04-02-PLAN.md — World-pinned target circle + full-phase play-test (wave 2)
+
+### Phase 5: Outer-tier body findability & galaxy visibility
+
+**Goal:** Make distant tier-member bodies findable and visible at true 1:1 scale, so a player flying out of a star system can actually see (and fly toward) the galaxy's stars in Galaxy space and the other galaxies in Universe space — closing the rendering gaps that left Phase 03 UAT incomplete.
+**Depends on:** Phase 4
+**Origin:** Phase 03 UAT (2026-06-18, status partial). Bundles the tracked tech debt surfaced when the Phase-04 flight model first let the player reach Galaxy/Universe space.
+**Requirements**: refines RND-02/RND-04 (tier-member mesh rendering) + RND-07 (point↔mesh handoff); revisits D-28 (galaxies sky-only).
+
+**Tech debt addressed (fix order):**
+
+1. `galaxy-space-star-meshes-invisible` (P1) — galaxy-space star meshes are sub-pixel + emission-floored to ~0 at 1:1 distances → invisible behind the target circle. Establishes the findability-floor machinery (minimum on-screen size + brightness floor for distant tier bodies). Unblocks UAT Tests 2/4/6.
+2. `galaxy-visibility-in-universe-space` (P2) — galaxies vanish in Universe space (D-28 skips galaxy meshes; skybox carries only the next tier out). Reuses #1's findability machinery one tier up. **Carries a design fork** (mesh vs enhanced-skybox vs hybrid disc→mesh handoff) — settle in discuss-phase. Revisits/records D-28.
+3. `galaxy-disc-tilt-foreshortening` (polish) — galaxy discs render face-on; reinstate `disc_normal` tilt with proper foreshortening (no degenerate collapse). Lowest priority.
+
+**Success Criteria** (what must be TRUE):
+
+  1. In Galaxy space the current galaxy's stars render as clearly visible emissive bodies the player can fly toward — not black space behind a target circle — with a minimum on-screen size/brightness floor that preserves 1:1 proportions on close approach.
+  2. In Universe space the destination galaxies are visible with a clear sense of distance/approach (per the chosen design option), and the target marker circles a visible body.
+  3. Tier-crossing handoffs (Star↔Galaxy, Galaxy↔Universe) stay visually continuous (RND-07) — no pop in position, brightness, or color.
+  4. Phase 03 UAT Tests 2, 4, and 6 re-pass on play-test; D-28 is revisited and the new decision recorded.
+
+**Verification:** in-game Godot play-test (GDShader/visual; not unit-testable). Re-runs the blocked Phase-03 UAT items.
+
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-discuss-phase 5 to settle the D-28 fork, then /gsd-plan-phase 5)

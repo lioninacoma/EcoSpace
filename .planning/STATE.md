@@ -105,6 +105,7 @@ Recent decisions affecting current work:
 ### Roadmap Evolution
 
 - 2026-06-17: Phase 4 added — "Flight Model v2 — tier & target-aware speed" (from P1 tech debt `flight-speed-model-tier-and-target-aware`; absorbs cross-SOI targeting + target-circle from backlog 999.1). Phase 3 left at UAT paused (1/7), gated on Phase 4.
+- 2026-06-18: Phase 5 added — "Outer-tier body findability & galaxy visibility" (from Phase 03 UAT partial). Bundles `galaxy-space-star-meshes-invisible` (P1), `galaxy-visibility-in-universe-space` (P2, design fork), and `galaxy-disc-tilt-foreshortening` (polish), fix order #1→#2→#3. Phase 3 UAT (3/7 pass) now gated on Phase 5.
 
 ### Pending Todos
 
