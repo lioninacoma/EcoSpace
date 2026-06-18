@@ -74,6 +74,7 @@ namespace Render
         // ----- Private state --------------------------------------------------
 
         private TestSetup          _world;
+        private Camera3D           _cam;
         private MultiMeshInstance3D _mmi;
         private MultiMesh           _mm;
         private int                 _starCount;
@@ -164,6 +165,17 @@ namespace Render
             };
             AddChild(_mmi);
 
+            // MANDATORY (godot-starlight technique): a large custom AABB. Because the vertex
+            // shader writes POSITION directly and the instances' real positions are far beyond
+            // the camera far plane, Godot's computed bounds do not match where the quads actually
+            // draw, so the MultiMeshInstance3D gets frustum-culled (nothing renders regardless of
+            // brightness/size). The camera lives at the floating origin, so an origin-centred box
+            // this large always contains the frustum → the instance is never culled.
+            _mmi.CustomAabb = new Aabb(new Vector3(-1e9f, -1e9f, -1e9f), new Vector3(2e9f, 2e9f, 2e9f));
+
+            // Active camera — used only by the one-shot diagnostic below to report on-screen pos.
+            _cam = GetViewport()?.GetCamera3D();
+
             GD.Print($"[StarPointRenderer] Ready — {_starCount} star(s) instanced.");
             return true;
         }
@@ -217,8 +229,17 @@ namespace Render
                 float bright   = Mathf.Clamp(apparent, MinBrightness, LuminosityCap);
 
                 if (!_loggedDiagnostics)
+                {
+                    string scr = "cam=null";
+                    if (_cam != null)
+                    {
+                        bool behind = _cam.IsPositionBehind(rp);
+                        Vector2 sp  = _cam.UnprojectPosition(rp);
+                        scr = $"behind={behind} screen=({sp.X:F0},{sp.Y:F0})";
+                    }
                     GD.Print($"[StarPointRenderer] star objIdx={starObjIdx} dist={relM.Magnitude():E2}m " +
-                             $"apparent={apparent:F3} bright={bright:F3} rp.len={rp.Length():E2}");
+                             $"apparent={apparent:F3} bright={bright:F3} rp.len={rp.Length():E2} {scr}");
+                }
 
                 // Set per-instance data:
                 //   Transform — ship-relative render-space position, identity basis (Pitfall 2).
