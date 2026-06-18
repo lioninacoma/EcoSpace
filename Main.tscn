@@ -8,7 +8,7 @@
 [ext_resource type="Script" uid="uid://6rgvete7r3rp" path="res://Scripts/Flight/FlightController.cs" id="6_flight"]
 [ext_resource type="Script" uid="uid://db0taudntiicx" path="res://Scripts/Render/SkyboxRenderer.cs" id="7_skybox"]
 [ext_resource type="Shader" uid="uid://b2ogcviap8k7w" path="res://Shaders/skybox.gdshader" id="8_skyshdr"]
-[ext_resource type="Script" path="res://Scripts/Render/StarPointRenderer.cs" id="9_starpt"]
+[ext_resource type="Script" uid="uid://ckg1wf5el47sa" path="res://Scripts/Render/StarPointRenderer.cs" id="9_starpt"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("8_skyshdr")
