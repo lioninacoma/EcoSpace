@@ -244,8 +244,10 @@ Plans:
 
 **Verification:** in-game Godot play-test (GDShader/visual; not unit-testable). Re-runs the blocked Phase-03 UAT items.
 
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-discuss-phase 5 to settle the D-28 fork, then /gsd-plan-phase 5)
+- [ ] 05-01-PLAN.md — Always-on MultiMesh PSF star-point renderer + additive quad shader (D-53/D-55/D-56/D-57); galaxy-space star findability + continuous point→mesh blend
+- [ ] 05-02-PLAN.md — Galaxy visibility in Universe space via TierClassifier Galaxy-unconditional sky routing (D-48/D-49) + skybox star-loop retirement (D-56) + safe-basis disc tilt & Star-Nest volumetric look (D-54/D-59)
+- [ ] 05-03-PLAN.md — UniObject-driven HUD target circle decoupled from the mesh render set (D-50/D-51); works for sky-only galaxies + sub-pixel galaxy-space stars
