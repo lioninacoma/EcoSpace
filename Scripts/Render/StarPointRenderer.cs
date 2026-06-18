@@ -70,6 +70,7 @@ namespace Render
         private MultiMesh           _mm;
         private int                 _starCount;
         private int[]               _starIndices;
+        private bool                _initialized;
 
         // ----- Godot callbacks ------------------------------------------------
 
@@ -87,8 +88,25 @@ namespace Render
                 return;
             }
 
-            // Scan GameObjects once to find all Type.Star bodies.
+            // Star scan + MultiMesh allocation are DEFERRED to the first _Process tick (see
+            // TryInitialize). Reason: this node is a CHILD of Main(TestSetup), and Godot runs a
+            // child's _Ready BEFORE the parent's — so TestSetup has not populated GameObjects yet
+            // here (_world.GameObjects is still null). WorldRenderer/SkyboxRenderer avoid the same
+            // trap by only touching GameObjects in _Process; TryInitialize() does the equivalent.
+        }
+
+        /// <summary>
+        /// Lazily builds the star index list and the MultiMesh on the first frame GameObjects is
+        /// populated. Required because GameObjects is null during this node's _Ready (child _Ready
+        /// runs before TestSetup._Ready). Returns true once initialised (including the zero-star
+        /// idle case, so it stops retrying); false while GameObjects is not yet available.
+        /// </summary>
+        private bool TryInitialize()
+        {
             var objs = _world.GameObjects;
+            if (objs == null || objs.Count == 0) return false;  // not built yet — retry next frame
+
+            // Scan GameObjects once to find all Type.Star bodies.
             var starIndicesList = new List<int>();
             for (int i = 0; i < objs.Count; i++)
             {
@@ -98,11 +116,12 @@ namespace Render
             }
             _starIndices = starIndicesList.ToArray();
             _starCount   = _starIndices.Length;
+            _initialized = true;  // mark done even at zero stars so we stop retrying every frame
 
             if (_starCount == 0)
             {
                 GD.Print("[StarPointRenderer] No Type.Star bodies found — renderer will idle.");
-                return;
+                return true;
             }
 
             // Build MultiMesh.
@@ -137,11 +156,14 @@ namespace Render
             AddChild(_mmi);
 
             GD.Print($"[StarPointRenderer] Ready — {_starCount} star(s) instanced.");
+            return true;
         }
 
         public override void _Process(double delta)
         {
-            if (_world == null || _mm == null || _starCount == 0) return;
+            if (_world == null) return;
+            if (!_initialized && !TryInitialize()) return;
+            if (_mm == null || _starCount == 0) return;
 
             var objs     = _world.GameObjects;
             int shipIdx  = _world.ShipIndex;
