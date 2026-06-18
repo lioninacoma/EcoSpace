@@ -45,6 +45,14 @@ namespace Render
         /// </summary>
         [Export] public float EmissionEnergy { get; set; } = 1.0f;
 
+        /// <summary>
+        /// The "always-on brightness floor" (D-56). Every star point emits AT LEAST this much,
+        /// so a star whose physical apparent brightness → 0 at interstellar/galaxy distance is
+        /// still drawn as a visible point (the core findability fix). The sphere mesh still
+        /// carries true brightness on close approach; this floor only affects the point.
+        /// </summary>
+        [Export] public float MinBrightness { get; set; } = 0.35f;
+
         // ----- Per-space render factors (verbatim copy from WorldRenderer — D-56 reuses
         //       the same RND-06 render-scale model, no star-specific factor) ----------------
 
@@ -71,6 +79,7 @@ namespace Render
         private int                 _starCount;
         private int[]               _starIndices;
         private bool                _initialized;
+        private bool                _loggedDiagnostics;
 
         // ----- Godot callbacks ------------------------------------------------
 
@@ -201,10 +210,15 @@ namespace Render
                     (float)(relM.Y * obsFactor),
                     (float)(relM.Z * obsFactor));
 
-                // Apparent brightness from the shared StarRendering model (no drift from mesh).
-                float bright = Mathf.Min(
-                    StarRendering.ApparentBrightness(star.Luminosity, relM.Magnitude()),
-                    LuminosityCap);
+                // Apparent brightness from the shared StarRendering model (no drift from mesh),
+                // floored to MinBrightness so every star stays an always-on visible point even when
+                // its physical apparent brightness → 0 at interstellar/galaxy distance (D-56).
+                float apparent = StarRendering.ApparentBrightness(star.Luminosity, relM.Magnitude());
+                float bright   = Mathf.Clamp(apparent, MinBrightness, LuminosityCap);
+
+                if (!_loggedDiagnostics)
+                    GD.Print($"[StarPointRenderer] star objIdx={starObjIdx} dist={relM.Magnitude():E2}m " +
+                             $"apparent={apparent:F3} bright={bright:F3} rp.len={rp.Length():E2}");
 
                 // Set per-instance data:
                 //   Transform — ship-relative render-space position, identity basis (Pitfall 2).
@@ -217,6 +231,7 @@ namespace Render
                 _mm.SetInstanceCustomData(i,
                     new Color((float)star.Luminosity, 0f, 0f, 0f));
             }
+            _loggedDiagnostics = true;  // one-shot diagnostic dump above — silent after first frame
 
             // Keep shader uniforms in sync with [Export] knobs (editor can change them live).
             if (_mmi.MaterialOverride is ShaderMaterial liveMat)
