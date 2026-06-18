@@ -122,8 +122,12 @@ namespace Render
 		/// Factor is applied to observer-unit positions (after ToLocalDoubleUnits) to
 		/// produce render-space coordinates. Choosing the factor from the ship's space
 		/// ensures all bodies in the same frame use a consistent unit basis.
+		///
+		/// <c>internal</c> (not private) so <see cref="Hud.Hud"/> can read the factor
+		/// for the D-50 UniObject-driven marker render-space conversion without duplicating
+		/// the per-space table. Read-only accessor only — no mutation (line 34 contract).
 		/// </summary>
-		private float RenderFactorFor(UniObject.Space space) => space switch
+		internal float RenderFactorFor(UniObject.Space space) => space switch
 		{
 			UniObject.Space.Planet   => PlanetRenderFactor,
 			UniObject.Space.Star     => StarRenderFactor,
