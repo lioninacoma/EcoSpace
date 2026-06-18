@@ -118,9 +118,11 @@ void fragment() {
     // Combine and cap to prevent over-saturation (luminosity_cap).
     float total = min(core + halo, luminosity_cap);
 
-    // In blend_add + unshaded mode, ALBEDO is not composited; all contribution comes via
-    // EMISSION. Setting ALPHA = 1.0 is conventional (blend_add ignores alpha for blending).
-    ALBEDO = COLOR.rgb;
+    // Additive PSF: ALL contribution MUST come through EMISSION, which carries the Gaussian
+    // falloff. In unshaded mode the final colour is ALBEDO + EMISSION, so a non-zero ALBEDO
+    // floods the ENTIRE quad with COLOR.rgb at full intensity — that is what rendered the stars
+    // as solid white squares. Keep ALBEDO black; EMISSION alone draws the soft point.
+    ALBEDO = vec3(0.0);
     EMISSION = COLOR.rgb * total * emission_energy;
     ALPHA = 1.0;
 }
