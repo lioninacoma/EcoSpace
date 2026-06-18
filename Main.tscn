@@ -171,8 +171,9 @@ offset_bottom = 16.0
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1364607324]
 environment = SubResource("Environment_r0du0")
+far = 100000.0
 
-[node name="RenderBridge" type="Node3D" parent="." unique_id=792530993]
+[node name="WorldRenderer" type="Node3D" parent="." unique_id=792530993]
 script = ExtResource("4_rendbrg")
 WorldPath = NodePath("..")
 

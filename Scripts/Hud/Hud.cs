@@ -135,13 +135,11 @@ namespace Hud
                 _camera = GetTree().Root.FindChild("Camera3D", true, false) as Camera3D;
 
             // Resolve world renderer (for target circle render-set gate, D-46).
-            // The WorldRenderer script lives on the scene node still named "RenderBridge"
-            // (legacy name retained after the RenderBridge.cs → WorldRenderer.cs rename).
             // FindChild matches by NODE NAME, not type — searching "WorldRenderer" returned
             // null and silently disabled the target circle (04-02 play-test SC#5 failure).
             // Try the actual node name first, then fall back to a type-based search so the
             // lookup is resilient to any future node rename.
-            _worldRenderer = GetTree().Root.FindChild("RenderBridge", true, false) as Render.WorldRenderer
+            _worldRenderer = GetTree().Root.FindChild("WorldRenderer", true, false) as Render.WorldRenderer
                            ?? FindNodeByType<Render.WorldRenderer>(GetTree().Root);
 
             // Resolve child label nodes
@@ -549,8 +547,7 @@ namespace Hud
 
         /// <summary>
         /// Recursively searches the scene subtree for the first node of type T.
-        /// Used as a name-independent fallback when a node has been renamed (the
-        /// WorldRenderer script sits on a node still named "RenderBridge"), so the
+        /// Used as a name-independent fallback when a node has been renamed, so the
         /// target-circle render-set gate resolves regardless of the node name.
         /// </summary>
         private static T FindNodeByType<T>(Node root) where T : class
