@@ -26,7 +26,7 @@ namespace Render
         /// This is the "brightness floor" — even the faintest star at max distance is always
         /// visible as at least this large a point (D-56). Tune in-game; default 0.003.
         /// </summary>
-        [Export] public float MinSizeRatio { get; set; } = 0.003f;
+        [Export] public float MinSizeRatio { get; set; } = 0.008f;
 
         /// <summary>
         /// Maximum per-star brightness in [0,1]. Prevents near-star saturation to white and

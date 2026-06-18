@@ -85,13 +85,17 @@ void vertex() {
         // depth_test_disabled means the exact depth is irrelevant — only surviving the clip is.
         POSITION.z = projected.w * 0.5;
 
-        // Billboard scaling in clip space.
-        // VERTEX.xy is in [-0.5, 0.5] (QuadMesh default) — the quad faces the camera already
-        // because we wrote POSITION from the world origin of the instance.
-        // Scale: mix between min_size_ratio (distance floor) and 1.0, weighted by brightness.
-        // Multiply by projected.w to convert from NDC scale to clip-space scale.
+        // Billboard scaling in clip space. VERTEX.xy is in [-0.5, 0.5] (QuadMesh default).
+        // CRITICAL: keep the on-screen footprint SMALL (a few % of the screen at most). The old
+        // mix(min_size_ratio, 1.0, bright) scaled bright stars to ~full-screen quads whose tiny
+        // Gaussian core was only visible when the star sat dead-centre — every off-axis star
+        // looked invisible. A star point must be a small fixed-pixel dot at the star's projected
+        // screen position, visible whenever the star is in the FOV. Brightness drives EMISSION
+        // intensity (fragment shader), NOT the on-screen size; a mild size bump with brightness
+        // keeps brighter stars a touch larger. Multiply by projected.w to undo the perspective
+        // divide so the footprint is constant in screen space regardless of render distance.
         float bright = COLOR.a;  // per-instance brightness from SetInstanceColor alpha
-        float quad_scale = mix(min_size_ratio, 1.0, bright);
+        float quad_scale = min_size_ratio * (1.0 + bright * 4.0);
         POSITION.xy += VERTEX.xy * quad_scale * projected.w;
     }
 }
