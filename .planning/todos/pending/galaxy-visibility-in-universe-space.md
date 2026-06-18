@@ -6,7 +6,8 @@ created: 2026-06-17
 area: render
 origin: phase-03 UAT play-test (intergalactic transit)
 tags: [tech-debt, render, skybox, galaxy, universe-space, design, needs-discussion]
-related: [flight-speed-model-tier-and-target-aware]
+related: [flight-speed-model-tier-and-target-aware, galaxy-space-star-meshes-invisible]
+confirmed: 2026-06-18 (phase-03 UAT Test 5 re-run — "in universe space I cannot see galaxies and they are not circled by the target marker")
 ---
 
 # Galaxies disappear in Universe space (no distance cue to target galaxy)

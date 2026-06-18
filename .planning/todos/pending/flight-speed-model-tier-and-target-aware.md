@@ -1,14 +1,22 @@
 ---
 type: tech-debt
-status: pending
+status: resolved
 priority: P1
 created: 2026-06-17
+resolved: 2026-06-18
+resolved_by: phase-04 (Flight Model v2 — tier & target-aware speed; COMPLETE & VERIFIED)
 area: flight
 origin: phase-03 UAT play-test (260617-j6b checkpoint, rejected)
 tags: [tech-debt, flight, speed-envelope, soi, hud-target, design]
 related: [thrust-zero-at-galaxy-soi-exit, hud-target-nearest-galaxy-space]
 backlog_ref: 999.1
 ---
+
+> RESOLVED 2026-06-18 — this debt was promoted into **Phase 04** and delivered (per-tier
+> speed ceiling + target-distance ease-out + world-pinned target circle). Phase 04 is
+> complete and verified; the thrust-zero-at-galaxy-SOI-exit dead zone is gone (confirmed
+> in phase-03 UAT Test 5 re-run). Kept for history.
+
 
 # Flight speed model: make max speed tier- and target-aware
 
