@@ -180,19 +180,14 @@ void sky()
             else
                 disc_bright = elliptical_galaxy(uv);
 
-            // D-54: Star-Nest-inspired fractal overlay — adds volumetric grain/depth to
-            // the disc, giving a "stars within the galaxy" look. Low iteration count (4)
-            // keeps per-pixel cost minimal. The folding formula abs(p)/dot(p,p) - c is a
-            // well-known mathematical construct (not a verbatim copy; no license concern).
-            // Clamped to [0,1] and blended via detail_blend so it never overwhelms the base.
-            float star_nest_brightness = 0.0;
-            vec3 p = vec3(uv * 0.5, 0.0);
-            for (int j = 0; j < 4; j++) {
-                p = abs(p) / dot(p, p) - 0.53;
-                star_nest_brightness += pow(max(length(p) - 0.5, 0.0), -2.0) * 0.01;
-            }
-            star_nest_brightness = clamp(star_nest_brightness, 0.0, 1.0);
-            disc_bright = mix(disc_bright, disc_bright + star_nest_brightness * 0.4, detail_blend);
+            // D-54: volumetric grain — a bounded value-noise MULTIPLIED into disc_bright so it
+            // only modulates where the disc is already lit and can never fill the sky.
+            // (The previous unbounded fractal fold abs(p)/dot(p,p) - c with a pow(.,-2)
+            // singularity converged to a hemisphere-wide constant and painted the whole
+            // front hemisphere — the "brown plane" artifact. Gating multiplicatively by
+            // disc_bright is what keeps the grain inside the disc.)
+            float grain = fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);
+            disc_bright *= mix(1.0, 0.55 + 0.45 * grain, detail_blend);
 
             // Blend: 30% point (center highlight + star-matching handoff) + 70% disc structure
             galaxy_bright = mix(disc_bright, point_disc, 0.3) * galaxy_colors[i].a;

@@ -62,29 +62,38 @@ void vertex() {
     // Project to clip space.
     vec4 projected = PROJECTION_MATRIX * VIEW_MATRIX * vec4(world_pos, 1.0);
 
-    // Write POSITION directly (bypasses the normal ModelView transform pipeline).
-    POSITION = projected;
-
-    // Far-plane-clip trick (godot-starlight technique, Pitfall 3):
-    // Force POSITION.z to the far plane so the quad is never frustum-culled regardless
-    // of how far the star is in render units (light-year stars sit beyond the 1e6 far plane).
-    // Forward+ (OUTPUT_IS_SRGB true): z = -projected.w places the fragment at the far plane.
-    // Compatibility (OUTPUT_IS_SRGB false): z = 0.0 * projected.w (NDC 0 ≈ near-to-mid plane).
-    // If OUTPUT_IS_SRGB is unavailable in this Godot build, fall back to the Compatibility path.
-    if (OUTPUT_IS_SRGB) {
-        POSITION.z = -1.0 * projected.w;
+    // Behind-camera guard (MANDATORY for a floating-origin starfield):
+    // when the star is behind the camera projected.w <= 0, and the billboard math below
+    // (POSITION.xy += VERTEX.xy * projected.w) mirrors the quad through the origin — a star
+    // behind-left ghosts to front-right ("star in the wrong direction"). Push such quads
+    // fully outside the clip volume so they are culled instead of ghosted. depth_test_disabled
+    // does not cull these on its own, so the clip must be explicit here.
+    if (projected.w <= 0.0) {
+        POSITION = vec4(2.0, 2.0, 2.0, 1.0);  // outside [-w, w] on every axis → clipped
     } else {
-        POSITION.z = 0.0 * projected.w;
-    }
+        // Write POSITION directly (bypasses the normal ModelView transform pipeline).
+        POSITION = projected;
 
-    // Billboard scaling in clip space.
-    // VERTEX.xy is in [-0.5, 0.5] (QuadMesh default) — the quad faces the camera already
-    // because we wrote POSITION from the world origin of the instance.
-    // Scale: mix between min_size_ratio (distance floor) and 1.0, weighted by brightness.
-    // Multiply by projected.w to convert from NDC scale to clip-space scale.
-    float bright = COLOR.a;  // per-instance brightness from SetInstanceColor alpha
-    float quad_scale = mix(min_size_ratio, 1.0, bright);
-    POSITION.xy += VERTEX.xy * quad_scale * projected.w;
+        // Far-plane-clip trick (godot-starlight technique, Pitfall 3):
+        // Force POSITION.z to the far plane so the quad is never frustum-culled regardless
+        // of how far the star is in render units (light-year stars sit beyond the 1e6 far plane).
+        // Forward+ (OUTPUT_IS_SRGB true): z = -projected.w places the fragment at the far plane.
+        // Compatibility (OUTPUT_IS_SRGB false): z = 0.0 * projected.w (NDC 0 ≈ near-to-mid plane).
+        if (OUTPUT_IS_SRGB) {
+            POSITION.z = -1.0 * projected.w;
+        } else {
+            POSITION.z = 0.0 * projected.w;
+        }
+
+        // Billboard scaling in clip space.
+        // VERTEX.xy is in [-0.5, 0.5] (QuadMesh default) — the quad faces the camera already
+        // because we wrote POSITION from the world origin of the instance.
+        // Scale: mix between min_size_ratio (distance floor) and 1.0, weighted by brightness.
+        // Multiply by projected.w to convert from NDC scale to clip-space scale.
+        float bright = COLOR.a;  // per-instance brightness from SetInstanceColor alpha
+        float quad_scale = mix(min_size_ratio, 1.0, bright);
+        POSITION.xy += VERTEX.xy * quad_scale * projected.w;
+    }
 }
 
 // ── Fragment shader ──────────────────────────────────────────────────────────────────────
