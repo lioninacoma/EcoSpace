@@ -1,0 +1,36 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-18T21:16:34.399Z",
+  "phase": "05",
+  "phase_name": "outer-tier-body-findability-galaxy-visibility",
+  "phase_dir": ".planning/phases/05-outer-tier-body-findability-galaxy-visibility",
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "paused",
+  "head_commit": "c98f56c",
+  "completed_tasks": [
+    {"id": 1, "name": "D-59 tilted galaxy discs in skybox.gdshader (galaxy_disc_coords_tilted + bounded D-54 grain overlay)", "status": "done", "commit": "c98f56c", "note": "The ONE kept improvement from this phase. Verified by user: 'galaxies look right now'."},
+    {"id": 2, "name": "Revert StarPointRenderer approach to pre-05 baseline (3d35740), stars drawn by skybox again", "status": "done", "commit": "c98f56c"}
+  ],
+  "remaining_tasks": [
+    {"id": 3, "name": "Re-plan phase 05 from clean baseline with a ROBUST approach to galaxy-space star findability (do NOT reuse manual-clip-space MultiMesh billboards)", "status": "not_started"},
+    {"id": 4, "name": "Solve the original problem: in Galaxy space the home galaxy's own stars are sub-pixel meshes and not on the skybox, so they vanish", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "Original phase goal still unsolved after revert: galaxy-space stars are invisible (sub-pixel meshes + skybox only paints next-tier-OUT bodies). A new, robust rendering approach must be chosen during re-plan.", "type": "technical", "workaround": "Stars render normally in Star space via skybox + WorldRenderer mesh; the gap is specifically Galaxy/Universe space."}
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {"action": "Decide the re-plan approach for galaxy-space star findability (discuss-phase recommended)", "context": "User wants to restart phase 05 from the beginning; the StarPointRenderer approach was abandoned.", "blocking": true}
+  ],
+  "decisions": [
+    {"decision": "Abandon the StarPointRenderer MultiMesh PSF approach (all of 05-01)", "rationale": "The godot-starlight 'manual clip-space POSITION + far-plane-clip' billboard technique had a long chain of engine-specific failures (script-not-attached/missing UID, _Ready-before-parent NRE, back-face cull, NDC-z clip, ALBEDO flood, screen-filling quad scale, frustum-cull AABB). Each was real but the technique was too fragile to be worth it.", "phase": "05"},
+    {"decision": "Keep ONLY the D-59 tilted galaxy discs", "rationale": "User confirmed it as the only visible improvement.", "phase": "05"},
+    {"decision": "Render stars via the skybox again (restored baseline star loop + push)", "rationale": "User directive; robust and already working in Star space.", "phase": "05"},
+    {"decision": "Restart phase 05 planning from this baseline", "rationale": "Existing 05-01/05-02/05-03 PLAN files describe the abandoned approach and are stale.", "phase": "05"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Run /gsd-discuss-phase 5 (recommended) or /gsd-plan-phase 5 to re-plan galaxy-space star findability with a robust approach. First read the BLOCKING anti-pattern in .continue-here.md.",
+  "context_notes": "Phase 05 was executed (3 plans, all parked at human-verify checkpoints). Play-testing exposed that 05-01's StarPointRenderer never rendered reliably. After ~10 incremental fixes, user called it: revert everything except the galaxy tilt. Codebase is now at pre-05 baseline + galaxy tilt (commit c98f56c), build clean, 18/18 TierClassifier tests pass. The galaxy disc tilt shader (galaxy_disc_coords_tilted) and the fixed bounded grain overlay are the only retained changes. Stale PLAN files for 05-01/02/03 remain on disk and should be regenerated on re-plan."
+}
