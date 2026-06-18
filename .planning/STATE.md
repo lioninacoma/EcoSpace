@@ -147,8 +147,8 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 ## Session Continuity
 
 Last session: 2026-06-18 (resumed)
-Stopped at: Session resumed 2026-06-18. Phase 04 COMPLETE & VERIFIED. Committed the dangling 04-02 SC#5 target-circle fix (899ef54: Main.tscn node rename RenderBridge→WorldRenderer + camera far=100000; Hud.cs WorldRenderer lookup). Tree clean. Proceeding to Phase 03 UAT (/gsd-verify-work 03) — items 1 & 3 already pass; item 2/5 were blocked on the now-fixed flight model.
-Resume file: .planning/phases/03-cross-galaxy-travel/.continue-here.md (stale, pre-Phase-04 — superseded by Phase 04)
+Stopped at: 2026-06-18 — Phase 03 UAT formally CLOSED as status:partial (3 pass, 1 issue, 2 blocked). Two visibility gaps captured as tracked tech debt: galaxy-space-star-meshes-invisible (P1, blocks UAT 2/4/6) and galaxy-visibility-in-universe-space (P2, design fork). Phase 04 target-circle fix committed earlier (899ef54). Next: bundle the 2 gaps + galaxy-disc-tilt polish into a fix effort (Phase 05 proposed), order #1→#2→#3; #2 needs a mesh-vs-skybox-vs-hybrid design decision.
+Resume file: None (Phase 03 .continue-here.md is stale/superseded; UAT closed)
 Prior resume note: Decision locked — (1) revert done; (2) fix target/HUD bugs first via /gsd-debug; (3) then flight speed model v2 as a discussed phase (P1, per-tier ceiling + target ease-out, minimal slice of backlog 999.1); (4) then galaxy-visibility-in-universe-space (P2, blocks intergalactic UAT 5-7). Phase 03 stays open at UAT until the flight model is reworked.
 
 ## Refactor Notes

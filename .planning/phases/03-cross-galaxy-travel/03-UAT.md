@@ -1,14 +1,19 @@
 ---
-status: testing
+status: partial
 phase: 03-cross-galaxy-travel
 source: [03-VERIFICATION.md]
 started: 2026-06-16T00:00:00Z
 updated: 2026-06-18T00:00:00Z
+closed: 2026-06-18
+gaps: [galaxy-space-star-meshes-invisible, galaxy-visibility-in-universe-space]
 ---
 
 ## Current Test
 
-[testing complete — 7/7 resolved: 3 pass, 1 issue, 2 blocked-by-rendering-issue, 1 visibility gap on Test 5]
+[session closed 2026-06-18 — status: partial. 7/7 resolved: 3 pass, 1 issue, 2 blocked
+on the galaxy-space star-mesh rendering bug. 2 gaps captured as tracked tech debt
+(galaxy-space-star-meshes-invisible P1, galaxy-visibility-in-universe-space P2).
+Phase 03 stays UAT-incomplete until those fixes land and Tests 2/4/6 re-pass.]
 
 ## Tests
 
