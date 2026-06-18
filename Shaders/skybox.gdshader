@@ -60,28 +60,66 @@ uniform int   galaxy_count = 0;
 //                         2e-4 ≈ 3 screen pixels at 1080p/75° FOV [ASSUMED — see RESEARCH A3].
 //   GALAXY_DISC_SCALE:    normalizes angular-size units to disc-plane UV coordinates.
 //                         80.0 is a starting estimate [ASSUMED — see RESEARCH A4/Pitfall 6].
+//
+// D-59 tilt constant (T-05-03 STRIDE mitigation — TILT_FLOOR > 0 mandatory):
+//   TILT_FLOOR: minimum foreshortening applied even when disc is viewed nearly edge-on.
+//               Prevents the minor-axis scale from approaching zero (ring-collapse landmine
+//               documented in commit fef1d91). Value ~0.15 allows visible tilt without
+//               collapsing to a sky-spanning band. Tune in-game (D-58).
+//
+// D-54 volumetric overlay constant (Claude's Discretion):
+//   detail_blend: strength of the Star-Nest fractal overlay blended into disc_bright.
+//                 0.0 = pure procedural spiral/elliptical; 1.0 = full fractal overlay.
+//                 Default 0.35 adds visible grain/depth without overwhelming the disc shape.
+//                 Tune in-game (D-58).
 
 const float GALAXY_LOD_THRESHOLD = 2e-4;  // switch sub-pixel point → structured disc
 const float GALAXY_DISC_SCALE    = 80.0;  // angular→UV scale; tune for arm/disc appearance
+const float TILT_FLOOR           = 0.15;  // D-59: minimum tilt compression (must be > 0; T-05-03)
+const float detail_blend         = 0.35;  // D-54: Star-Nest overlay blend strength [0..1]
 
 // ── Galaxy helper functions ───────────────────────────────────────────────────
 
-/// Returns a 2D disc-plane UV for EYEDIR relative to a galaxy centered at galaxy_dir.
-/// The tangent basis is built from galaxy_dir (the view direction TO the galaxy), NOT
-/// from the disc normal. Building it from the disc normal collapsed the disc to a 1-D
-/// band whenever the normal ≈ world-up (the authored galaxy case: normal ~ (0,1,0)),
-/// because the degenerate-axis guard then aligned a tangent with galaxy_dir and the
-/// perpendicular offset projected to a line — painting a great-circle ring across the
-/// whole sky. A galaxy_dir-aligned basis is always well-conditioned (the seed up-vector
-/// is swapped when galaxy_dir ≈ world-up). The caller MUST gate on
-/// dot(EYEDIR, galaxy_dir) > 0 so the disc never ghosts onto the antipode.
-vec2 galaxy_disc_coords(vec3 eye_dir, vec3 galaxy_dir) {
+/// Returns a 2D disc-plane UV for EYEDIR relative to a galaxy centered at galaxy_dir,
+/// with D-59 safe-basis tilt foreshortening applied using disc_normal.
+///
+/// Basis is built from galaxy_dir ONLY — NEVER from disc_normal (the fef1d91 ring-collapse
+/// landmine: building from disc_normal degenerates when disc_normal ≈ world-up, collapsing
+/// the cross products and painting a sky-spanning ring). The stable basis is then used to
+/// project disc_normal into the face-on plane, from which the minor axis is derived for
+/// foreshortening. TILT_FLOOR clamps the compression so it never reaches zero (T-05-03).
+///
+/// The caller MUST gate on dot(EYEDIR, galaxy_dir) > 0 (front hemisphere only) so the
+/// perpendicular projection never ghosts the disc onto the antipode (Pitfall 7/fef1d91).
+vec2 galaxy_disc_coords_tilted(vec3 eye_dir, vec3 galaxy_dir, vec3 disc_normal) {
+    // 1. Stable face-on tangent basis from galaxy_dir (never from disc_normal — D-59 rule)
     vec3 up0 = abs(galaxy_dir.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
     vec3 t1  = normalize(cross(up0, galaxy_dir));
     vec3 t2  = cross(galaxy_dir, t1);
     // View-plane offset of the eye ray from the galaxy center (perpendicular to galaxy_dir).
     vec3 delta = eye_dir - dot(eye_dir, galaxy_dir) * galaxy_dir;
-    return vec2(dot(delta, t1), dot(delta, t2));
+    vec2 uv = vec2(dot(delta, t1), dot(delta, t2));
+
+    // 2. D-59 tilt foreshortening via disc_normal's in-plane projection
+    // disc_normal projected onto the face-on (t1, t2) plane gives the minor-axis direction.
+    vec2 disc_normal_uv = vec2(dot(disc_normal, t1), dot(disc_normal, t2));
+    float disc_normal_len = length(disc_normal_uv);
+    if (disc_normal_len > 0.001) {
+        // Minor axis direction in UV space (in-plane component of disc_normal)
+        vec2 minor_axis = disc_normal_uv / disc_normal_len;
+        // tilt_factor = |dot(disc_normal, galaxy_dir)| = cos(angle between disc plane normal
+        // and the view direction to the galaxy). Face-on = 1; edge-on = 0.
+        float tilt_factor = abs(dot(disc_normal, galaxy_dir));
+        // TILT_FLOOR clamp is MANDATORY (T-05-03): prevents scale approaching zero,
+        // which would collapse the minor axis and create the ring-collapse visual artifact.
+        float safe_tilt = clamp(tilt_factor, TILT_FLOOR, 1.0);
+        // Decompose uv into minor (compressed) and major (unchanged) components, then reconstruct
+        float minor_comp = dot(uv, minor_axis);
+        vec2  major_dir  = vec2(-minor_axis.y, minor_axis.x);
+        float major_comp = dot(uv, major_dir);
+        uv = minor_axis * minor_comp * safe_tilt + major_dir * major_comp;
+    }
+    return uv;
 }
 
 /// Returns [0,1] brightness for a procedural 2-arm spiral galaxy at disc-plane UV.
@@ -109,8 +147,8 @@ void sky()
     vec3 col = vec3(0.0);
 
     // ── Galaxy loop (D-40) ───────────────────────────────────────────────────────
-    // Runs alongside the star loop — in-system the sky shows sibling stars AND galaxies.
     // Loop is bounded by galaxy_count ≤ MAX_GALAXIES (T-03-01 DoS mitigation).
+    // Stars are now drawn by StarPointRenderer (D-56); this loop handles galaxies only.
     for (int i = 0; i < galaxy_count; i++) {
         float size = galaxy_sizes[i];
         float d    = dot(EYEDIR, galaxy_dirs[i]);
@@ -125,10 +163,14 @@ void sky()
         } else if (d > 0.0) {
             // Disc mode: structured procedural rendering (D-31), FRONT HEMISPHERE ONLY.
             // The d > 0.0 gate stops the disc from also painting the antipode — the
-            // perpendicular projection in galaxy_disc_coords is symmetric under
-            // EYEDIR → −EYEDIR, which previously ghosted the disc 180° behind the galaxy.
-            float seed = galaxy_orientations[i].w;
-            vec2  uv   = galaxy_disc_coords(EYEDIR, galaxy_dirs[i]);
+            // perpendicular projection in galaxy_disc_coords_tilted is symmetric under
+            // EYEDIR → −EYEDIR, which would ghost the disc 180° behind the galaxy (Pitfall 7).
+            float seed     = galaxy_orientations[i].w;
+            vec3  disc_nrm = galaxy_orientations[i].xyz;  // world-space disc normal (D-59)
+
+            // D-59 safe-basis tilt: UV computed from galaxy_dir basis, minor axis compressed
+            // by disc_normal foreshortening. Basis NEVER built from disc_normal (fef1d91 rule).
+            vec2  uv = galaxy_disc_coords_tilted(EYEDIR, galaxy_dirs[i], disc_nrm);
             // Scale UV: angular-size units → disc-plane [-1..1] approx.
             uv /= max(size * GALAXY_DISC_SCALE, 0.001);
 
@@ -137,6 +179,21 @@ void sky()
                 disc_bright = spiral_galaxy(uv, seed);
             else
                 disc_bright = elliptical_galaxy(uv);
+
+            // D-54: Star-Nest-inspired fractal overlay — adds volumetric grain/depth to
+            // the disc, giving a "stars within the galaxy" look. Low iteration count (4)
+            // keeps per-pixel cost minimal. The folding formula abs(p)/dot(p,p) - c is a
+            // well-known mathematical construct (not a verbatim copy; no license concern).
+            // Clamped to [0,1] and blended via detail_blend so it never overwhelms the base.
+            float star_nest_brightness = 0.0;
+            vec3 p = vec3(uv * 0.5, 0.0);
+            for (int j = 0; j < 4; j++) {
+                p = abs(p) / dot(p, p) - 0.53;
+                star_nest_brightness += pow(max(length(p) - 0.5, 0.0), -2.0) * 0.01;
+            }
+            star_nest_brightness = clamp(star_nest_brightness, 0.0, 1.0);
+            disc_bright = mix(disc_bright, disc_bright + star_nest_brightness * 0.4, detail_blend);
+
             // Blend: 30% point (center highlight + star-matching handoff) + 70% disc structure
             galaxy_bright = mix(disc_bright, point_disc, 0.3) * galaxy_colors[i].a;
         } else {
