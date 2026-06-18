@@ -74,16 +74,13 @@ void vertex() {
         // Write POSITION directly (bypasses the normal ModelView transform pipeline).
         POSITION = projected;
 
-        // Far-plane-clip trick (godot-starlight technique, Pitfall 3):
-        // Force POSITION.z to the far plane so the quad is never frustum-culled regardless
-        // of how far the star is in render units (light-year stars sit beyond the 1e6 far plane).
-        // Forward+ (OUTPUT_IS_SRGB true): z = -projected.w places the fragment at the far plane.
-        // Compatibility (OUTPUT_IS_SRGB false): z = 0.0 * projected.w (NDC 0 ≈ near-to-mid plane).
-        if (OUTPUT_IS_SRGB) {
-            POSITION.z = -1.0 * projected.w;
-        } else {
-            POSITION.z = 0.0 * projected.w;
-        }
+        // Depth-clamp trick (Pitfall 3): a star at light-year render distance has a natural
+        // NDC z far beyond the far plane, so the rasterizer frustum-clips its quad. Override z
+        // to the MIDDLE of the clip volume (NDC z = 0.5) so it always survives clipping,
+        // independent of the depth convention (Vulkan/Forward+ uses [0,1]; setting z = -w gave
+        // NDC z = -1, which is OUTSIDE [0,1] and silently discarded every front-facing star).
+        // depth_test_disabled means the exact depth is irrelevant — only surviving the clip is.
+        POSITION.z = projected.w * 0.5;
 
         // Billboard scaling in clip space.
         // VERTEX.xy is in [-0.5, 0.5] (QuadMesh default) — the quad faces the camera already
