@@ -8,7 +8,6 @@
 // Classification rule (ship.CurrentSpace drives the entire partitioning):
 //   null or same-Index         → Skip             (self or invalid)
 //   Root-space body            → Skip             (Root has no meaningful position)
-//   body.ObjectType == Galaxy  → NextTierSkybox   (D-49: always sky, regardless of tier)
 //   body.CurrentSpace == ship.CurrentSpace
 //                              → CurrentTierMesh  (WorldRenderer owns these)
 //   body.CurrentSpace is any ancestor of ship.CurrentSpace
@@ -57,11 +56,6 @@ public static class TierClassifier
         if (body == null || ship == null)               return SkyTier.Skip;
         if (body.Index == ship.Index)                   return SkyTier.Skip;
         if (body.CurrentSpace == UniObject.Space.Root)  return SkyTier.Skip;
-
-        // D-49: Galaxy-typed bodies are ALWAYS sky entities, regardless of tier match.
-        // Prevents Galaxy-in-Universe-space from returning CurrentTierMesh, which WorldRenderer
-        // skips entirely (D-28/D-38 guard), leaving nothing drawn (Pitfall 5 in RESEARCH.md).
-        if (body.ObjectType == UniObject.Type.Galaxy)   return SkyTier.NextTierSkybox;
 
         // WorldRenderer renders all bodies whose CurrentSpace matches the ship's CurrentSpace
         // (they share the same parent coordinate frame as the ship).

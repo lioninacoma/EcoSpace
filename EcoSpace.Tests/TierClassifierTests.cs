@@ -184,51 +184,6 @@ public class TierClassifierTests
         Assert.Equal(SkyTier.NextTierSkybox, TierClassifier.Classify(sirius, ship));
     }
 
-    // ── Galaxy-unconditional sky cases (D-49) ─────────────────────────────────
-    // Critical regression guard: Galaxy-typed bodies must return NextTierSkybox in EVERY
-    // ship tier, including Universe space where body.CurrentSpace == ship.CurrentSpace.
-    // Previously this case returned CurrentTierMesh (WorldRenderer then skipped it — D-28
-    // guard), so galaxies vanished in Universe space (Pitfall 5 in RESEARCH.md).
-
-    [Fact]
-    public void GalaxyInUniverseSpace_ShipInUniverse_ReturnsNextTierSkybox()
-    {
-        // THE critical regression case (D-48/D-49): both ship and galaxy share Universe space.
-        // Before the D-49 fix this returned CurrentTierMesh → WorldRenderer skipped it → invisible.
-        var ship = MakeObj(0, UniObject.Space.Universe);
-        var galaxy = new UniObject { Index = 1, CurrentSpace = UniObject.Space.Universe, ParentIndex = -1, ObjectType = UniObject.Type.Galaxy };
-        Assert.Equal(SkyTier.NextTierSkybox, TierClassifier.Classify(galaxy, ship));
-    }
-
-    [Fact]
-    public void GalaxyInUniverseSpace_ShipInGalaxy_ReturnsNextTierSkybox()
-    {
-        // Ship in Galaxy space, galaxy body in Universe space (one tier out) → NextTierSkybox.
-        // The D-49 guard fires before the ancestor walk; behavior matches the ancestor-walk result
-        // anyway, but the guard is the reason for the correct classification.
-        var ship = MakeObj(0, UniObject.Space.Galaxy);
-        var galaxy = new UniObject { Index = 1, CurrentSpace = UniObject.Space.Universe, ParentIndex = -1, ObjectType = UniObject.Type.Galaxy };
-        Assert.Equal(SkyTier.NextTierSkybox, TierClassifier.Classify(galaxy, ship));
-    }
-
-    [Fact]
-    public void GalaxyInUniverseSpace_ShipInStar_ReturnsNextTierSkybox()
-    {
-        // Ship in Star space, galaxy body in Universe space (two tiers out) → NextTierSkybox.
-        var ship = MakeObj(0, UniObject.Space.Star);
-        var galaxy = new UniObject { Index = 1, CurrentSpace = UniObject.Space.Universe, ParentIndex = -1, ObjectType = UniObject.Type.Galaxy };
-        Assert.Equal(SkyTier.NextTierSkybox, TierClassifier.Classify(galaxy, ship));
-    }
-
-    [Fact]
-    public void GalaxyInRootSpace_ReturnsSkip()
-    {
-        // Root check must still fire BEFORE the Galaxy guard — Root galaxies are invalid.
-        var ship = MakeObj(0, UniObject.Space.Star);
-        var galaxy = new UniObject { Index = 1, CurrentSpace = UniObject.Space.Root, ParentIndex = -1, ObjectType = UniObject.Type.Galaxy };
-        Assert.Equal(SkyTier.Skip, TierClassifier.Classify(galaxy, ship));
-    }
-
     // ── Star brightness model (Render.StarRendering.ApparentBrightness) ────────
     // These exercise the SHIPPED brightness function used by BOTH SkyboxRenderer and
     // WorldRenderer — an inverse-square flux (L/d²) through a magnitude (log10) curve

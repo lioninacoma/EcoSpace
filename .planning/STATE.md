@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 04
-current_phase_name: flight-model-v2-tier-and-target-aware-speed
-status: verifying
+current_phase: 05
+current_phase_name: outer-tier-body-findability-galaxy-visibility
+status: executing
 stopped_at: Phase 5 context gathered
-last_updated: "2026-06-18T19:16:20.310Z"
-last_activity: 2026-06-17
-last_activity_desc: Phase 04 execution started
+last_updated: "2026-06-18T19:47:20.497Z"
+last_activity: 2026-06-18
+last_activity_desc: Phase 05 execution started
 progress:
   total_phases: 9
   completed_phases: 4
-  total_plans: 12
+  total_plans: 15
   completed_plans: 12
   percent: 44
 ---
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-12)
 
 **Core value:** The player can fly seamlessly through a massive 1:1-scale universe — from a planet's surroundings out to interstellar and intergalactic distances — with rendering and flight that stay correct and feel good across every scale.
-**Current focus:** Phase 04 — flight-model-v2-tier-and-target-aware-speed
+**Current focus:** Phase 05 — outer-tier-body-findability-galaxy-visibility
 
 ## Current Position
 
-Phase: 04 (flight-model-v2-tier-and-target-aware-speed) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-06-17 -- Phase 04 execution started
+Phase: 05 (outer-tier-body-findability-galaxy-visibility) — EXECUTING
+Plan: 1 of 3
+Status: Executing Phase 05
+Last activity: 2026-06-18 — Phase 05 execution started
 
 Plans:
 

@@ -357,19 +357,13 @@ namespace Hud
         /// <summary>
         /// Computes per-frame circle state (_showTargetCircle, _targetCirclePos, _targetCircleRadius).
         /// Sets _showTargetCircle = false at the top; only sets it true after ALL guards pass:
-        ///   1. _worldRenderer + _camera null-guard (renderer still needed for GlobalPosition
-        ///      anchor and RenderFactorFor; camera for projection)
+        ///   1. _worldRenderer + _camera null-guard
         ///   2. Resolve active target via BuildTargetableList (current-tier reach, D-45/D-12)
-        ///   3. D-50: UniObject-driven position — UniMath.RelativeMetres(ship, targetObj) in
-        ///      the LCA frame (MANDATORY LCA path per CLAUDE.md Position Math; never raw
-        ///      absolute ToDouble3). Converted to render-space via RenderFactorFor + Scale.
-        ///      The old mesh-set gate (D-46, removed in D-50) hid the circle for sky-only
-        ///      galaxies and distance-culled stars (Pitfall 6 / D-58 watch item).
-        ///   4. Behind-camera guard (camLocal.Z > 0, mirrors UpdateDirectionMarker)
+        ///   3. Render-set gate: WorldRenderer.GetRenderPosition (D-46) — off if not a current-space mesh
+        ///   4. Behind-camera guard (camLocal.Z > 0, mirrors UpdateDirectionMarker, Pitfall 6)
         ///   5. Off-screen bounds check — both suppressed cases fall back to the edge marker
-        ///   6. D-50: size via StarRendering.AngularRadius(targetObj.RadiusMeters, dist),
-        ///      projected to pixels, clamped to [MIN_CIRCLE_RADIUS, MAX_CIRCLE_RADIUS]
-        ///      (D-46 min floor catches sub-pixel cases; galaxy ~18px at intergalactic dist)
+        ///   6. Size the circle to the body's projected on-screen radius (grows on approach),
+        ///      clamped to [MIN_CIRCLE_RADIUS, MAX_CIRCLE_RADIUS] (D-46 min floor / max cap)
         ///
         /// This method is a read-only consumer — it MUST NOT mutate _targetIndex or any GameObjects element.
         /// </summary>
@@ -377,7 +371,7 @@ namespace Hud
         {
             _showTargetCircle = false;
 
-            // Guard 1: require world renderer (for GlobalPosition anchor + RenderFactorFor) and camera
+            // Guard 1: require world renderer and camera
             if (_worldRenderer == null || _camera == null) return;
 
             // Guard 2: resolve active target via current-tier targetable list (D-45 / D-12)
@@ -386,35 +380,15 @@ namespace Hud
             int clamped = Mathf.Clamp(_targetIndex, 0, targets.Count - 1);
             int tgtIdx = targets[clamped].Index;
 
-            // D-50: resolve the target UniObject directly from GameObjects.
-            // The old mesh-set gate has been removed so the circle works uniformly for
-            // sky-only galaxies and sub-pixel stars, not only close mesh bodies (D-58).
-            // Bounds idiom: (uint) cast makes out-of-range indices look large, catching both
-            // negative and over-Count cases in one comparison (same pattern as GameWorld).
-            var targetObj = (uint)tgtIdx < (uint)gameObjects.Count ? gameObjects[tgtIdx] : null;
-            if (targetObj == null) return;
-
-            // D-50: ship→body vector in metres via UniMath LCA path (MANDATORY per CLAUDE.md
-            // Position Math — NEVER raw absolute ToDouble3; subtract in the same-scale LCA frame
-            // for exact integer Units cancellation regardless of distance magnitude).
-            Double3 relMetres = UniMath.RelativeMetres(ship, targetObj, gameObjects);
-            double dist = relMetres.Magnitude();
-
-            // Convert to render-space: observer units (÷ ship.LocalPos.Scale) then × factor.
-            // Same formula as StarPointRenderer and ComputeStarRenderPosFromHierarchy — shared
-            // render-space model for all renderers (RND-06).
-            float factor = _worldRenderer.RenderFactorFor(ship.CurrentSpace);
-            double obsFactor = factor / ship.LocalPos.Scale;
-            Vector3 renderPos = new Vector3(
-                (float)(relMetres.X * obsFactor),
-                (float)(relMetres.Y * obsFactor),
-                (float)(relMetres.Z * obsFactor));
+            // Guard 3: render-set gate — is the body a mesh in the current space? (D-46)
+            // Returns false when the target is in a different SOI space → edge marker handles findability.
+            if (!_worldRenderer.GetRenderPosition(tgtIdx, out Vector3 renderPos)) return;
 
             // Convert render-space position to global (Pitfall 5 / A3 — explicit GlobalPosition is safe
             // regardless of WorldRenderer's actual world position, unlike assuming Vector3.Zero).
             Vector3 globalPos = _worldRenderer.GlobalPosition + renderPos;
 
-            // Guard 4: behind-camera check — mirrors UpdateDirectionMarker
+            // Guard 4: behind-camera check — mirrors UpdateDirectionMarker (Pitfall 6)
             // Godot uses -Z-forward; cameraLocal.Z > 0 means the point is behind the camera.
             Vector3 camLocal = _camera.GlobalTransform.AffineInverse() * (globalPos - _camera.GlobalPosition);
             if (camLocal.Z > 0) return;  // behind camera → edge marker fallback
@@ -427,32 +401,37 @@ namespace Hud
             if (screenPos.X < 0 || screenPos.X > vpSize.X || screenPos.Y < 0 || screenPos.Y > vpSize.Y)
                 return;  // off-screen → edge marker fallback
 
-            // All guards passed — D-50: size via StarRendering.AngularRadius so the circle
-            // hugs the body's true angular size at any distance (the same size rule used by
-            // SkyboxRenderer for sky-point sizing — identical formula so the circle matches
-            // the visible body regardless of whether it is rendered as mesh or sky point).
-            // D-46 min floor: Clamp ensures a sub-pixel-small body still shows a tight reticle
-            // (a galaxy at ~2.4e22 m gives ~18px at 1080p — visible; a sub-pixel star floors to
-            // MIN_CIRCLE_RADIUS). Max cap prevents the circle from swallowing the screen close-up.
+            // All guards passed — compute the on-screen radius ANALYTICALLY so the circle
+            // matches the body's projected silhouette at any screen position.
+            //
+            // The previous approach projected a single perpendicular-offset point and measured
+            // its pixel gap from the centre. Near the frustum EDGE the perspective projection
+            // stretches non-linearly, so that gap over-grew while the GPU-rasterized mesh did
+            // not — the circle ballooned at the edge and the error scaled with FOV (play-test).
+            //
+            // The correct, position-independent formula uses the body's DEPTH along the camera
+            // forward axis. For a perspective camera the half-view-plane height at depth d is
+            // d·tan(fovY/2); a world radius r therefore subtends (r/d)/tan(fovY/2) of the
+            // half-height, i.e. pixelRadius = (viewportHeight/2) · (r/d) / tan(fovY/2).
+            // This depends only on depth, never on where the body sits on screen, so the circle
+            // tracks the mesh evenly across the whole view regardless of FOV.
             float bodyPixelRadius = MIN_CIRCLE_RADIUS;
-            double angularRadius = Render.StarRendering.AngularRadius(targetObj.RadiusMeters, dist);
-            if (angularRadius > 0.0 && camLocal.Z < -1e-4f)
+            if (_worldRenderer.GetRenderRadius(tgtIdx, out float renderRadius) && renderRadius > 0f)
             {
                 // Depth along the camera forward axis (Godot: forward = -Z, so depth = -camLocal.Z).
-                // Pixel projection: the half-view-plane height at depth d is d·tan(fovY/2); an
-                // angular radius α therefore maps to refExtent·tan(α)/tan(fovY/2) pixels ≈
-                // refExtent·α/tan(fovY/2) for small α (AngularRadius returns radians = R/d).
                 float depth = -(float)camLocal.Z;
-                float fovRad = Mathf.DegToRad(_camera.Fov);
-                float tanHalfFov = Mathf.Tan(fovRad * 0.5f);
-                float refExtent = _camera.KeepAspect == Camera3D.KeepAspectEnum.Height
-                    ? vpSize.Y * 0.5f
-                    : vpSize.X * 0.5f;
-                // AngularRadius = R / dist (radians). In render space depth ≈ dist * obsFactor,
-                // so (float)angularRadius / tanHalfFov * refExtent gives pixels independent of
-                // the render-scale conversion (depth and R/d are in the same ratio). Use the
-                // render-space depth actually available to stay consistent with the projection.
-                bodyPixelRadius = refExtent * (float)angularRadius / tanHalfFov * CIRCLE_BODY_PADDING;
+                if (depth > 1e-4f)
+                {
+                    // Godot's Camera3D.Fov is the VERTICAL FOV in KeepHeight (the project default);
+                    // it is the horizontal FOV in KeepWidth. Use the axis that matches Fov, then the
+                    // circle is round because pixels are square.
+                    float fovRad = Mathf.DegToRad(_camera.Fov);
+                    float tanHalfFov = Mathf.Tan(fovRad * 0.5f);
+                    float refExtent = _camera.KeepAspect == Camera3D.KeepAspectEnum.Height
+                        ? vpSize.Y * 0.5f
+                        : vpSize.X * 0.5f;
+                    bodyPixelRadius = refExtent * (renderRadius / depth) / tanHalfFov * CIRCLE_BODY_PADDING;
+                }
             }
 
             _targetCirclePos    = screenPos;
@@ -530,14 +509,13 @@ namespace Hud
 
             // Parent body is targetable (it is visible as the SOI origin) — EXCEPT a Galaxy
             // parent (04-02 play-test fix). When the ship is in Galaxy space the parent is the
-            // home galaxy, a diffuse sky body that: (a) is never rendered as a mesh (D-28)
-            // — the D-50 UniObject-driven circle can still draw on sky-only galaxies via the
-            // UniMath LCA position path, but the home galaxy sits at the frame origin so its
-            // near-zero distance makes it a poor default target; and (b) its near-zero distance
-            // crushed the target ease-out (D-43) to MinSpeed. Skipping it makes the home STAR
-            // the default target — a real visible body the circle can hug and a sensible target
-            // to ease onto. Galaxy SIBLINGS (in Universe space) stay targetable below for
-            // edge-marker navigation and the D-50 UniObject-driven circle.
+            // home galaxy, a diffuse sky body that: (a) is never rendered as a mesh (D-28),
+            // so GetRenderPosition returns false and the target circle can never draw on it;
+            // and (b) sits at the frame origin alongside the home star, so as the DEFAULT
+            // target (_targetIndex=0) its near-zero distance crushed the target ease-out
+            // (D-43) to MinSpeed. Skipping it makes the home STAR the default target — a real
+            // mesh the circle can pin to and a sensible body to ease onto. Galaxy SIBLINGS
+            // (in Universe space) stay targetable below for edge-marker navigation.
             if (parent.ObjectType != UniObject.Type.Galaxy)
                 result.Add(new TargetEntry(parentIdx));
 
