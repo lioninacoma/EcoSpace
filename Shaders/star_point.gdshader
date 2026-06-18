@@ -12,6 +12,9 @@
 //   unshaded        — no Godot lighting; emission is the whole contribution (EMISSION channel)
 //   depth_test_disabled — disables depth-buffer test so the far-plane-clip trick can place
 //                     the quad at the far plane (Pitfall 3 / Research.md lines 224-245)
+//   cull_disabled   — a billboard quad written directly in clip space can land with either
+//                     winding (and the sign of projected.w flips it); without this, default
+//                     back-face culling silently discards the front-facing star quads.
 //
 // Far-plane-clip trick (Pitfall 3):
 //   In vertex() we write POSITION (clip-space) directly. Setting POSITION.z ≈ ±projected.w
@@ -30,7 +33,7 @@
 // the star sphere mesh). Set EmissionEnergy > 1 in the StarPointRenderer to scale brightness.
 
 shader_type spatial;
-render_mode blend_add, unshaded, depth_test_disabled;
+render_mode blend_add, unshaded, depth_test_disabled, cull_disabled;
 
 // ── Tuning knobs (set from StarPointRenderer [Export] values via ShaderMaterial) ────────
 
