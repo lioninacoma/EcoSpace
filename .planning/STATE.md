@@ -2,16 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
+current_phase: 04
+current_phase_name: flight-model-v2-tier-and-target-aware-speed
 status: verifying
-stopped_at: "PAUSED 2026-06-17 — Phase 04 COMPLETE & VERIFIED (6/6 must-haves). Clean tree on main, no pending checkpoint. Next: close Phase 3 UAT items, then promote backlog 999.2/999.3/999.4."
-last_updated: "2026-06-17T19:49:13.331Z"
-last_activity: 2026-06-17 -- Phase 04 execution started
+stopped_at: Phase 5 context gathered
+last_updated: "2026-06-18T19:16:20.310Z"
+last_activity: 2026-06-17
+last_activity_desc: Phase 04 execution started
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 4
   total_plans: 12
   completed_plans: 12
-  percent: 50
+  percent: 44
 ---
 
 # Project State
@@ -147,9 +150,9 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-18 (resumed)
-Stopped at: 2026-06-18 — Phase 03 UAT formally CLOSED as status:partial (3 pass, 1 issue, 2 blocked). Two visibility gaps captured as tracked tech debt: galaxy-space-star-meshes-invisible (P1, blocks UAT 2/4/6) and galaxy-visibility-in-universe-space (P2, design fork). Phase 04 target-circle fix committed earlier (899ef54). Next: bundle the 2 gaps + galaxy-disc-tilt polish into a fix effort (Phase 05 proposed), order #1→#2→#3; #2 needs a mesh-vs-skybox-vs-hybrid design decision.
-Resume file: None (Phase 03 .continue-here.md is stale/superseded; UAT closed)
+Last session: 2026-06-18T19:16:20.294Z
+Stopped at: Phase 5 context gathered
+Resume file: .planning/phases/05-outer-tier-body-findability-galaxy-visibility/05-CONTEXT.md
 Prior resume note: Decision locked — (1) revert done; (2) fix target/HUD bugs first via /gsd-debug; (3) then flight speed model v2 as a discussed phase (P1, per-tier ceiling + target ease-out, minimal slice of backlog 999.1); (4) then galaxy-visibility-in-universe-space (P2, blocks intergalactic UAT 5-7). Phase 03 stays open at UAT until the flight model is reworked.
 
 ## Refactor Notes
