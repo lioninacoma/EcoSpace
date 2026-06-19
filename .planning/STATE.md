@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 05
 current_phase_name: Rendering Overhaul
 status: executing
-stopped_at: Phase 5 paused mid-execution — 05-01 done; 05-02 play-test reversed the architecture (sky shader for distant bodies + post-process for glow/halo); replanning 2-4
-last_updated: "2026-06-19T12:51:29.586Z"
+stopped_at: Phase 5 context REVISED (architecture reversed to sky-shader + post-process-glow); replan plans 2-4
+last_updated: "2026-06-19T14:39:57.816Z"
 last_activity: 2026-06-19
-last_activity_desc: Phase 05 paused for replan — 05-02 play-test reversed architecture to sky-shader + post-process-glow split
+last_activity_desc: 05-02 play-test rejected; user chose to replan plans 2–4
 progress:
   total_phases: 9
   completed_phases: 4
@@ -43,18 +43,23 @@ behind opaque meshes — distant stars/galaxies paint in front of planets. A
 which is the correct tool for distant bodies.
 
 **New target architecture (to drive the replan of 2–4):**
+
 - **Sky shader** (keep/refeed the existing `skybox.gdshader` — do NOT delete it; reverses D-09)
   renders DISTANT stars + galaxies, fed by the Plan-1 `LuminousBodyDescriptor` pipeline
   (single source of truth — 05-01 survives intact and stays the feed).
+
 - **Post-process shader** (`luminous_pass.gdshader`) narrows to GLOW / HALO around near
   stars only (a screen-space effect — its correct use).
+
 - Plan 1 (descriptor pipeline) is unchanged and reused. Plans 3 (was "remove skybox") and
   4 must be reworked: skybox stays, galaxy disc stays in the sky shader.
 
 **Partial 05-02 work already committed (reusable, NOT reverted):**
+
 - 8d28b90 `luminous_pass.gdshader` (will narrow to glow/halo)
 - f6287c3 `LuminousPassRenderer.cs` + Main.tscn wiring (will repurpose)
 - 22e4bc8 EYEDIR→world_view_dir fix (spatial-shader-safe view ray)
+
 05-02 has NO SUMMARY and is NOT marked complete — it is being redesigned.
 
 Next: `/gsd-discuss-phase 5` to record the revised decisions (supersede D-08/D-09),
@@ -192,9 +197,9 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-19T12:51:29.578Z
-Stopped at: Phase 05 Plan 01 complete — 05-01 descriptor foundation (D-02) built, tested (47/47), play-test APPROVED (D-08 Plan 1). Next: 05-02 LuminousPassRenderer (Wave 2).
-Resume file: .planning/phases/05-rendering-overhaul/05-01-SUMMARY.md
+Last session: 2026-06-19T14:39:57.808Z
+Stopped at: Phase 5 context REVISED (architecture reversed to sky-shader + post-process-glow); replan plans 2-4
+Resume file: .planning/phases/05-rendering-overhaul/05-CONTEXT.md
 Prior resume note: 05-01 delivered: LuminousBodyDescriptor + LuminousLod + LuminousDescriptorBuilder
 wired at process_priority=-10 in Main.tscn. SkyboxRenderer untouched (D-08 Plan 1). Zero visual change,
 47/47 tests green. Plan 2 of 4 ready: 05-02 adds LuminousPassRenderer (depth-aware luminous_pass.gdshader
