@@ -29,9 +29,15 @@ namespace Render
     ///   <see cref="PsfSpikeLongScale"/>  — elongation factor for diffraction spikes (long axis).
     ///   <see cref="PsfSpikeShortScale"/> — width factor for diffraction spikes (short axis).
     ///   <see cref="PsfIntensity"/>       — overall PSF brightness multiplier.
-    ///   <see cref="PsfLodFloor"/>        — minimum LOD weight to receive any PSF.
-    ///   <see cref="PsfDepthEpsilon"/>    — depth tolerance at the star mesh surface (0–1).
-    ///   <see cref="RenderFactor"/>       — metres-to-render-units scale (matches WorldRenderer).
+    ///   <see cref="PsfLodFloor"/>        — LOD weight at which PSF begins to appear.
+    ///   <see cref="PsfLodRange"/>        — width of the LOD ramp (wider = gentler fade-in).
+    ///   <see cref="PsfDepthEpsilon"/>    — additive depth tolerance at the star mesh surface.
+    ///
+    /// Removed in Iteration 2 (depth-texture gate):
+    ///   star_lin_depths[] array — was hand-computed as distMeters * RenderFactor; replaced by
+    ///   a depth texture sample at the star's projected UV so both sides of the depth comparison
+    ///   come from the same source and occlusion works correctly at all camera ranges.
+    ///   RenderFactor export — no longer needed; star depth is now read from the depth texture.
     /// </summary>
     public partial class LuminousPassRenderer : Node3D
     {
@@ -71,29 +77,34 @@ namespace Render
         [Export] public float PsfIntensity       { get; set; } = 1.0f;
 
         /// <summary>
-        /// Minimum LOD weight (0–1) below which PSF contribution fades to zero.
-        /// Prevents far-field sky-shader points from accumulating PSF.
-        /// [ASSUMED D-04 play-test calibration knob]
+        /// Minimum LOD weight (0–1) at which PSF begins to appear (start of fade ramp).
+        /// The first faint hint of lens flare appears at this lod_weight; it grows over
+        /// the range defined by <see cref="PsfLodRange"/>.
+        /// [D-04 play-test calibration knob]
         /// </summary>
         [Export] public float PsfLodFloor        { get; set; } = 0.02f;
 
         /// <summary>
-        /// Depth tolerance multiplier (0–1) for the per-pixel depth gate at the star surface.
-        /// PSF is allowed where scene lin_depth >= star_lin_depth * PsfDepthEpsilon.
-        /// Values close to 1.0 are strict (only at or beyond the star); smaller values
-        /// add tolerance for z-fighting at the star mesh surface.
-        /// [ASSUMED D-04 play-test calibration knob]
+        /// Width of the LOD ramp over which PSF grows from zero to full intensity.
+        /// smoothstep(PsfLodFloor, PsfLodFloor + PsfLodRange, lod).
+        /// Larger value = gentler, more gradual fade-in over a longer portion of the approach.
+        /// Default 0.6 spreads the ramp across most of the near-approach range, eliminating
+        /// the abrupt "pop" seen with the previous hardcoded 0.2-wide window.
+        /// [D-04 play-test calibration knob — Iteration 2]
         /// </summary>
-        [Export] public float PsfDepthEpsilon    { get; set; } = 0.8f;
+        [Export] public float PsfLodRange        { get; set; } = 0.6f;
 
         /// <summary>
-        /// Metres-to-render-units scale factor, matching WorldRenderer's per-space render factor.
-        /// Used to convert <see cref="LuminousBodyDescriptor.DistanceMeters"/> into view-space
-        /// linear depth pushed as <c>star_lin_depths[]</c> to the shader depth gate.
-        /// Must match the PlanetRenderFactor/StarRenderFactor set on WorldRenderer (default 1e-8).
-        /// [ASSUMED D-04 play-test calibration knob — matches WorldRenderer.StarRenderFactor]
+        /// Additive depth tolerance in linearized view-space units for the per-pixel depth gate.
+        /// PSF is allowed where pixel_lin_depth &gt;= star_lin_depth - PsfDepthEpsilon.
+        /// A small positive value (e.g. 0.05) avoids z-fight shimmer at the star mesh surface
+        /// without leaking PSF through foreground geometry.
+        ///
+        /// Iteration 2: was a multiplicative factor on the hand-computed star depth; now an
+        /// additive offset on the depth-texture-sampled star depth — consistent at all ranges.
+        /// [D-04 play-test calibration knob — Iteration 2]
         /// </summary>
-        [Export] public float RenderFactor       { get; set; } = 1e-8f;
+        [Export] public float PsfDepthEpsilon    { get; set; } = 0.05f;
 
         // ----- Constants (T-05-01 mitigation: fixed-size caps matching the shader) ------
 
@@ -107,7 +118,6 @@ namespace Render
         private readonly Color[]   _starColors     = new Color[MaxStars];
         private readonly float[]   _starSizes      = new float[MaxStars];
         private readonly float[]   _starLodWeights = new float[MaxStars];
-        private readonly float[]   _starLinDepths  = new float[MaxStars];
 
         // ----- Private state --------------------------------------------------
 
@@ -164,13 +174,12 @@ namespace Render
 
                 if (d.BodyType == UniObject.Type.Star && starCount < MaxStars)
                 {
-                    _starDirs[starCount]      = d.Direction;
-                    _starColors[starCount]    = d.BaseColor;          // A channel = Brightness
-                    _starSizes[starCount]     = d.AngularSize;
-                    _starLodWeights[starCount] = d.LodWeight;         // drives PSF intensity
-                    // Convert metric distance to view-space render units for the depth gate.
-                    // Matches WorldRenderer per-space render factor (default 1e-8 for Star space).
-                    _starLinDepths[starCount] = (float)(d.DistanceMeters * RenderFactor);
+                    _starDirs[starCount]       = d.Direction;
+                    _starColors[starCount]     = d.BaseColor;          // A channel = Brightness
+                    _starSizes[starCount]      = d.AngularSize;
+                    _starLodWeights[starCount] = d.LodWeight;          // drives PSF intensity
+                    // star_lin_depths[] removed in Iteration 2: depth gate now samples the
+                    // depth texture at the star's projected UV (consistent units at all ranges).
                     starCount++;
                 }
             }
@@ -185,7 +194,7 @@ namespace Render
                 _mat?.SetShaderParameter("star_colors",      _starColors);
                 _mat?.SetShaderParameter("star_sizes",       _starSizes);
                 _mat?.SetShaderParameter("star_lod_weights", _starLodWeights);
-                _mat?.SetShaderParameter("star_lin_depths",  _starLinDepths);
+                // star_lin_depths push removed in Iteration 2 — depth gate reads from texture.
             }
 
             // Push PSF tuning knobs each frame so they update live in the editor.
@@ -194,6 +203,7 @@ namespace Render
             _mat?.SetShaderParameter("psf_spike_short_scale", PsfSpikeShortScale);
             _mat?.SetShaderParameter("psf_intensity",         PsfIntensity);
             _mat?.SetShaderParameter("psf_lod_floor",         PsfLodFloor);
+            _mat?.SetShaderParameter("psf_lod_range",         PsfLodRange);
             _mat?.SetShaderParameter("psf_depth_epsilon",     PsfDepthEpsilon);
         }
     }
