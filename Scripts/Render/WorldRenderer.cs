@@ -54,8 +54,12 @@ namespace Render
 		/// <summary>
 		/// Render units per observer-unit for Star-space frames (applied after ToLocalDoubleUnits).
 		/// Star scale = 1 m/unit → 1 observer-unit = 1 m. Factor=1e-8 → 1 render unit = 1e8 m.
+		///
+		/// Public so <see cref="LuminousPassRenderer"/> can compute analytical star view-depth
+		/// (distMeters × StarRenderFactor) without duplicating the constant.
+		/// Single source of truth — do NOT hardcode 1e-8 in any other file.
 		/// </summary>
-		private float StarRenderFactor { get; set; } = 1e-8f;
+		public const float StarRenderFactor = 1e-8f;
 
 		/// <summary>
 		/// Render units per observer-unit for Galaxy-space frames.

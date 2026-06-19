@@ -95,16 +95,17 @@ namespace Render
         [Export] public float PsfLodRange        { get; set; } = 0.6f;
 
         /// <summary>
-        /// Additive depth tolerance in linearized view-space units for the per-pixel depth gate.
-        /// PSF is allowed where pixel_lin_depth &gt;= star_lin_depth - PsfDepthEpsilon.
-        /// A small positive value (e.g. 0.05) avoids z-fight shimmer at the star mesh surface
-        /// without leaking PSF through foreground geometry.
+        /// Additive depth tolerance in view-space render units for the per-pixel analytic depth gate.
+        /// PSF is allowed where pixel_view_z &gt;= star_view_z - PsfDepthEpsilon.
+        /// A small positive value avoids z-fight shimmer at the star mesh surface without
+        /// leaking PSF through foreground geometry (planets, etc.).
         ///
-        /// Iteration 2: was a multiplicative factor on the hand-computed star depth; now an
-        /// additive offset on the depth-texture-sampled star depth — consistent at all ranges.
-        /// [D-04 play-test calibration knob — Iteration 2]
+        /// Iteration 3 (analytic depth): units are view-space render units (metres × StarRenderFactor).
+        /// The star at 1 AU is ~1.496e3 render units away; a tolerance of 10–50 render units is
+        /// typically adequate to avoid shimmer. Default 50.0 = 50 render units ≈ 5e9 m slack.
+        /// [D-04 play-test calibration knob — Iteration 3]
         /// </summary>
-        [Export] public float PsfDepthEpsilon    { get; set; } = 0.05f;
+        [Export] public float PsfDepthEpsilon    { get; set; } = 50.0f;
 
         // ----- Constants (T-05-01 mitigation: fixed-size caps matching the shader) ------
 
@@ -118,6 +119,13 @@ namespace Render
         private readonly Color[]   _starColors     = new Color[MaxStars];
         private readonly float[]   _starSizes      = new float[MaxStars];
         private readonly float[]   _starLodWeights = new float[MaxStars];
+
+        /// <summary>
+        /// Per-star render-space distance from camera: distMeters × WorldRenderer.StarRenderFactor.
+        /// Used by the shader for analytic star view-depth occlusion (Iteration 3 fix).
+        /// WorldRenderer.StarRenderFactor is the single source of truth (public const).
+        /// </summary>
+        private readonly float[] _starViewDists = new float[MaxStars];
 
         // ----- Private state --------------------------------------------------
 
@@ -178,8 +186,14 @@ namespace Render
                     _starColors[starCount]     = d.BaseColor;          // A channel = Brightness
                     _starSizes[starCount]      = d.AngularSize;
                     _starLodWeights[starCount] = d.LodWeight;          // drives PSF intensity
-                    // star_lin_depths[] removed in Iteration 2: depth gate now samples the
-                    // depth texture at the star's projected UV (consistent units at all ranges).
+
+                    // Iteration 3: analytic star view-depth — render-space distance from camera.
+                    // distMeters × StarRenderFactor gives the star's distance in render units,
+                    // matching the units produced by the shader's scene depth reconstruction.
+                    // WorldRenderer.StarRenderFactor is the single source of truth (public const,
+                    // do NOT hardcode 1e-8 here directly).
+                    _starViewDists[starCount]  = (float)(d.DistanceMeters * WorldRenderer.StarRenderFactor);
+
                     starCount++;
                 }
             }
@@ -194,7 +208,8 @@ namespace Render
                 _mat?.SetShaderParameter("star_colors",      _starColors);
                 _mat?.SetShaderParameter("star_sizes",       _starSizes);
                 _mat?.SetShaderParameter("star_lod_weights", _starLodWeights);
-                // star_lin_depths push removed in Iteration 2 — depth gate reads from texture.
+                // Iteration 3: push analytic render-space distances for per-pixel depth gate.
+                _mat?.SetShaderParameter("star_view_dists",  _starViewDists);
             }
 
             // Push PSF tuning knobs each frame so they update live in the editor.

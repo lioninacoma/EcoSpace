@@ -9,34 +9,40 @@
 //   This is the ONLY valid way to read hint_depth_texture in Forward+ (Pitfall 1 — canvas_item
 //   shaders cannot bind the depth buffer, Godot bug #74464).
 //
-// DEPTH OCCLUSION (D-03 / Pitfall 5 / Play-test feedback — Iteration 2):
+// DEPTH OCCLUSION (D-03 / Pitfall 5 / Play-test feedback — Iteration 3):
 //   Godot 4.3+ Forward+ uses reversed-Z: far plane = 0.0, near plane = 1.0.
 //   raw_depth ≈ 0 → empty sky pixel.  raw_depth > ε → foreground geometry present.
 //
-//   Per-pixel depth gate (REVISED — Iteration 2):
-//   Instead of hand-computing star depth as distMeters * RenderFactor (which uses mismatched
-//   units and only happened to work when very close to a planet), the star's scene depth is
-//   now read directly from the depth texture sampled at the star's projected screen UV
-//   (star_uv). Both sides of the depth comparison now come from the same source (depth_texture
-//   linearized the same way), so occlusion is correct at ALL camera distances.
+//   Per-pixel analytic depth gate (Iteration 3 — replaces single-point depth sample):
 //
-//   Algorithm per PSF-contributing star:
-//     1. Project star_dirs[i] to star_uv (already done for screen-space PSF centering).
-//     2. Skip the star's PSF entirely if star_uv is outside [0,1] (off-screen / behind camera).
-//     3. Sample depth_texture at star_uv → star_raw_depth.  Linearize to star_lin_depth.
-//        This is the true depth of whatever geometry is at the star's center pixel:
-//          - Star's own mesh when near → star_lin_depth ≈ actual star surface depth.
-//          - A nearer planet occluding the star → star_lin_depth is that planet's depth
-//            → the whole PSF is suppressed because the star is hidden.  (Correct!)
-//          - Empty sky → star_raw_depth ≈ 0 (sky pixel) → treated as infinite depth → PSF allowed.
-//     4. Per-pixel depth gate: allow PSF if the current pixel is AT or BEYOND the star depth:
-//          depth_ok = sky_pixel || (lin_depth >= star_lin_depth - psf_depth_epsilon)
-//        psf_depth_epsilon is a small ADDITIVE tolerance in linearized view-space units so a
-//        thin tolerance avoids z-fight shimmer at the star-mesh surface.
+//   Iteration 2 BUG: The star's depth was obtained by sampling depth_texture at the star's
+//   projected screen UV (star_uv). This makes occlusion a disc centred on the star's screen
+//   projection. When the camera turns, the projection slides toward the planet edge and the
+//   "occluding disc" follows it — the flare leaks through the rest of the planet's silhouette.
+//   ("circle shaped sub depth that moves with the camera" — play-test feedback, Iteration 3.)
 //
-//   PERF GUARD: the star-center depth sample (step 3) is only executed for stars whose
-//   psf_lod > 0.001 (the early-continue threshold).  Far stars (lod≈0) early-continue
-//   before any extra depth texture read.
+//   Iteration 3 FIX — analytic star view-depth:
+//   The star's depth is NOT read from the depth texture. Instead it is computed analytically:
+//     star_render_pos  = star_dirs[i] * star_view_dists[i]
+//       (direction × render-space distance — both in the same render-unit frame)
+//     star_view_z      = -(VIEW_MATRIX * vec4(star_render_pos, 1.0)).z
+//       (view-space depth of the star's centre, positive = distance from camera)
+//   The per-pixel scene depth (pixel_view_z) is still reconstructed from the depth texture
+//   at SCREEN_UV via INV_PROJECTION_MATRIX (unchanged from previous iterations).
+//   Both star_view_z and pixel_view_z are in the same view-space render units.
+//
+//   Per-pixel gate:
+//     depth_ok = sky_pixel || (pixel_view_z >= star_view_z - psf_depth_epsilon)
+//   sky_pixel (raw depth ≈ 0) is a pass-through: sky is always beyond the star.
+//   Foreground geometry (planet silhouette at ANY screen position) has pixel_view_z < star_view_z
+//   and suppresses the PSF over the planet's FULL silhouette, regardless of camera angle.
+//
+//   PERF GUARD: star_view_z is only computed for stars whose psf_lod > 0.001
+//   (the early-continue threshold). Far stars (lod≈0) pay zero extra math.
+//
+//   star_view_dists[] is pushed per-frame by LuminousPassRenderer as:
+//     distMeters × WorldRenderer.StarRenderFactor (the single source of truth — 1e-8).
+//   This keeps the render factor in one place and avoids any unit mismatch.
 //
 // WORLD VIEW RAY RECONSTRUCTION (Open Question 1 — RESOLVED):
 //   EYEDIR is NOT available in shader_type spatial fragments — it is a built-in exclusive to
@@ -112,6 +118,12 @@ uniform float star_sizes[MAX_STARS];
 /// PSF intensity scales WITH lod_weight (strongest when near — lens flare is a near-star effect).
 uniform float star_lod_weights[MAX_STARS];
 
+/// Render-space distance from camera to star centre: distMeters × WorldRenderer.StarRenderFactor.
+/// Used for analytic star view-depth: star_render_pos = star_dirs[i] * star_view_dists[i].
+/// Units match the scene depth reconstruction (view-space render units).
+/// Pushed by LuminousPassRenderer; StarRenderFactor=1e-8 is the single source of truth.
+uniform float star_view_dists[MAX_STARS];
+
 /// Number of valid entries in the star arrays above.
 uniform int   star_count = 0;
 
@@ -146,14 +158,14 @@ uniform float psf_lod_floor         = 0.02;
 /// [D-04 play-test knob — Iteration 2 — default 0.6]
 uniform float psf_lod_range         = 0.6;
 
-/// Additive depth tolerance in linearized view-space units for the per-pixel depth gate.
-/// PSF is allowed at pixels where pixel_lin_depth >= star_lin_depth - psf_depth_epsilon.
-/// A small positive value (e.g. 0.05) avoids z-fight shimmer at the star mesh surface
-/// without over-permitting PSF through foreground geometry.
-/// (Iteration 2: was a multiplicative factor on a hand-computed star depth; now an additive
-///  offset on the texture-sampled star depth, so units match at all camera ranges.)
-/// [D-04 play-test knob — Iteration 2 — default 0.05]
-uniform float psf_depth_epsilon     = 0.05;
+/// Additive depth tolerance in view-space render units for the per-pixel analytic depth gate.
+/// PSF is allowed at pixels where pixel_view_z >= star_view_z - psf_depth_epsilon.
+/// Avoids z-fight shimmer at the star mesh surface (the star's own mesh is at ~star_view_z)
+/// without over-permitting PSF through foreground geometry (planets, etc.).
+/// Units: render units = metres × StarRenderFactor (1e-8). Star at 1 AU ≈ 1.496e3 render units.
+/// A tolerance of 10–100 render units is typical (≈ 1e9–1e10 m slack at the star surface).
+/// [D-04 play-test knob — Iteration 3 — default 50.0]
+uniform float psf_depth_epsilon     = 50.0;
 
 // ── Vertex stage ───────────────────────────────────────────────────────────────
 
@@ -250,37 +262,34 @@ void fragment() {
         // off-screen stars where depth-sampling would read invalid border data.
         if (any(lessThan(star_uv, vec2(0.0))) || any(greaterThan(star_uv, vec2(1.0)))) continue;
 
-        // ── Per-pixel depth gate (Iteration 2: from depth texture, not hand-computed) ──
-        // Sample the depth texture AT THE STAR'S CENTER UV to get the true depth of
-        // whatever geometry is rendered at the star's projected position.
-        //   - Star's own mesh near: star_raw_depth ≈ star mesh surface depth.
-        //   - Nearer planet occluding the star: star_raw_depth = planet surface depth
-        //     (small depth value, close to camera) → PSF suppressed for the whole frame.
-        //   - Empty sky at star center: star_raw_depth ≈ 0 (sky threshold) → treated as
-        //     infinite → PSF allowed (star is beyond all geometry).
-        // This gives a consistent comparison: both lin_depth (current pixel) and
-        // star_lin_depth are linearized from the same depth texture in the same units.
-        float star_raw_depth = texture(depth_texture, star_uv).x;
-        bool  star_is_sky    = (star_raw_depth < 1e-6);
+        // ── Per-pixel analytic depth gate (Iteration 3: replaces single-point sample) ──
+        // Compute the star's view-space depth ANALYTICALLY from its render-space position.
+        // This makes the planet's FULL SILHOUETTE occlude the flare at any camera angle —
+        // instead of the buggy Iteration 2 approach where a "circle" tied to the star's
+        // projected UV moved with the camera and leaked through the planet's edge.
+        //
+        // star_render_pos = star_dirs[i] * star_view_dists[i]
+        //   star_dirs[i]       — world/render-space unit direction from camera to star
+        //   star_view_dists[i] — distMeters × StarRenderFactor (render units)
+        //   → this is the star's position in world/render space relative to the camera.
+        //
+        // star_view_z = -(VIEW_MATRIX * vec4(star_render_pos, 1.0)).z
+        //   VIEW_MATRIX maps world→view; w=1 treats the input as a position.
+        //   Negative .z because view space is right-handed (+z toward camera = negative depth).
+        //   Positive star_view_z = distance from camera in render units (same sign as lin_depth).
+        //
+        // pixel_view_z = lin_depth (already computed above from INV_PROJECTION_MATRIX path).
+        // Both are in view-space render units — unit match is guaranteed.
+        //
+        // Gate: allow PSF where pixel_view_z >= star_view_z - psf_depth_epsilon.
+        //   pixel_view_z << star_view_z  → foreground geometry (planet) → suppress PSF.
+        //   pixel_view_z ~  star_view_z  → at the star mesh surface → allow PSF (with epsilon).
+        //   sky_pixel (raw_depth ≈ 0)   → always allowed (sky is beyond the star).
+        vec3  star_render_pos = star_dirs[i] * star_view_dists[i];
+        float star_view_z     = -(VIEW_MATRIX * vec4(star_render_pos, 1.0)).z;
+        float pixel_view_z    = lin_depth;  // already computed above via INV_PROJECTION_MATRIX
 
-        float star_lin_depth;
-        if (star_is_sky) {
-            // Sky at star center → treat star as infinitely far.
-            // PSF is allowed everywhere (nothing occludes an infinitely-far star).
-            star_lin_depth = 1e30;
-        } else {
-            // Linearize star center depth using the same INV_PROJECTION_MATRIX path
-            // as the per-pixel lin_depth computed above — consistent units guaranteed.
-            vec3  star_ndc3    = vec3(star_uv * 2.0 - 1.0, star_raw_depth);
-            vec4  star_view    = INV_PROJECTION_MATRIX * vec4(star_ndc3, 1.0);
-            star_lin_depth     = -star_view.z / star_view.w;
-        }
-
-        // PSF is allowed at this pixel if the current pixel is AT or BEYOND the star depth.
-        // Foreground occluders (planets) have a smaller lin_depth (closer to camera) and
-        // suppress the PSF.  psf_depth_epsilon is a small additive tolerance to avoid
-        // z-fight shimmer at the star mesh surface itself.
-        bool  depth_ok = sky_pixel || (lin_depth >= star_lin_depth - psf_depth_epsilon);
+        bool  depth_ok = sky_pixel || (pixel_view_z >= star_view_z - psf_depth_epsilon);
 
         if (!depth_ok) continue;
 
