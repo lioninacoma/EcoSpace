@@ -149,7 +149,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 + play-test)*
 
-- [ ] 05-02-PLAN.md — Sky-shader refeed + near-star findability: re-enable SkyboxRenderer (reset process_mode), drive skybox.gdshader from LuminousDescriptorBuilder.Descriptors[] (skybox KEPT, D-07 reversed); MinVisibleBrightness floor for distant stars (closes P1); NearStarEmissionFloor fix for the missing sun (D-12); galaxy_disc_weights uniform groundwork (D-13) (wave 2)
+- [x] 05-02-PLAN.md — Sky-shader refeed + near-star findability: re-enable SkyboxRenderer (reset process_mode), drive skybox.gdshader from LuminousDescriptorBuilder.Descriptors[] (skybox KEPT, D-07 reversed); MinVisibleBrightness floor for distant stars (closes P1); NearStarEmissionFloor fix for the missing sun (D-12); galaxy_disc_weights uniform groundwork (D-13) (wave 2) — COMPLETE 2026-06-19 (play-test APPROVED)
 
 **Wave 3** *(blocked on Wave 2 + play-test)*
 
@@ -260,7 +260,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Dynamic Skybox | 3/3 | Complete   | 2026-06-15 |
 | 3. Cross-Galaxy Travel | 3/3 | UAT partial (3/7 pass) — gated on the render debts (post-overhaul) | — |
 | 4. Flight Model v2 — tier & target-aware speed | 2/2 | Complete   | 2026-06-17 |
-| 5. Rendering Overhaul | 1/4 | Executing — Wave 2 next (05-02) | — |
+| 5. Rendering Overhaul | 2/4 | Executing — Wave 3 next (05-03) | — |
 
 Plans:
 

@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 05
-current_phase_name: Rendering Overhaul
+current_phase_name: rendering-overhaul
 status: executing
-stopped_at: Phase 5 context REVISED (architecture reversed to sky-shader + post-process-glow); replan plans 2-4
-last_updated: "2026-06-19T14:39:57.816Z"
+stopped_at: Phase 05 Plan 02 complete (2 of 4 plans done); Plan 3 (05-03) ready — galaxy_disc_weights crossfade + LuminousPassRenderer glow/halo narrowing
+last_updated: "2026-06-19T18:30:00.000Z"
 last_activity: 2026-06-19
-last_activity_desc: 05-02 play-test rejected; user chose to replan plans 2–4
+last_activity_desc: Phase 05 Plan 02 complete — descriptor-fed skybox + NearStarEmissionFloor fix; play-test approved
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 16
-  completed_plans: 13
-  percent: 44
+  completed_plans: 14
+  percent: 47
 ---
 
 # Project State
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-12)
 
 **Core value:** The player can fly seamlessly through a massive 1:1-scale universe — from a planet's surroundings out to interstellar and intergalactic distances — with rendering and flight that stay correct and feel good across every scale.
-**Current focus:** Phase 05 — Rendering Overhaul
+**Current focus:** Phase 05 — rendering-overhaul
 
 ## Current Position
 
-Phase: 05 (Rendering Overhaul) — EXECUTION PAUSED FOR REPLAN (2026-06-19)
-Plan: 1 of 4 complete; 2–4 to be REPLANNED around a revised architecture
-Status: 05-02 play-test surfaced an architecture reversal — see below.
-Last activity: 2026-06-19 — 05-02 play-test rejected; user chose to replan plans 2–4
+Phase: 05 (rendering-overhaul) — EXECUTING
+Plan: 3 of 4 (2 complete, Plan 3 ready)
+Status: Executing Phase 05
+Last activity: 2026-06-19 — Phase 05 Plan 02 complete; play-test approved
 
 ### ARCHITECTURE REVERSAL (decided 2026-06-19, user-driven at 05-02 play-test)
 
@@ -144,6 +144,11 @@ Recent decisions affecting current work:
 - 05-01: D-08 Plan 1 respected — SkyboxRenderer untouched, builder data-only (no drawable output), zero visual change; play-test gate APPROVED 2026-06-19
 - 05-01: Home-galaxy suppression guard (FindLca==body.Index) ported verbatim from SkyboxRenderer — consistent with user-locked decision 2026-06-16
 - 05-01: process_priority=-10 for LuminousDescriptorBuilder — deterministic ordering ensures Descriptors[] fresh before SkyboxRenderer/WorldRenderer _Process
+- 05-02: D-07 REVERSED confirmed in code — SkyboxRenderer is KEPT as the distant-body drawer; LuminousPassRenderer narrowed to glow/halo only (Plan 3)
+- 05-02: D-09/P1 floor: MinVisibleBrightness=0.05f display-only sky alpha floor; APPROVED play-test 2026-06-19; StarRendering.ApparentBrightness unchanged
+- 05-02: D-12 fix: NearStarEmissionFloor=0.8f on star mesh emissive multiplier via Mathf.Max — APPROVED play-test 2026-06-19; StarRendering.ApparentBrightness unchanged
+- 05-02: D-13 groundwork: galaxy_disc_weights uniform wired in skybox.gdshader + Main.tscn default; crossfade logic (LuminousLod.GalaxyDiscWeight per-frame values) deferred to Plan 3
+- 05-02: SkyboxRenderer.SyncSkyPoints refeed — no UniMath.RelativePosition, no TierClassifier.Classify, no GameObjects iteration; descriptor is the single feed (Pitfall 5 resolved)
 
 ### Roadmap Evolution
 
@@ -197,14 +202,14 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-19T14:39:57.808Z
-Stopped at: Phase 5 context REVISED (architecture reversed to sky-shader + post-process-glow); replan plans 2-4
-Resume file: .planning/phases/05-rendering-overhaul/05-CONTEXT.md
-Prior resume note: 05-01 delivered: LuminousBodyDescriptor + LuminousLod + LuminousDescriptorBuilder
-wired at process_priority=-10 in Main.tscn. SkyboxRenderer untouched (D-08 Plan 1). Zero visual change,
-47/47 tests green. Plan 2 of 4 ready: 05-02 adds LuminousPassRenderer (depth-aware luminous_pass.gdshader
-spatial quad — the first drawable output on the descriptor foundation). StarMeshWeight/GalaxyDiscWeight
-thresholds are [ASSUMED] knobs to calibrate in 05-02 play-test.
+Last session: 2026-06-19T18:30:00.000Z
+Stopped at: Phase 05 Plan 02 complete (2 of 4 plans done); Plan 3 (05-03) ready — galaxy_disc_weights crossfade + LuminousPassRenderer glow/halo narrowing
+Resume file: .planning/phases/05-rendering-overhaul/05-03-PLAN.md
+Prior resume note: 05-02 delivered: descriptor-fed SkyboxRenderer (process_mode reset, no double classify loop),
+MinVisibleBrightness=0.05f distant-star floor (P1 closed), galaxy_disc_weights uniform groundwork (D-13),
+NearStarEmissionFloor=0.8f missing-sun fix (D-12). Play-test approved 2026-06-19. Commits: a8cc821 (feat), 821c484 (fix).
+Plan 3 of 4 ready: 05-03 drives LuminousLod.GalaxyDiscWeight per-frame values into the galaxy_disc_weights shader push
+and narrows LuminousPassRenderer to glow/halo only. MinVisibleBrightness + NearStarEmissionFloor calibration confirmed.
 
 ## Refactor Notes
 
