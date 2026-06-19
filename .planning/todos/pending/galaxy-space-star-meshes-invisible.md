@@ -42,6 +42,15 @@ This is the long-standing "findability of tiny specks at 1:1 scale" issue noted 
 01-render decisions (deferred to "HUD marker + Phase 3 tiered renderer") — it finally
 bites now that the flight model (Phase 04) lets the player reach Galaxy space.
 
+## Status (2026-06-19)
+
+**Standalone debt** — the old Phase 5 that bundled this with the two debts below was
+deleted; the StarPointRenderer approach it tried is an abandoned anti-pattern (see git
+HANDOFF history / commit c98f56c). This is now tracked on its own and will be promoted
+to its own phase **after** the Phase 5 *Rendering Overhaul* lands, which provides the
+findability-floor seam this fix plugs into. Do **not** reintroduce the manual clip-space
+billboard MultiMesh.
+
 ## What "done" looks like
 
 - In Galaxy space the current galaxy's stars are **clearly visible** as emissive

@@ -1,36 +1,35 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-18T21:16:34.399Z",
+  "timestamp": "2026-06-19T00:00:00.000Z",
   "phase": "05",
-  "phase_name": "outer-tier-body-findability-galaxy-visibility",
-  "phase_dir": ".planning/phases/05-outer-tier-body-findability-galaxy-visibility",
+  "phase_name": "rendering-overhaul",
+  "phase_dir": ".planning/phases/05-rendering-overhaul",
   "plan": null,
   "task": null,
   "total_tasks": null,
-  "status": "paused",
-  "head_commit": "c98f56c",
+  "status": "not-planned",
+  "head_commit": "c82cdff",
   "completed_tasks": [
-    {"id": 1, "name": "D-59 tilted galaxy discs in skybox.gdshader (galaxy_disc_coords_tilted + bounded D-54 grain overlay)", "status": "done", "commit": "c98f56c", "note": "The ONE kept improvement from this phase. Verified by user: 'galaxies look right now'."},
-    {"id": 2, "name": "Revert StarPointRenderer approach to pre-05 baseline (3d35740), stars drawn by skybox again", "status": "done", "commit": "c98f56c"}
+    {"id": 1, "name": "Delete the abandoned old Phase 5 (outer-tier-body-findability-galaxy-visibility) and its stale artifacts", "status": "done"},
+    {"id": 2, "name": "Define new Phase 5 = 'Rendering Overhaul' (full rewrite: WorldRenderer + post-process + body-lighting unified) in ROADMAP.md", "status": "done"},
+    {"id": 3, "name": "Un-bundle the 3 render problems into standalone todos; mark galaxy-disc-tilt resolved-pending-verify", "status": "done"},
+    {"id": 4, "name": "Scaffold .planning/phases/05-rendering-overhaul/ and update STATE.md", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 3, "name": "Re-plan phase 05 from clean baseline with a ROBUST approach to galaxy-space star findability (do NOT reuse manual-clip-space MultiMesh billboards)", "status": "not_started"},
-    {"id": 4, "name": "Solve the original problem: in Galaxy space the home galaxy's own stars are sub-pixel meshes and not on the skybox, so they vanish", "status": "not_started"}
+    {"id": 5, "name": "Discuss/plan the Rendering Overhaul (/gsd-discuss-phase 5 → /gsd-plan-phase 5)", "status": "not_started"}
   ],
-  "blockers": [
-    {"description": "Original phase goal still unsolved after revert: galaxy-space stars are invisible (sub-pixel meshes + skybox only paints next-tier-OUT bodies). A new, robust rendering approach must be chosen during re-plan.", "type": "technical", "workaround": "Stars render normally in Star space via skybox + WorldRenderer mesh; the gap is specifically Galaxy/Universe space."}
-  ],
+  "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [
-    {"action": "Decide the re-plan approach for galaxy-space star findability (discuss-phase recommended)", "context": "User wants to restart phase 05 from the beginning; the StarPointRenderer approach was abandoned.", "blocking": true}
+    {"action": "Run /gsd-discuss-phase 5 to scope the Rendering Overhaul before planning", "context": "Scope is a full rendering-layer rewrite (largest of the offered options); discuss-phase recommended to settle the architecture before plans are written.", "blocking": false}
   ],
   "decisions": [
-    {"decision": "Abandon the StarPointRenderer MultiMesh PSF approach (all of 05-01)", "rationale": "The godot-starlight 'manual clip-space POSITION + far-plane-clip' billboard technique had a long chain of engine-specific failures (script-not-attached/missing UID, _Ready-before-parent NRE, back-face cull, NDC-z clip, ALBEDO flood, screen-filling quad scale, frustum-cull AABB). Each was real but the technique was too fragile to be worth it.", "phase": "05"},
-    {"decision": "Keep ONLY the D-59 tilted galaxy discs", "rationale": "User confirmed it as the only visible improvement.", "phase": "05"},
-    {"decision": "Render stars via the skybox again (restored baseline star loop + push)", "rationale": "User directive; robust and already working in Star space.", "phase": "05"},
-    {"decision": "Restart phase 05 planning from this baseline", "rationale": "Existing 05-01/05-02/05-03 PLAN files describe the abandoned approach and are stale.", "phase": "05"}
+    {"decision": "Delete the old Phase 5 findability bundle; do a foundational Rendering Overhaul first instead", "rationale": "The bundle tried to fix three render problems at once and dead-ended on the fragile StarPointRenderer (prior HANDOFF, commit c98f56c). User: don't fix all render problems in one phase.", "phase": "05"},
+    {"decision": "New Phase 5 = full rendering rewrite (WorldRenderer + post-process + body-lighting unified)", "rationale": "User selected the largest-scope option: one coherent multi-tier rendering layer that the render debts can then be solved on top of, individually.", "phase": "05"},
+    {"decision": "Keep the 3 render problems as standalone tracked debts, promoted to their own later phases", "rationale": "They are out of scope for the overhaul; the overhaul only exposes the seams (findability floor) they plug into.", "phase": "05"},
+    {"decision": "CARRIED FORWARD: do NOT reintroduce the manual clip-space billboard MultiMesh (StarPointRenderer) anti-pattern", "rationale": "Exhaustively tried and abandoned in the old Phase 5; structurally fragile against the engine.", "phase": "05"}
   ],
   "uncommitted_files": [],
-  "next_action": "Run /gsd-discuss-phase 5 (recommended) or /gsd-plan-phase 5 to re-plan galaxy-space star findability with a robust approach. First read the BLOCKING anti-pattern in .continue-here.md.",
-  "context_notes": "Phase 05 was executed (3 plans, all parked at human-verify checkpoints). Play-testing exposed that 05-01's StarPointRenderer never rendered reliably. After ~10 incremental fixes, user called it: revert everything except the galaxy tilt. Codebase is now at pre-05 baseline + galaxy tilt (commit c98f56c), build clean, 18/18 TierClassifier tests pass. The galaxy disc tilt shader (galaxy_disc_coords_tilted) and the fixed bounded grain overlay are the only retained changes. Stale PLAN files for 05-01/02/03 remain on disk and should be regenerated on re-plan."
+  "next_action": "Run /gsd-discuss-phase 5 (recommended) then /gsd-plan-phase 5 to scope and plan the Rendering Overhaul. The three render debts in .planning/todos/pending/ are out of scope and get their own later phases.",
+  "context_notes": "Planning-only restructure (quick delete-phase5-add-rendering-overhaul, 2026-06-19). No code changed; HEAD remains the kept-galaxy-tilt baseline (c82cdff). The old Phase 5 directory and its stale 05-01/02/03 plans + RESEARCH/CONTEXT/PATTERNS were git-removed. Build/baseline state unchanged from prior session: clean build, 18/18 TierClassifier tests, galaxy tilt kept in Shaders/skybox.gdshader."
 }

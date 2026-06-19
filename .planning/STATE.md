@@ -3,16 +3,16 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 05
-current_phase_name: outer-tier-body-findability-galaxy-visibility
-status: executing
-stopped_at: Phase 5 context gathered
-last_updated: "2026-06-18T19:47:20.497Z"
-last_activity: 2026-06-18
-last_activity_desc: Phase 05 execution started
+current_phase_name: rendering-overhaul
+status: not-planned
+stopped_at: Phase 5 restructured — Rendering Overhaul defined, awaiting discuss/plan
+last_updated: "2026-06-19T00:00:00.000Z"
+last_activity: 2026-06-19
+last_activity_desc: Phase 05 replaced (findability bundle → Rendering Overhaul); render debts un-bundled
 progress:
   total_phases: 9
   completed_phases: 4
-  total_plans: 15
+  total_plans: 12
   completed_plans: 12
   percent: 44
 ---
@@ -24,14 +24,18 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-12)
 
 **Core value:** The player can fly seamlessly through a massive 1:1-scale universe — from a planet's surroundings out to interstellar and intergalactic distances — with rendering and flight that stay correct and feel good across every scale.
-**Current focus:** Phase 05 — outer-tier-body-findability-galaxy-visibility
+**Current focus:** Phase 05 — Rendering Overhaul (full rendering-layer rewrite; not yet planned)
 
 ## Current Position
 
-Phase: 05 (outer-tier-body-findability-galaxy-visibility) — EXECUTING
-Plan: 1 of 3
-Status: Executing Phase 05
-Last activity: 2026-06-18 — Phase 05 execution started
+Phase: 05 (Rendering Overhaul) — NOT PLANNED (defined in ROADMAP; awaiting discuss/plan)
+Plan: none yet (TBD)
+Status: Phase 05 restructured 2026-06-19 — old findability bundle deleted, Rendering Overhaul defined
+Last activity: 2026-06-19 — Phase 05 replaced; render debts un-bundled into standalone todos
+
+Next: `/gsd-discuss-phase 5` (recommended, scope is large) then `/gsd-plan-phase 5`.
+Blocking constraint carried forward: do NOT reintroduce the manual clip-space billboard
+MultiMesh (StarPointRenderer) anti-pattern — see the render debts and prior HANDOFF.
 
 Plans:
 
@@ -109,18 +113,24 @@ Recent decisions affecting current work:
 
 - 2026-06-17: Phase 4 added — "Flight Model v2 — tier & target-aware speed" (from P1 tech debt `flight-speed-model-tier-and-target-aware`; absorbs cross-SOI targeting + target-circle from backlog 999.1). Phase 3 left at UAT paused (1/7), gated on Phase 4.
 - 2026-06-18: Phase 5 added — "Outer-tier body findability & galaxy visibility" (from Phase 03 UAT partial). Bundles `galaxy-space-star-meshes-invisible` (P1), `galaxy-visibility-in-universe-space` (P2, design fork), and `galaxy-disc-tilt-foreshortening` (polish), fix order #1→#2→#3. Phase 3 UAT (3/7 pass) now gated on Phase 5.
+- 2026-06-19: Phase 5 **replaced** (quick `delete-phase5-add-rendering-overhaul`). The findability bundle was deleted after its StarPointRenderer approach dead-ended (HANDOFF c98f56c). New **Phase 5 = "Rendering Overhaul"** — a foundational full rewrite unifying WorldRenderer + post-process + body-lighting into one coherent multi-tier rendering layer (user direction: don't fix all render problems in one phase). The three render problems remain as **standalone debts** in `.planning/todos/pending/` (`galaxy-space-star-meshes-invisible`, `galaxy-visibility-in-universe-space`, `galaxy-disc-tilt-foreshortening` → resolved-pending-verify), to be promoted to their own later phases *after* the overhaul. Phase 3 UAT now gated on the render debts (post-overhaul), not on Phase 5 directly.
 
 ### Pending Todos
 
-From Phase 03 UAT play-test (2026-06-17), priority order:
+Render debts (un-bundled from the deleted old Phase 5; to be solved individually
+*after* the Phase 5 Rendering Overhaul, each promoted to its own later phase):
 
-- **P1** `flight-speed-model-tier-and-target-aware` — OPEN. Single global MaxSpeed across all tiers; needs per-tier ceiling + optional target-distance ease-out. Now also absorbs cross-SOI targeting (D-12 override) + world-pinned target circle (999.1 slice). Supersedes `thrust-zero-at-galaxy-soi-exit`. Phase-sized → **next up**.
-- **P2** `galaxy-visibility-in-universe-space` — OPEN. Galaxies vanish in Universe space (D-28 skips galaxy meshes; skybox only carries next-tier-out). Blocks intergalactic confirm. Needs design decision.
-- ~~P3 `hud-target-nearest-galaxy-space`~~ — flicker FIXED (UniMath + ROOT name); cross-SOI-nearest part folded into P1.
-- ~~P4 `hud-cycle-target-not-working`~~ — RESOLVED (Tab keybinding Escape→Tab + _Input/SetInputAsHandled).
+- **P1** `galaxy-space-star-meshes-invisible` — OPEN. Galaxy-space star meshes are sub-pixel + emission-floored to ~0 at 1:1 distances → invisible behind the target circle. Needs the findability-floor seam the Rendering Overhaul will expose. Do NOT reuse the abandoned StarPointRenderer billboard.
+- **P2** `galaxy-visibility-in-universe-space` — OPEN (design fork). Galaxies vanish in Universe space (D-28 skips galaxy meshes; skybox only carries next-tier-out). Mesh vs enhanced-skybox vs hybrid — settle in discuss. Builds on the unified tier-render path.
+- `galaxy-disc-tilt-foreshortening` — RESOLVED-PENDING-VERIFY (kept c98f56c tilt; re-confirm after the overhaul reworks the skybox path).
+
+Already resolved (prior sessions):
+
+- ~~`flight-speed-model-tier-and-target-aware`~~ — DELIVERED as Phase 4 (complete 2026-06-17).
+- ~~`hud-target-nearest-galaxy-space`~~ / ~~`hud-cycle-target-not-working`~~ — RESOLVED (/gsd-debug).
 - ~~`sibling-star-distances-1e4-too-close`~~ — RESOLVED (quick 260617-lip; positions ×1e4 to true ly metres).
 
-Plan: ✅ revert done · ✅ HUD bugs fixed (/gsd-debug) · ✅ star-distance fixed (quick) → **P1 flight model v2 as a discussed phase** (per-tier ceiling + target ease-out + minimal 999.1 targeting slice) → P2 galaxy visibility.
+Plan: **Phase 5 Rendering Overhaul** (`/gsd-discuss-phase 5` → `/gsd-plan-phase 5`) → then P1 galaxy-space star findability → P2 Universe-space galaxy visibility, each as its own phase.
 
 ### Blockers/Concerns
 
@@ -147,13 +157,20 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 | 2026-06-16 | suppress-the-home-galaxy-in-skyboxrender | feat: read-only `UniMath.FindLca(ship, body, objs) == body.Index` ancestry guard at the top of SkyboxRenderer's galaxy branch suppresses the home galaxy disc while the ship is inside its SOI — only the 2 OTHER galaxies render, satisfying phase-03 must-have truth #2. Resolves the open home-galaxy in-SOI visibility design question deferred from 03-01 (SUMMARY line 135); user-locked decision: suppress (not Milky-Way band). Star branch + `_skyDirs` untouched; no shader/TestSetup change. 30 tests green (28 + 2 ancestry-predicate facts). Build clean. In-game visual confirm DEFERRED to 03-02 play-test (user choice). Commits a94305e, a2588d2 |
 | 2026-06-17 | 260617-j6b-fix-thrust-zero-at-galaxy-soi-exit | REJECTED + REVERTED: direction-aware (receding-exempt) speed clamp built (f343cc3, build 0/0, 30/30) but play-test failed — exempting the clamp jumps to global intergalactic MaxSpeed, making in-system travel unusable. Reverted (76f6b3b). Exposed root issue: single global MaxSpeed across all tiers. Superseded thrust-zero-at-galaxy-soi-exit; spun off 4 tech debts (flight speed model P1, galaxy visibility P2, HUD nearest/target P3, target cycling P4). |
 | 2026-06-17 | 260617-lip-fix-sibling-star-distance-data-bug-scale | COMPLETE: within-galaxy star positions were authored in "Galaxy units" (1e4 m/unit) but AddGameObject takes metres → stars 1e4× too close (~26 AU), SOIs overlapping. Scaled all sibling/cluster/dest-sib offsets ×1e4 to true metres (ALPHA CEN 4.2 ly, etc.); now ~26× StarSOI radius apart, no overlap. Build 0/0, 30/30. User-verified: sky-points still visible, no regression; fly-out SOI re-test deferred to P1 flight model. |
+| 2026-06-19 | delete-phase5-add-rendering-overhaul | COMPLETE (planning-only): Deleted the abandoned old Phase 5 ("Outer-tier body findability & galaxy visibility") + its stale artifacts; defined new **Phase 5 = "Rendering Overhaul"** (full rewrite — WorldRenderer + post-process + body-lighting unified) in ROADMAP. Un-bundled the 3 render problems into standalone todos (`galaxy-space-star-meshes-invisible` P1, `galaxy-visibility-in-universe-space` P2, `galaxy-disc-tilt-foreshortening` → resolved-pending-verify) to be fixed individually in later phases. Updated STATE + HANDOFF. No code changes. |
 
 ## Session Continuity
 
-Last session: 2026-06-18T19:16:20.294Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-outer-tier-body-findability-galaxy-visibility/05-CONTEXT.md
-Prior resume note: Decision locked — (1) revert done; (2) fix target/HUD bugs first via /gsd-debug; (3) then flight speed model v2 as a discussed phase (P1, per-tier ceiling + target ease-out, minimal slice of backlog 999.1); (4) then galaxy-visibility-in-universe-space (P2, blocks intergalactic UAT 5-7). Phase 03 stays open at UAT until the flight model is reworked.
+Last session: 2026-06-19
+Stopped at: Phase 5 restructured (quick delete-phase5-add-rendering-overhaul)
+Resume file: .planning/phases/05-rendering-overhaul/ (scaffold only — run discuss/plan)
+Prior resume note: Old Phase 5 (findability bundle) deleted after the StarPointRenderer
+dead-end; its three render problems are now standalone debts in `.planning/todos/pending/`.
+New Phase 5 = "Rendering Overhaul" (full rewrite: WorldRenderer + post-process +
+body-lighting unified), defined in ROADMAP but NOT yet planned. Next: `/gsd-discuss-phase 5`
+then `/gsd-plan-phase 5`. Hard constraint: do NOT reintroduce the manual clip-space billboard
+MultiMesh. The render debts are explicitly out of scope for the overhaul and get their own
+later phases. Phase 03 UAT (3/7) stays gated on the render debts.
 
 ## Refactor Notes
 

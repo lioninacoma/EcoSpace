@@ -1,13 +1,23 @@
 ---
 type: tech-debt
-status: pending
+status: resolved-pending-verify
 created: 2026-06-16
+resolved: 2026-06-19
 area: rendering
 origin: phase-03 debug session galaxy-sky-disc-antipode
 tags: [tech-debt, rendering, shader, galaxy]
 ---
 
 # Galaxy disc tilt / foreshortening (face-on only)
+
+## Status (2026-06-19)
+
+**Largely resolved.** The one improvement kept from the abandoned old Phase 5 (commit
+`c98f56c`) reinstated tilted galaxy discs in `Shaders/skybox.gdshader` via
+`galaxy_disc_coords_tilted` (+ a bounded D-54 grain overlay), using a safe basis that
+avoids the degenerate band collapse. User confirmed in-game: *"galaxies look right now."*
+Left as `resolved-pending-verify` only so the tilt is re-confirmed once the Phase 5
+*Rendering Overhaul* reworks the skybox path. Not a blocker; not part of the overhaul scope.
 
 ## What
 

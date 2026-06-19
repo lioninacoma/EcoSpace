@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Dynamic Skybox** - Shader-type sky updated on scale-tier transitions; only the next tier out (other systems' stars, then only galaxies) is projected onto a stable spherical skybox, with a visually continuous skybox↔mesh handoff (completed 2026-06-15)
 - [x] **Phase 3: Cross-Galaxy Travel** - Extend hand-authored data to galaxy/universe scale; full SOI chain validated at intergalactic distances (UAT paused 1/7 — gated on Phase 4 flight model) (completed 2026-06-17)
 - [x] **Phase 4: Flight Model v2 — tier & target-aware speed** - Per-tier speed ceiling + target-distance ease-out replacing the single global MaxSpeed; world-pinned target outline (minimal 999.1 slice); fixes in-system over-speed and the galaxy-SOI-exit dead zone within one envelope (COMPLETE 2026-06-17)
-- [ ] **Phase 5: Outer-tier body findability & galaxy visibility** - Make distant tier-member bodies visible/findable at 1:1 scale (galaxy-space star meshes + Universe-space galaxies) with a min on-screen size/brightness floor and continuous tier handoffs; closes the Phase 03 UAT rendering gaps (revisits D-28)
+- [ ] **Phase 5: Rendering Overhaul** - Foundational full rewrite that unifies world rendering, post-process (8-bit/dither/CRT), and body-lighting into one coherent multi-tier rendering layer; replaces the ad-hoc skybox-loop + per-tier WorldRenderer routing and gives the tracked render debts (galaxy-space star findability, Universe-space galaxy visibility) a robust base to be solved on — individually, in later phases, not all at once
 
 ## Phase Details
 
@@ -113,6 +113,34 @@ Plans:
 **Wave 2** *(blocked on Wave 1 — shares Hud.cs)*
 
 - [x] 04-02-PLAN.md — World-pinned target circle: Hud._Draw outline gated on WorldRenderer.GetRenderPosition with minimum on-screen radius + edge-marker fallback; full-phase play-test checkpoint (wave 2)
+
+### Phase 5: Rendering Overhaul
+
+**Goal**: Replace the current ad-hoc, per-tier-special-cased rendering with one coherent rendering layer that draws every body correctly and robustly across all scale tiers (Planet → Star → Galaxy → Universe), with a single source of truth for classification, appearance, and tier handoffs — so that the outstanding render debts can be solved cleanly on top of it instead of fought one engine quirk at a time.
+**Mode:** TBD (set in discuss/plan-phase — likely multi-wave given the scope)
+**Depends on**: Phase 4
+**Origin**: Phase 05 (old "findability bundle") was abandoned after the StarPointRenderer manual clip-space billboard dead-end (HANDOFF.json, 2026-06-18). User direction (2026-06-19): do a foundational rendering rewrite first; keep the individual render problems as standalone debts, fixed later one at a time — not all bundled in one phase.
+**Scope (full rewrite)**: unify the three rendering concerns into one layer —
+  1. **World rendering** — `WorldRenderer` (floating-origin mesh sync) + `SkyboxRenderer` (next-tier-out points/discs) + the per-tier `ObjectType` routing, replaced by a single tier-driven render path with one classification + appearance source of truth (continuing the `StarRendering` / `TierClassifier` direction).
+  2. **Post-process** — the 8-bit / dither / CRT stack (`PostProcessRenderer`, `dithering.gdshader`).
+  3. **Body-lighting** — the unified `body_lit.gdshader` Lambert/terminator model.
+**Requirements**: refines RND-02/RND-04/RND-05/RND-07 (tier-member mesh/point rendering + continuous point↔mesh handoff) and RND-01/RND-03/RND-06 (8-bit dithered look); does not by itself close the findability/visibility debts.
+**Success Criteria** (what must be TRUE):
+
+  1. There is ONE rendering path that classifies and draws every body by its scale tier each frame, with no per-`ObjectType` special-case branches scattered across renderers — appearance derives from a single source of truth (physical size + luminosity), reused by point, mesh, and disc representations.
+  2. The skybox↔mesh (point↔mesh) handoff (RND-07) is structurally guaranteed by shared math, not coincidental per-renderer alignment — no pop in position, brightness, or color across any tier boundary (Star↔Galaxy, Galaxy↔Universe).
+  3. The 8-bit/dither/CRT post-process and the unified body-lighting model are preserved (or improved) and integrated into the new layer — the established look does not regress.
+  4. No fragile manual clip-space billboard technique is reintroduced (the abandoned StarPointRenderer anti-pattern); robustness is verified by in-game play-test across Planet/Star/Galaxy/Universe space with a clean build and green TierClassifier tests.
+  5. The new layer exposes the seams needed to later add a findability floor (minimum on-screen size/brightness) for distant tier bodies, WITHOUT itself implementing the fix — the tracked debts remain explicitly out of scope.
+
+**Out of scope** (tracked as standalone debts, to be promoted to their own later phases — *not* solved here):
+  - `galaxy-space-star-meshes-invisible` (P1) — minimum on-screen size/brightness floor for galaxy-space star meshes.
+  - `galaxy-visibility-in-universe-space` (P2, design fork) — how galaxies render in Universe space; revisits D-28.
+  - `galaxy-disc-tilt-foreshortening` (polish) — largely addressed by the kept c98f56c tilt; verify post-rewrite.
+
+**Verification**: in-game Godot play-test (GDShader/visual; not fully unit-testable) across all four spaces, plus the existing TierClassifier unit suite.
+
+**Plans**: TBD (run `/gsd-discuss-phase 5` then `/gsd-plan-phase 5`)
 
 ## Backlog
 
@@ -213,41 +241,17 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. In-System Flight MVP | 4/4 (TRV-01 milestone) | ✓ Complete | 2026-06-14 |
 | 2. Dynamic Skybox | 3/3 | Complete   | 2026-06-15 |
-| 3. Cross-Galaxy Travel | 3/3 | UAT partial (3/7 pass) — gated on Phase 5 | — |
+| 3. Cross-Galaxy Travel | 3/3 | UAT partial (3/7 pass) — gated on the render debts (post-overhaul) | — |
 | 4. Flight Model v2 — tier & target-aware speed | 2/2 | Complete   | 2026-06-17 |
-| 5. Outer-tier body findability & galaxy visibility | 0/0 | Not planned | — |
+| 5. Rendering Overhaul | 0/0 | Not planned | — |
 
 Plans:
 
 - [x] 04-01-PLAN.md — Tier- & target-aware speed envelope + Hud.ActiveTargetIndex (wave 1)
 - [x] 04-02-PLAN.md — World-pinned target circle + full-phase play-test (wave 2)
 
-### Phase 5: Outer-tier body findability & galaxy visibility
-
-**Goal:** Make distant tier-member bodies findable and visible at true 1:1 scale, so a player flying out of a star system can actually see (and fly toward) the galaxy's stars in Galaxy space and the other galaxies in Universe space — closing the rendering gaps that left Phase 03 UAT incomplete.
-**Depends on:** Phase 4
-**Origin:** Phase 03 UAT (2026-06-18, status partial). Bundles the tracked tech debt surfaced when the Phase-04 flight model first let the player reach Galaxy/Universe space.
-**Requirements**: refines RND-02/RND-04 (tier-member mesh rendering) + RND-07 (point↔mesh handoff); revisits D-28 (galaxies sky-only).
-
-**Tech debt addressed (fix order):**
-
-1. `galaxy-space-star-meshes-invisible` (P1) — galaxy-space star meshes are sub-pixel + emission-floored to ~0 at 1:1 distances → invisible behind the target circle. Establishes the findability-floor machinery (minimum on-screen size + brightness floor for distant tier bodies). Unblocks UAT Tests 2/4/6.
-2. `galaxy-visibility-in-universe-space` (P2) — galaxies vanish in Universe space (D-28 skips galaxy meshes; skybox carries only the next tier out). Reuses #1's findability machinery one tier up. **Carries a design fork** (mesh vs enhanced-skybox vs hybrid disc→mesh handoff) — settle in discuss-phase. Revisits/records D-28.
-3. `galaxy-disc-tilt-foreshortening` (polish) — galaxy discs render face-on; reinstate `disc_normal` tilt with proper foreshortening (no degenerate collapse). Lowest priority.
-
-**Success Criteria** (what must be TRUE):
-
-  1. In Galaxy space the current galaxy's stars render as clearly visible emissive bodies the player can fly toward — not black space behind a target circle — with a minimum on-screen size/brightness floor that preserves 1:1 proportions on close approach.
-  2. In Universe space the destination galaxies are visible with a clear sense of distance/approach (per the chosen design option), and the target marker circles a visible body.
-  3. Tier-crossing handoffs (Star↔Galaxy, Galaxy↔Universe) stay visually continuous (RND-07) — no pop in position, brightness, or color.
-  4. Phase 03 UAT Tests 2, 4, and 6 re-pass on play-test; D-28 is revisited and the new decision recorded.
-
-**Verification:** in-game Godot play-test (GDShader/visual; not unit-testable). Re-runs the blocked Phase-03 UAT items.
-
-**Plans:** 3 plans
-
-Plans:
-
-- [ ] 05-01-PLAN.md — Always-on MultiMesh PSF star-point renderer + additive quad shader (D-53/D-55/D-56/D-57); galaxy-space star findability + continuous point→mesh blend
-- [ ] 05-02-PLAN.md — Galaxy visibility in Universe space via TierClassifier Galaxy-unconditional sky routing (D-48/D-49) + skybox star-loop retirement (D-56) + safe-basis disc tilt & Star-Nest volumetric look (D-54/D-59)
-- [ ] 05-03-PLAN.md — UniObject-driven HUD target circle decoupled from the mesh render set (D-50/D-51); works for sky-only galaxies + sub-pixel galaxy-space stars
+> **Phase 5 detail** lives in the `## Phase Details` section above (Rendering Overhaul).
+> The old "Outer-tier body findability & galaxy visibility" Phase 5 was removed
+> (2026-06-19) — see ### Roadmap Evolution in STATE.md. Its three render problems are
+> tracked as standalone debts in `.planning/todos/pending/` and will be promoted to their
+> own later phases, individually, after the Rendering Overhaul lands.

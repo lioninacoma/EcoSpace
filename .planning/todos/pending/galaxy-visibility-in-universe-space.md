@@ -29,6 +29,12 @@ come from `SkyboxRenderer`, which only projects the "next tier out." In Universe
 the galaxies are the CURRENT tier, so the skybox no longer carries them — and because
 meshes are skipped, nothing renders them at all.
 
+## Status (2026-06-19)
+
+**Standalone debt** — un-bundled from the deleted old Phase 5. Carries a design fork
+(see below); to be promoted to its own phase **after** the Phase 5 *Rendering Overhaul*,
+which is the right place for the unified tier-render path this builds on.
+
 ## Open design question (needs discussion)
 
 In Universe space, how should galaxies be drawn?
