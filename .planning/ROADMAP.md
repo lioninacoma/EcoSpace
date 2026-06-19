@@ -149,15 +149,15 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 + play-test)*
 
-- [ ] 05-02-PLAN.md — Post-process star glow + point lights: depth-aware luminous_pass.gdshader spatial quad (Camera3D child) + LuminousPassRenderer; near stars glow/halo, distant stars points, continuous point↔mesh handoff; supersedes Sky-shader star points (closes P1) (wave 2)
+- [ ] 05-02-PLAN.md — Sky-shader refeed + near-star findability: re-enable SkyboxRenderer (reset process_mode), drive skybox.gdshader from LuminousDescriptorBuilder.Descriptors[] (skybox KEPT, D-07 reversed); MinVisibleBrightness floor for distant stars (closes P1); NearStarEmissionFloor fix for the missing sun (D-12); galaxy_disc_weights uniform groundwork (D-13) (wave 2)
 
 **Wave 3** *(blocked on Wave 2 + play-test)*
 
-- [ ] 05-03-PLAN.md — Galaxy distance crossfade: port spiral/elliptical/tilt disc verbatim into luminous_pass.gdshader (disc fades out approaching / in leaving); REMOVE SkyboxRenderer + skybox.gdshader + Sky Environment (closes P2) (wave 3)
+- [ ] 05-03-PLAN.md — Post-process glow/halo + 3-stage handoff + galaxy crossfade: narrow luminous_pass.gdshader to near-star glow/halo (relax depth gate via is_near=LodWeight, halo wraps the mesh, D-11); remove the galaxy loop (galaxies stay in the sky shader, D-13); extend LuminousLod.GalaxyDiscWeight fade band past the SOI boundary to fix the galaxy pop-in (D-13) (wave 3)
 
 **Wave 4** *(blocked on Wave 3 + play-test)*
 
-- [ ] 05-04-PLAN.md — Dither composition + cleanup: luminous pass composes in HDR before the 8-bit dither (D-05); remove dead WorldRenderer._lastRenderPositions cache; final per-tier parity/improvement play-test (CRT stays out per D-06) (wave 4)
+- [ ] 05-04-PLAN.md — HDR dither composition + cleanup: verify/lock the near-star glow pass composing in HDR before the 8-bit dither (D-05); remove the dead WorldRenderer._lastRenderPositions cache while keeping the Hud GetRenderPosition/GetRenderRadius accessors working (D-46); final per-tier parity/improvement play-test (CRT stays out per D-06) (wave 4)
 
 ## Backlog
 
