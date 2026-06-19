@@ -106,3 +106,65 @@ This redefined the phase from "consolidate the existing skybox + mesh renderers"
 - CRT scanline effect (RND-01) — own later task.
 - `galaxy-disc-tilt-foreshortening` — verify post-rework, not actively reworked.
 - Procedural generation, cockpit art, economy, combat — milestone out-of-scope, unchanged.
+
+---
+
+# Revision Session — 2026-06-19 (after 05-02 play-test)
+
+**Trigger:** 05-02 play-test rejected. The post-process spatial quad rendered distant
+stars/galaxies IN FRONT of planet meshes (post-process cannot occlude behind opaque
+geometry); home sun didn't render up close; a galaxy popped in. User proposed: sky shader
+for distant stars+galaxies, post-process for glow/halo. This reverses the original
+"replace the skybox entirely" frame (D-07/D-09, discussion-log line 53).
+
+## Architecture split (sky shader vs post-process)
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Sky shader (distant) + post-process (glow/halo) | Keep `skybox.gdshader` for distant stars+galaxies (renders behind geometry); narrow `luminous_pass` to near-star glow/halo; both fed by the Plan-1 descriptor | ✓ |
+| Keep unified post-process, fix depth gate | Make the depth-texture occlusion gate work in the single post-process pass | |
+| Full replan from scratch | Discard Plan 1 too | |
+
+**User's choice:** Sky shader + post-process split. **Notes:** post-process structurally
+can't occlude behind meshes; sky shader is the right tool for the distant celestial sphere.
+Plan-1 descriptor survives and feeds both layers. → reverses D-07, revises D-03/D-05/D-08/D-09.
+
+## Star handoff (far → near)
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| 3-stage continuous blend (point → glow → mesh) | Sky point far; glow/halo grows mid; sphere mesh near; LodWeight-driven | ✓ |
+| 2-stage (point ↔ mesh+glow) | | |
+| Sky shader does points + glow | | |
+
+**User's choice:** 3-stage continuous blend. → new D-11.
+
+## Near-star findability (missing-sun bug)
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Sphere mesh + glow, fix now | Parent sun + in-SOI siblings render as WorldRenderer sphere meshes; missing-sun is an in-scope regression | ✓ |
+| Mesh + glow, defer the fix | | |
+| Glow sprite only (no sphere) | | |
+
+**User's choice:** Sphere mesh + glow, fix now. → new D-12.
+
+## Galaxy rendering + crossfade
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Sky shader, reuse procedural disc math | Far disc ↔ resolved-stars crossfade; fix the "pops out of nowhere" bug | ✓ |
+| Sky shader, simpler sprite disc | | |
+| Galaxies in post-process | | |
+
+**User's choice:** Sky shader, reuse disc math. → new D-13.
+
+## Plan 2–4 re-slicing
+
+| Option | Description | Selected |
+|--------|-------------|----------|
+| Findability-first | (2) sky-shader refeed + near-sun fix; (3) glow/halo + 3-stage handoff; (4) galaxy crossfade + dither composition + cleanup | ✓ |
+| Galaxy-focused middle | | |
+| Let the planner decide | | |
+
+**User's choice:** Findability-first. → revised D-08. Plan 1 (05-01) stays complete.
