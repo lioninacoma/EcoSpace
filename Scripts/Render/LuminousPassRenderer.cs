@@ -1,4 +1,5 @@
 using Godot;
+using System.Collections.Generic;
 
 namespace Render
 {
@@ -45,6 +46,13 @@ namespace Render
 
         /// <summary>NodePath to the LuminousDescriptorBuilder node (read-only descriptor source).</summary>
         [Export] public NodePath BuilderPath { get; set; }
+
+        /// <summary>
+        /// NodePath to the TestSetup/GameWorld node. Used to read ship.LocalPos.Scale
+        /// each frame for the observer-unit basis conversion in star_view_dists.
+        /// If empty, auto-resolved via FindChild("Main") — same pattern as LuminousDescriptorBuilder.
+        /// </summary>
+        [Export] public NodePath WorldPath { get; set; }
 
         // ── PSF tuning knobs (pushed as shader uniforms each frame) ──────────────
 
@@ -100,10 +108,12 @@ namespace Render
         /// A small positive value avoids z-fight shimmer at the star mesh surface without
         /// leaking PSF through foreground geometry (planets, etc.).
         ///
-        /// Iteration 3 (analytic depth): units are view-space render units (metres × StarRenderFactor).
-        /// The star at 1 AU is ~1.496e3 render units away; a tolerance of 10–50 render units is
-        /// typically adequate to avoid shimmer. Default 50.0 = 50 render units ≈ 5e9 m slack.
-        /// [D-04 play-test calibration knob — Iteration 3]
+        /// Iteration 4 (corrected units): view-space render units = metres / ship.LocalPos.Scale * StarRenderFactor.
+        /// In Planet space (scale=1e-4): star at 1 AU ≈ 1.496e7 render units; a tolerance of 50 render
+        /// units ≈ 5e6 m slack — adequate to avoid z-fight shimmer while staying far within the
+        /// planet-to-star distance. In Star space (scale=1): star at 1 AU ≈ 1.496e3 render units;
+        /// the same 50 render unit tolerance = 5e9 m slack (still fine).
+        /// [D-04 play-test calibration knob — Iteration 4]
         /// </summary>
         [Export] public float PsfDepthEpsilon    { get; set; } = 50.0f;
 
@@ -121,9 +131,11 @@ namespace Render
         private readonly float[]   _starLodWeights = new float[MaxStars];
 
         /// <summary>
-        /// Per-star render-space distance from camera: distMeters × WorldRenderer.StarRenderFactor.
-        /// Used by the shader for analytic star view-depth occlusion (Iteration 3 fix).
-        /// WorldRenderer.StarRenderFactor is the single source of truth (public const).
+        /// Per-star render-space distance from camera in observer-unit basis:
+        ///   distMeters / ship.LocalPos.Scale * WorldRenderer.StarRenderFactor
+        /// Matches WorldRenderer.RenderBodyAt units exactly so the depth gate works at all scales.
+        /// WorldRenderer.StarRenderFactor (public const 1e-8) is the single source of truth.
+        /// ship.LocalPos.Scale read fresh each frame (changes on SOI transitions).
         /// </summary>
         private readonly float[] _starViewDists = new float[MaxStars];
 
@@ -131,6 +143,7 @@ namespace Render
 
         private ShaderMaterial            _mat;
         private LuminousDescriptorBuilder _builder;
+        private TestSetup                 _world;
 
         // ----- Godot callbacks ------------------------------------------------
 
@@ -146,6 +159,17 @@ namespace Render
             if (_builder == null)
                 GD.PrintErr("[LuminousPassRenderer] Could not resolve LuminousDescriptorBuilder. " +
                             "Set BuilderPath export or ensure Main.tscn hierarchy is correct.");
+
+            // --- Resolve world reference (needed for ship.LocalPos.Scale each frame) ---
+            // Same pattern as LuminousDescriptorBuilder._Ready and WorldRenderer._Ready.
+            if (WorldPath != null && !WorldPath.IsEmpty)
+                _world = GetNode<TestSetup>(WorldPath);
+            else
+                _world = GetParent<TestSetup>() ?? GetTree().Root.FindChild("Main", true, false) as TestSetup;
+
+            if (_world == null)
+                GD.PrintErr("[LuminousPassRenderer] Could not resolve world (TestSetup) node. " +
+                            "Set WorldPath export or ensure Main.tscn hierarchy is correct.");
 
             // --- Create Camera3D-child spatial quad (RESEARCH Pattern 3 / Code Examples) ---
             // QuadMesh 2×2 with FlipFaces=true so the face normal points toward the camera.
@@ -173,6 +197,28 @@ namespace Render
             // Read-only: MUST NOT call BuildDescriptors() here — that would double the
             // classify+project loop (Pitfall 5 from RESEARCH.md).
             // Galaxy branch removed (D-13 / Plan 3): galaxies handled by SkyboxRenderer.
+
+            // Read ship.LocalPos.Scale fresh each frame — it changes on SOI transitions.
+            // Required for the observer-unit basis conversion in star_view_dists (see below).
+            // Bounds-check idiom: (uint) cast catches both < 0 and >= Count in one comparison
+            // (WorldRenderer line 206, LuminousDescriptorBuilder line 102).
+            var  gameObjs  = _world?.GameObjects;
+            int  shipIdx   = _world?.ShipIndex ?? -1;
+            var  ship      = (gameObjs != null && (uint)shipIdx < (uint)gameObjs.Count)
+                                 ? gameObjs[shipIdx]
+                                 : null;
+
+            // If world is not ready yet, skip this frame (star_count=0 keeps the shader quiet).
+            if (ship == null)
+            {
+                _mat?.SetShaderParameter("star_count", 0);
+                return;
+            }
+
+            // observer-unit scale: metres → observer units (same divisor WorldRenderer uses in
+            // RenderBodyAt: r = rawRadiusMeters / ship.LocalPos.Scale * factor).
+            double shipScale = ship.LocalPos.Scale;
+
             int starCount = 0;
 
             for (int i = 0; i < _builder.DescriptorCount; i++)
@@ -187,12 +233,24 @@ namespace Render
                     _starSizes[starCount]      = d.AngularSize;
                     _starLodWeights[starCount] = d.LodWeight;          // drives PSF intensity
 
-                    // Iteration 3: analytic star view-depth — render-space distance from camera.
-                    // distMeters × StarRenderFactor gives the star's distance in render units,
-                    // matching the units produced by the shader's scene depth reconstruction.
-                    // WorldRenderer.StarRenderFactor is the single source of truth (public const,
-                    // do NOT hardcode 1e-8 here directly).
-                    _starViewDists[starCount]  = (float)(d.DistanceMeters * WorldRenderer.StarRenderFactor);
+                    // Iteration 4 fix: observer-unit scale divisor added.
+                    // Render-space distance (metres / ship.LocalPos.Scale * factor) matches
+                    // WorldRenderer.RenderBodyAt: renderPos = relUnits * factor
+                    // where relUnits = metres / ship.LocalPos.Scale (observer-unit basis).
+                    // Both lin_depth (planet mesh depth) and star_view_dists MUST be in the
+                    // SAME render-unit basis so the depth gate fires correctly at all scales.
+                    //
+                    // Sanity check (Planet space, scale=1e-4, factor=1e-8):
+                    //   Star at 1 AU: 1.496e11 / 1e-4 * 1e-8 = 1.496e7 render units (correct)
+                    //   Planet 5e6 m away: 5e6 / 1e-4 * 1e-8 = 5e2 render units << 1.496e7 → occludes
+                    //
+                    // Previous (broken) formula: 1.496e11 * 1e-8 = 1496 render units — 10,000x too
+                    // small; appeared comparable to planet surface depth causing range-dependent occlusion.
+                    //
+                    // WorldRenderer.StarRenderFactor is the single source of truth (public const 1e-8).
+                    // Note: all spaces currently share the same factor; if per-space factors ever
+                    // diverge, use RenderFactorFor(ship.CurrentSpace) here.
+                    _starViewDists[starCount]  = (float)(d.DistanceMeters / shipScale * WorldRenderer.StarRenderFactor);
 
                     starCount++;
                 }

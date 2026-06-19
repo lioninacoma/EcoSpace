@@ -41,8 +41,10 @@
 //   (the early-continue threshold). Far stars (lod≈0) pay zero extra math.
 //
 //   star_view_dists[] is pushed per-frame by LuminousPassRenderer as:
-//     distMeters × WorldRenderer.StarRenderFactor (the single source of truth — 1e-8).
-//   This keeps the render factor in one place and avoids any unit mismatch.
+//     distMeters / ship.LocalPos.Scale × WorldRenderer.StarRenderFactor  (observer-unit basis)
+//   This matches WorldRenderer.RenderBodyAt exactly: renderPos = relUnits * factor where
+//   relUnits = metres / ship.LocalPos.Scale. The single source of truth for StarRenderFactor
+//   is WorldRenderer (public const 1e-8). Ship scale is read fresh each frame (changes on SOI).
 //
 // WORLD VIEW RAY RECONSTRUCTION (Open Question 1 — RESOLVED):
 //   EYEDIR is NOT available in shader_type spatial fragments — it is a built-in exclusive to
@@ -118,9 +120,11 @@ uniform float star_sizes[MAX_STARS];
 /// PSF intensity scales WITH lod_weight (strongest when near — lens flare is a near-star effect).
 uniform float star_lod_weights[MAX_STARS];
 
-/// Render-space distance from camera to star centre: distMeters × WorldRenderer.StarRenderFactor.
-/// Used for analytic star view-depth: star_render_pos = star_dirs[i] * star_view_dists[i].
-/// Units match the scene depth reconstruction (view-space render units).
+/// Render-space distance from camera to star centre:
+///   distMeters / ship.LocalPos.Scale * WorldRenderer.StarRenderFactor
+/// Observer-unit basis: identical to WorldRenderer.RenderBodyAt (renderPos = relUnits * factor,
+/// relUnits = metres / ship.LocalPos.Scale). Both lin_depth and star_view_dists are in the SAME
+/// render-unit basis, so the depth gate fires correctly at all scales and spaces.
 /// Pushed by LuminousPassRenderer; StarRenderFactor=1e-8 is the single source of truth.
 uniform float star_view_dists[MAX_STARS];
 
@@ -162,9 +166,10 @@ uniform float psf_lod_range         = 0.6;
 /// PSF is allowed at pixels where pixel_view_z >= star_view_z - psf_depth_epsilon.
 /// Avoids z-fight shimmer at the star mesh surface (the star's own mesh is at ~star_view_z)
 /// without over-permitting PSF through foreground geometry (planets, etc.).
-/// Units: render units = metres × StarRenderFactor (1e-8). Star at 1 AU ≈ 1.496e3 render units.
-/// A tolerance of 10–100 render units is typical (≈ 1e9–1e10 m slack at the star surface).
-/// [D-04 play-test knob — Iteration 3 — default 50.0]
+/// Units: render units = metres / ship.LocalPos.Scale * StarRenderFactor (observer-unit basis).
+/// Planet space (scale=1e-4): star at 1 AU ≈ 1.496e7 render units → 50 unit tolerance ≈ 5e6 m.
+/// Star space   (scale=1):    star at 1 AU ≈ 1.496e3 render units → 50 unit tolerance ≈ 5e9 m.
+/// [D-04 play-test knob — Iteration 4 — default 50.0]
 uniform float psf_depth_epsilon     = 50.0;
 
 // ── Vertex stage ───────────────────────────────────────────────────────────────
