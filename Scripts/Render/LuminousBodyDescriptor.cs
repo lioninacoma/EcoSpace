@@ -64,5 +64,15 @@ namespace Render
         /// NOT pushed to a shader uniform — kept here for LOD and debugging only.
         /// </summary>
         public double           DistanceMeters;
+
+        /// <summary>
+        /// Render-space distance from camera to body centre, in the observer-unit render basis:
+        ///   DistanceMeters / ship.LocalPos.Scale * WorldRenderer.StarRenderFactor
+        /// Same units as WorldRenderer mesh placement and the depth-buffer reconstruction in
+        /// luminous_pass.gdshader. Used for the analytic per-pixel depth gate (star_view_dists).
+        /// Computed once per frame in LuminousDescriptorBuilder.ComputeDescriptor and consumed
+        /// read-only by LuminousPassRenderer — no world/ship reference needed at draw time.
+        /// </summary>
+        public double           RenderDistance;
     }
 }

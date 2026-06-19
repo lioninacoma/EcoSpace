@@ -31,6 +31,14 @@ namespace Render
         private const int MaxStars    = 128;
         private const int MaxGalaxies = 32;
 
+        /// <summary>
+        /// Render units per observer-unit (metres / ship.LocalPos.Scale → observer units, × this factor → render units).
+        /// Shared with <see cref="WorldRenderer.StarRenderFactor"/> — both must always be 1e-8f.
+        /// Defined here (in the test-compiled set) so <see cref="ComputeDescriptor"/> can use it
+        /// without pulling the full Godot-Node WorldRenderer into the test project.
+        /// </summary>
+        internal const float StarRenderFactor = 1e-8f;
+
         /// <summary>Safety cap on a sky-point disc angular radius (radians, ~28°).</summary>
         private const float MaxDiscAngle = 0.5f;
 
@@ -181,6 +189,17 @@ namespace Render
                 ? LuminousLod.GalaxyDiscWeight(len, body.SOIMeters)
                 : LuminousLod.StarMeshWeight(len);
 
+            // Render-space distance: mirrors WorldRenderer's metres→render conversion exactly.
+            // WorldRenderer.RenderBodyAt: r = rawRadiusMeters / ship.LocalPos.Scale * factor
+            // WorldRenderer.ComputeStarRenderPosFromHierarchy: obsFactor = factor / ship.LocalPos.Scale
+            // All three use metres / ship.LocalPos.Scale * StarRenderFactor — single source of truth.
+            // StarRenderFactor is defined here (accessible to tests) and must equal WorldRenderer.StarRenderFactor.
+            // Defensive guard: ship.LocalPos.Scale is a valid non-zero universe scale in practice,
+            // but guard against a degenerate zero to avoid a division-by-zero crash.
+            double renderDistance = ship.LocalPos.Scale != 0.0
+                ? len / ship.LocalPos.Scale * StarRenderFactor
+                : 0.0;
+
             // BaseColor.A = Brightness matches the star_colors[i].a packing in skybox.gdshader.
             var desc = new LuminousBodyDescriptor
             {
@@ -196,6 +215,7 @@ namespace Render
                     body.GalaxyOrientation.X, body.GalaxyOrientation.Y, body.GalaxyOrientation.Z,
                     body.GalaxySeed),
                 DistanceMeters    = len,
+                RenderDistance    = renderDistance,
             };
 
             return desc;
