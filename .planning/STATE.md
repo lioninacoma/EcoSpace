@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 05
 current_phase_name: rendering-overhaul
 status: executing
-stopped_at: Phase 05 Plan 02 complete (2 of 4 plans done); Plan 3 (05-03) ready — galaxy_disc_weights crossfade + LuminousPassRenderer glow/halo narrowing
-last_updated: "2026-06-19T18:30:00.000Z"
+stopped_at: Phase 05 Plan 03 complete (3 of 4 plans done); Plan 4 (05-04) ready — HDR-before-dither + dead-code removal. Execution PAUSED at user's request after 05-03.
+last_updated: "2026-06-19T20:00:00.000Z"
 last_activity: 2026-06-19
-last_activity_desc: Phase 05 Plan 02 complete — descriptor-fed skybox + NearStarEmissionFloor fix; play-test approved
+last_activity_desc: Phase 05 Plan 03 complete — near-star PSF glow/halo (depth-occluded, LOD-ramp), galaxy disc fade fixed; 5-iteration play-test loop; play-test APPROVED
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 16
-  completed_plans: 14
-  percent: 47
+  completed_plans: 15
+  percent: 50
 ---
 
 # Project State
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 
 ## Current Position
 
-Phase: 05 (rendering-overhaul) — EXECUTING
-Plan: 3 of 4 (2 complete, Plan 3 ready)
-Status: Executing Phase 05
-Last activity: 2026-06-19 — Phase 05 Plan 02 complete; play-test approved
+Phase: 05 (rendering-overhaul) — EXECUTING (paused after 05-03 at user request)
+Plan: 4 of 4 (3 complete, Plan 4 ready)
+Status: Executing Phase 05 — paused; resume at 05-04
+Last activity: 2026-06-19 — Phase 05 Plan 03 complete; play-test approved; paused at user request
 
 ### ARCHITECTURE REVERSAL (decided 2026-06-19, user-driven at 05-02 play-test)
 
@@ -149,6 +149,14 @@ Recent decisions affecting current work:
 - 05-02: D-12 fix: NearStarEmissionFloor=0.8f on star mesh emissive multiplier via Mathf.Max — APPROVED play-test 2026-06-19; StarRendering.ApparentBrightness unchanged
 - 05-02: D-13 groundwork: galaxy_disc_weights uniform wired in skybox.gdshader + Main.tscn default; crossfade logic (LuminousLod.GalaxyDiscWeight per-frame values) deferred to Plan 3
 - 05-02: SkyboxRenderer.SyncSkyPoints refeed — no UniMath.RelativePosition, no TierClassifier.Classify, no GameObjects iteration; descriptor is the single feed (Pitfall 5 resolved)
+- 05-03: D-13 galaxies sky-only CONFIRMED in code — galaxy loop + galaxy uniforms removed from luminous_pass.gdshader; LuminousPassRenderer pushes star arrays only
+- 05-03: D-11 three-stage star handoff via PSF LOD ramp — smoothstep(PsfLodFloor, PsfLodFloor+PsfLodRange, lod) eases PSF in before LodWeight hits 1.0; pop-free by construction
+- 05-03: DEPTH OCCLUSION LESSON — metres→render conversion in this engine MUST be metres / ship.LocalPos.Scale * StarRenderFactor. Using metres * factor alone is always wrong at non-unity scale. This is the canonical observer-unit rule for all future render conversions.
+- 05-03: RenderDistance pre-computed in LuminousDescriptorBuilder (has ship reference); renderers read off descriptor — avoids the Camera3D child world-resolution failure that zeroed star_count
+- 05-03: StarRenderFactor = 1e-8f declared once in LuminousDescriptorBuilder, aliased by WorldRenderer.StarRenderFactor — single source of truth for render scale factor
+- 05-03: GalaxyDiscWeight fade band extended to [0.5×SOI, 1.1×SOI] — gradual fade-in across SOI boundary (low at 1.0×SOI, ~1.0 past boundary); fixes single-frame pop on SOI exit
+- 05-03: PSF knobs APPROVED at play-test 2026-06-19 (D-04): PsfCoreScale=80, PsfSpikeLongScale=12, PsfSpikeShortScale=0.25, PsfIntensity=1.0, PsfLodFloor=0.02, PsfLodRange=0.6, PsfDepthEpsilon=50, caps star=128/galaxy=32
+- 05-03: SkyboxRenderer BuilderPath corrected to "../LuminousDescriptorBuilder" (sibling path); FindChild fallback had masked misconfiguration
 
 ### Roadmap Evolution
 
@@ -202,14 +210,15 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-19T18:30:00.000Z
-Stopped at: Phase 05 Plan 02 complete (2 of 4 plans done); Plan 3 (05-03) ready — galaxy_disc_weights crossfade + LuminousPassRenderer glow/halo narrowing
-Resume file: .planning/phases/05-rendering-overhaul/05-03-PLAN.md
-Prior resume note: 05-02 delivered: descriptor-fed SkyboxRenderer (process_mode reset, no double classify loop),
-MinVisibleBrightness=0.05f distant-star floor (P1 closed), galaxy_disc_weights uniform groundwork (D-13),
-NearStarEmissionFloor=0.8f missing-sun fix (D-12). Play-test approved 2026-06-19. Commits: a8cc821 (feat), 821c484 (fix).
-Plan 3 of 4 ready: 05-03 drives LuminousLod.GalaxyDiscWeight per-frame values into the galaxy_disc_weights shader push
-and narrows LuminousPassRenderer to glow/halo only. MinVisibleBrightness + NearStarEmissionFloor calibration confirmed.
+Last session: 2026-06-19T20:00:00.000Z
+Stopped at: Phase 05 Plan 03 complete (3 of 4 plans done); Plan 4 (05-04) ready — HDR-before-dither composition + dead-code removal. PAUSED at user's request.
+Resume file: .planning/phases/05-rendering-overhaul/05-04-PLAN.md
+Prior resume note: 05-03 delivered: luminous_pass.gdshader narrowed to near-star PSF only (galaxy loop removed, D-13
+confirmed); screen-space aperture-diffraction PSF (inverse-cube core + diffraction spikes, aspect-corrected);
+per-pixel analytic depth occlusion via observer-unit RenderDistance (root cause: metres/scale*factor, NOT metres*factor);
+StarRenderFactor single source of truth in LuminousDescriptorBuilder; GalaxyDiscWeight fade band [0.5×SOI,1.1×SOI]
+no-pop fix; PSF knobs APPROVED at play-test. 48/48 tests green. 5-iteration depth-gate debug journey.
+LESSON: metres→render conversions MUST use / ship.LocalPos.Scale * factor — never metres * factor alone.
 
 ## Refactor Notes
 

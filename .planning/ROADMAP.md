@@ -121,9 +121,11 @@ Plans:
 **Depends on**: Phase 4
 **Origin**: Phase 05 (old "findability bundle") was abandoned after the StarPointRenderer manual clip-space billboard dead-end (HANDOFF.json, 2026-06-18). User direction (2026-06-19): do a foundational rendering rewrite first; keep the individual render problems as standalone debts, fixed later one at a time — not all bundled in one phase.
 **Scope (full rewrite)**: unify the three rendering concerns into one layer —
+
   1. **World rendering** — `WorldRenderer` (floating-origin mesh sync) + `SkyboxRenderer` (next-tier-out points/discs) + the per-tier `ObjectType` routing, replaced by a single tier-driven render path with one classification + appearance source of truth (continuing the `StarRendering` / `TierClassifier` direction).
   2. **Post-process** — the 8-bit / dither / CRT stack (`PostProcessRenderer`, `dithering.gdshader`).
   3. **Body-lighting** — the unified `body_lit.gdshader` Lambert/terminator model.
+
 **Requirements**: refines RND-02/RND-04/RND-05/RND-07 (tier-member mesh/point rendering + continuous point↔mesh handoff) and RND-01/RND-03/RND-06 (8-bit dithered look); does not by itself close the findability/visibility debts.
 **Success Criteria** (what must be TRUE):
 
@@ -134,13 +136,14 @@ Plans:
   5. The new layer exposes the seams needed to later add a findability floor (minimum on-screen size/brightness) for distant tier bodies, WITHOUT itself implementing the fix — the tracked debts remain explicitly out of scope.
 
 **Out of scope** (tracked as standalone debts, to be promoted to their own later phases — *not* solved here):
+
   - `galaxy-space-star-meshes-invisible` (P1) — minimum on-screen size/brightness floor for galaxy-space star meshes.
   - `galaxy-visibility-in-universe-space` (P2, design fork) — how galaxies render in Universe space; revisits D-28.
   - `galaxy-disc-tilt-foreshortening` (polish) — largely addressed by the kept c98f56c tilt; verify post-rewrite.
 
 **Verification**: in-game Godot play-test (GDShader/visual; not fully unit-testable) across all four spaces, plus the existing TierClassifier unit suite.
 
-**Plans**: 4 plans (4 sequential waves — D-08 incremental, play-test-gated)
+**Plans**: 3/4 plans executed
 Plans:
 
 **Wave 1**
@@ -153,7 +156,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 + play-test)*
 
-- [ ] 05-03-PLAN.md — Post-process glow/halo + 3-stage handoff + galaxy crossfade: narrow luminous_pass.gdshader to near-star glow/halo (relax depth gate via is_near=LodWeight, halo wraps the mesh, D-11); remove the galaxy loop (galaxies stay in the sky shader, D-13); extend LuminousLod.GalaxyDiscWeight fade band past the SOI boundary to fix the galaxy pop-in (D-13) (wave 3)
+- [x] 05-03-PLAN.md — Post-process glow/halo + 3-stage handoff + galaxy crossfade: narrow luminous_pass.gdshader to near-star glow/halo (relax depth gate via is_near=LodWeight, halo wraps the mesh, D-11); remove the galaxy loop (galaxies stay in the sky shader, D-13); extend LuminousLod.GalaxyDiscWeight fade band past the SOI boundary to fix the galaxy pop-in (D-13) (wave 3)
 
 **Wave 4** *(blocked on Wave 3 + play-test)*
 
@@ -260,7 +263,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Dynamic Skybox | 3/3 | Complete   | 2026-06-15 |
 | 3. Cross-Galaxy Travel | 3/3 | UAT partial (3/7 pass) — gated on the render debts (post-overhaul) | — |
 | 4. Flight Model v2 — tier & target-aware speed | 2/2 | Complete   | 2026-06-17 |
-| 5. Rendering Overhaul | 2/4 | Executing — Wave 3 next (05-03) | — |
+| 5. Rendering Overhaul | 3/4 | In Progress|  |
 
 Plans:
 
