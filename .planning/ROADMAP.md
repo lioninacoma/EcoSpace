@@ -145,7 +145,7 @@ Plans:
 
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — Branch + descriptor/projection foundation: LuminousBodyDescriptor + LuminousLod + LuminousDescriptorBuilder (single classify→project→appearance loop migrated from SkyboxRenderer) + unit tests, alongside the still-running skybox (no visual change) (wave 1)
+- [x] 05-01-PLAN.md — Branch + descriptor/projection foundation: LuminousBodyDescriptor + LuminousLod + LuminousDescriptorBuilder (single classify→project→appearance loop migrated from SkyboxRenderer) + unit tests, alongside the still-running skybox (no visual change) (wave 1) — COMPLETE 2026-06-19 (play-test APPROVED)
 
 **Wave 2** *(blocked on Wave 1 + play-test)*
 
@@ -260,7 +260,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Dynamic Skybox | 3/3 | Complete   | 2026-06-15 |
 | 3. Cross-Galaxy Travel | 3/3 | UAT partial (3/7 pass) — gated on the render debts (post-overhaul) | — |
 | 4. Flight Model v2 — tier & target-aware speed | 2/2 | Complete   | 2026-06-17 |
-| 5. Rendering Overhaul | 0/4 | Planned (4 waves) | — |
+| 5. Rendering Overhaul | 1/4 | Executing — Wave 2 next (05-02) | — |
 
 Plans:
 

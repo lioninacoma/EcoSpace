@@ -4,16 +4,16 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 05
 current_phase_name: Rendering Overhaul
-status: not-planned
+status: executing
 stopped_at: Phase 5 context gathered (scope reframed to post-process unified renderer)
-last_updated: "2026-06-19T06:48:36.207Z"
+last_updated: "2026-06-19T12:51:29.586Z"
 last_activity: 2026-06-19
-last_activity_desc: Phase 05 replaced; render debts un-bundled into standalone todos
+last_activity_desc: Phase 05 execution started
 progress:
   total_phases: 9
   completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 16
+  completed_plans: 13
   percent: 44
 ---
 
@@ -24,14 +24,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-12)
 
 **Core value:** The player can fly seamlessly through a massive 1:1-scale universe — from a planet's surroundings out to interstellar and intergalactic distances — with rendering and flight that stay correct and feel good across every scale.
-**Current focus:** Phase 05 — Rendering Overhaul (full rendering-layer rewrite; not yet planned)
+**Current focus:** Phase 05 — Rendering Overhaul
 
 ## Current Position
 
-Phase: 05 (Rendering Overhaul) — NOT PLANNED (defined in ROADMAP; awaiting discuss/plan)
-Plan: none yet (TBD)
-Status: Phase 05 restructured 2026-06-19 — old findability bundle deleted, Rendering Overhaul defined
-Last activity: 2026-06-19 — Phase 05 replaced; render debts un-bundled into standalone todos
+Phase: 05 (Rendering Overhaul) — EXECUTING
+Plan: 2 of 4
+Status: 05-01 complete — plan 2 of 4 next (05-02 LuminousPassRenderer)
+Last activity: 2026-06-19 — 05-01 descriptor foundation complete; play-test APPROVED (D-08 Plan 1)
 
 Next: `/gsd-discuss-phase 5` (recommended, scope is large) then `/gsd-plan-phase 5`.
 Blocking constraint carried forward: do NOT reintroduce the manual clip-space billboard
@@ -72,6 +72,7 @@ model lands. HUD target bugs + sibling-star-distance bug fixed & verified this s
 | Phase 03-cross-galaxy-travel P03 | 3 | 1 tasks | 1 files |
 | Phase 04 P01 | 5 | 3 tasks | 2 files |
 | Phase 04 P02 | 110 | 2 tasks | 1 files |
+| Phase 05 P05-01 | 10 | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -108,6 +109,11 @@ Recent decisions affecting current work:
 - [Phase ?]: D-43/D-44: target ease-out uses UniMath.Distance (LCA path); tier ceiling still caps; Hud.ActiveTargetIndex is read-only (D-45/D-12 preserved)
 - [Phase ?]: D-46: world-pinned phosphor-green outline in Hud._Draw gated on WorldRenderer.GetRenderPosition; DrawArc not DrawCircle (unfilled outline); MIN_CIRCLE_RADIUS=20f floor
 - [Phase ?]: Phase 04 follow-ons captured as backlog (user 2026-06-17): 999.2 shader target-sphere outline (matches body distortion); 999.3 distance-based cross-space targeting + autopilot warp drive (free roam km/s only, warp autopilot-only, intergalactic in minutes); 999.4 warp-drive visual FX
+- 05-01: D-02 implemented — LuminousBodyDescriptor is single source of truth for all drawers; direction via UniMath LCA, appearance via StarRendering, LOD via LuminousLod; replaces dual _skyDirs/_lastRenderPositions caches
+- 05-01: LuminousLod is global-namespace, Godot-free — StarMeshWeight thresholds (StarNearStart=5e12, StarNearEnd=5e13) are [ASSUMED] play-test knobs; GalaxyDiscWeight fade band 0.1*SOI–0.5*SOI also a tuning knob
+- 05-01: D-08 Plan 1 respected — SkyboxRenderer untouched, builder data-only (no drawable output), zero visual change; play-test gate APPROVED 2026-06-19
+- 05-01: Home-galaxy suppression guard (FindLca==body.Index) ported verbatim from SkyboxRenderer — consistent with user-locked decision 2026-06-16
+- 05-01: process_priority=-10 for LuminousDescriptorBuilder — deterministic ordering ensures Descriptors[] fresh before SkyboxRenderer/WorldRenderer _Process
 
 ### Roadmap Evolution
 
@@ -161,16 +167,14 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-19T06:48:36.199Z
-Stopped at: Phase 5 context gathered (scope reframed to post-process unified renderer)
-Resume file: .planning/phases/05-rendering-overhaul/05-CONTEXT.md
-Prior resume note: Old Phase 5 (findability bundle) deleted after the StarPointRenderer
-dead-end; its three render problems are now standalone debts in `.planning/todos/pending/`.
-New Phase 5 = "Rendering Overhaul" (full rewrite: WorldRenderer + post-process +
-body-lighting unified), defined in ROADMAP but NOT yet planned. Next: `/gsd-discuss-phase 5`
-then `/gsd-plan-phase 5`. Hard constraint: do NOT reintroduce the manual clip-space billboard
-MultiMesh. The render debts are explicitly out of scope for the overhaul and get their own
-later phases. Phase 03 UAT (3/7) stays gated on the render debts.
+Last session: 2026-06-19T12:51:29.578Z
+Stopped at: Phase 05 Plan 01 complete — 05-01 descriptor foundation (D-02) built, tested (47/47), play-test APPROVED (D-08 Plan 1). Next: 05-02 LuminousPassRenderer (Wave 2).
+Resume file: .planning/phases/05-rendering-overhaul/05-01-SUMMARY.md
+Prior resume note: 05-01 delivered: LuminousBodyDescriptor + LuminousLod + LuminousDescriptorBuilder
+wired at process_priority=-10 in Main.tscn. SkyboxRenderer untouched (D-08 Plan 1). Zero visual change,
+47/47 tests green. Plan 2 of 4 ready: 05-02 adds LuminousPassRenderer (depth-aware luminous_pass.gdshader
+spatial quad — the first drawable output on the descriptor foundation). StarMeshWeight/GalaxyDiscWeight
+thresholds are [ASSUMED] knobs to calibrate in 05-02 play-test.
 
 ## Refactor Notes
 
