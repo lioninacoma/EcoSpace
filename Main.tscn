@@ -192,7 +192,7 @@ SpeedPerTarget = 1.0
 
 [node name="SkyboxRenderer" type="Node" parent="." unique_id=-1293967282]
 script = ExtResource("7_skybox")
-BuilderPath = NodePath("LuminousDescriptorBuilder")
+BuilderPath = NodePath("../LuminousDescriptorBuilder")
 
 [node name="LuminousDescriptorBuilder" type="Node" parent="." unique_id=-1293967270]
 process_priority = -10

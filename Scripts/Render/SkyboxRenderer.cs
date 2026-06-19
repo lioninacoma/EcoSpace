@@ -34,10 +34,8 @@ namespace Render
 		private ShaderMaterial           _skyMat;
 		private LuminousDescriptorBuilder _builder;
 
-		private const int MaxStars    = 8;
-
-		/// <summary>Maximum galaxy entries in sky uniform arrays. Matches MAX_GALAXIES in skybox.gdshader.</summary>
-		private const int MaxGalaxies = 4;
+		private const int MaxStars    = 128;
+		private const int MaxGalaxies = 32;
 
 		/// <summary>Safety cap on a sky point's angular disc radius (radians, ~28°).</summary>
 		private const float MaxDiscAngle = 0.5f;

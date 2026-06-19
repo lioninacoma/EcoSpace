@@ -29,7 +29,8 @@
 
 shader_type sky;
 
-const int MAX_STARS = 8;
+const int MAX_STARS = 128;
+const int MAX_GALAXIES = 32;
 
 /// World-space unit directions from ship to each sky body. Packed as 8-element fixed array.
 /// Computed each frame by SkyboxRenderer using the LCA-relative hierarchy walk (Pitfall 5).
@@ -47,8 +48,6 @@ uniform float star_sizes[MAX_STARS];
 uniform int   star_count = 0;
 
 // ── Galaxy uniforms (D-40) ────────────────────────────────────────────────
-
-const int MAX_GALAXIES = 4;
 
 /// World-space unit direction to each galaxy center (same EYEDIR frame as star_dirs).
 uniform vec3  galaxy_dirs[MAX_GALAXIES];

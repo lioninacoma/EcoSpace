@@ -28,8 +28,8 @@ namespace Render
 
         // ----- Constants ------------------------------------------------------
 
-        private const int MaxStars    = 8;
-        private const int MaxGalaxies = 4;
+        private const int MaxStars    = 128;
+        private const int MaxGalaxies = 32;
 
         /// <summary>Safety cap on a sky-point disc angular radius (radians, ~28°).</summary>
         private const float MaxDiscAngle = 0.5f;
