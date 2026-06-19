@@ -1,35 +1,35 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-19T00:00:00.000Z",
+  "timestamp": "2026-06-19T21:10:16.721Z",
   "phase": "05",
   "phase_name": "rendering-overhaul",
   "phase_dir": ".planning/phases/05-rendering-overhaul",
-  "plan": null,
-  "task": null,
-  "total_tasks": null,
-  "status": "not-planned",
-  "head_commit": "c82cdff",
+  "plan": 4,
+  "task": 1,
+  "total_tasks": 3,
+  "status": "paused",
+  "head_commit": "a0d6070",
   "completed_tasks": [
-    {"id": 1, "name": "Delete the abandoned old Phase 5 (outer-tier-body-findability-galaxy-visibility) and its stale artifacts", "status": "done"},
-    {"id": 2, "name": "Define new Phase 5 = 'Rendering Overhaul' (full rewrite: WorldRenderer + post-process + body-lighting unified) in ROADMAP.md", "status": "done"},
-    {"id": 3, "name": "Un-bundle the 3 render problems into standalone todos; mark galaxy-disc-tilt resolved-pending-verify", "status": "done"},
-    {"id": 4, "name": "Scaffold .planning/phases/05-rendering-overhaul/ and update STATE.md", "status": "done"}
+    {"id": "05-01", "name": "Luminous descriptor foundation (LuminousBodyDescriptor + LuminousLod + LuminousDescriptorBuilder)", "status": "done", "commit": "28c3fed"},
+    {"id": "05-02", "name": "Descriptor-fed skybox refeed + distant-star brightness floor + galaxy_disc_weights groundwork + NearStarEmissionFloor missing-sun fix", "status": "done", "commit": "bca6120"},
+    {"id": "05-03", "name": "Near-star PSF lens flare (aperture diffraction) + per-pixel analytic depth occlusion + galaxy disc crossfade; closed via 5-iteration play-test loop", "status": "done", "commit": "a0d6070"}
   ],
   "remaining_tasks": [
-    {"id": 5, "name": "Discuss/plan the Rendering Overhaul (/gsd-discuss-phase 5 → /gsd-plan-phase 5)", "status": "not_started"}
+    {"id": "05-04", "name": "Finalize rendering overhaul: lock D-05 HDR/linear-before-dither composition ordering; remove dead WorldRenderer._lastRenderPositions cache + its per-frame writes (keep GetRenderPosition/GetRenderRadius working); confirm no stale galaxy uniforms remain in LuminousPassRenderer; final per-tier parity/improvement play-test across all four spaces (CRT stays OUT, D-06)", "status": "not_started", "wave": 4}
   ],
   "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [
-    {"action": "Run /gsd-discuss-phase 5 to scope the Rendering Overhaul before planning", "context": "Scope is a full rendering-layer rewrite (largest of the offered options); discuss-phase recommended to settle the architecture before plans are written.", "blocking": false}
+    {"action": "Final play-test gate at end of 05-04 (per-tier parity across Planet/Star/Galaxy/Universe spaces)", "context": "05-04 Task 3 is a checkpoint:human-verify; execution pauses for in-Godot verification", "blocking": true}
   ],
   "decisions": [
-    {"decision": "Delete the old Phase 5 findability bundle; do a foundational Rendering Overhaul first instead", "rationale": "The bundle tried to fix three render problems at once and dead-ended on the fragile StarPointRenderer (prior HANDOFF, commit c98f56c). User: don't fix all render problems in one phase.", "phase": "05"},
-    {"decision": "New Phase 5 = full rendering rewrite (WorldRenderer + post-process + body-lighting unified)", "rationale": "User selected the largest-scope option: one coherent multi-tier rendering layer that the render debts can then be solved on top of, individually.", "phase": "05"},
-    {"decision": "Keep the 3 render problems as standalone tracked debts, promoted to their own later phases", "rationale": "They are out of scope for the overhaul; the overhaul only exposes the seams (findability floor) they plug into.", "phase": "05"},
-    {"decision": "CARRIED FORWARD: do NOT reintroduce the manual clip-space billboard MultiMesh (StarPointRenderer) anti-pattern", "rationale": "Exhaustively tried and abandoned in the old Phase 5; structurally fragile against the engine.", "phase": "05"}
+    {"decision": "Metres->render conversion in this engine MUST be `metres / ship.LocalPos.Scale * StarRenderFactor` (observer-unit basis), never `metres * factor`", "rationale": "The 05-03 PSF depth-occlusion bug took 5 iterations; root cause was omitting the `/ ship.LocalPos.Scale` divisor, making star render-depth 1e4x too small in Planet space (scale=1e-4). Identical conversion is used at all 4 WorldRenderer call sites + descriptor RenderDistance.", "phase": "05"},
+    {"decision": "StarRenderFactor (1e-8) is a single source of truth: defined once in LuminousDescriptorBuilder, aliased by WorldRenderer.StarRenderFactor", "rationale": "Prevents the duplicate-literal drift that contributed to the units bug", "phase": "05"},
+    {"decision": "Render-space distance pre-computed in the builder and stored on LuminousBodyDescriptor.RenderDistance; consumed read-only by LuminousPassRenderer", "rationale": "LuminousPassRenderer is a Camera3D child with no WorldPath; resolving the world itself returned null and zeroed star_count (no PSF). The builder reliably has the ship. D-02 single-descriptor principle.", "phase": "05"},
+    {"decision": "Near-star glow is a screen-space aperture-diffraction PSF (inverse-cube core + H/V spikes), depth-gated per-pixel; galaxies are sky-shader-only (D-13)", "rationale": "User play-test direction (ShaderToy reference); reversed D-09 so the skybox stays the distant-body drawer (D-07)", "phase": "05"},
+    {"decision": "Play-test-approved knobs (D-04, 2026-06-19): PsfCoreScale=80, PsfSpikeLongScale=12, PsfSpikeShortScale=0.25, PsfIntensity=1.0, PsfLodFloor=0.02, PsfLodRange=0.6, PsfDepthEpsilon=50 (render units); MinVisibleBrightness=0.05; NearStarEmissionFloor=0.8; star/galaxy uniform caps 128/32", "rationale": "Calibrated live in the editor during the 05-02/05-03 play-tests", "phase": "05"}
   ],
   "uncommitted_files": [],
-  "next_action": "Run /gsd-discuss-phase 5 (recommended) then /gsd-plan-phase 5 to scope and plan the Rendering Overhaul. The three render debts in .planning/todos/pending/ are out of scope and get their own later phases.",
-  "context_notes": "Planning-only restructure (quick delete-phase5-add-rendering-overhaul, 2026-06-19). No code changed; HEAD remains the kept-galaxy-tilt baseline (c82cdff). The old Phase 5 directory and its stale 05-01/02/03 plans + RESEARCH/CONTEXT/PATTERNS were git-removed. Build/baseline state unchanged from prior session: clean build, 18/18 TierClassifier tests, galaxy tilt kept in Shaders/skybox.gdshader."
+  "next_action": "Run /gsd-execute-phase 5 (or --wave 4) to execute the final plan 05-04. Sequential on the main working tree (worktree auto-degraded per #683, origin/HEAD unresolved); ends in a blocking human-verify play-test.",
+  "context_notes": "Phase 5 = sequential single-plan waves with a blocking human play-test gate per plan. 3 of 4 plans complete. executor_model=sonnet, branch=phase-05-rendering-overhaul, no new branch (branching_strategy=none), auto-advance off. Build 0/0, 48/48 tests green. The 05-02 commits from BEFORE the architecture reversal were intentionally reused (not reverted) and subsumed by the replanned 05-02. 05-04 is pure finalization/cleanup + a final cross-space parity play-test."
 }
