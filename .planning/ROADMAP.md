@@ -140,7 +140,24 @@ Plans:
 
 **Verification**: in-game Godot play-test (GDShader/visual; not fully unit-testable) across all four spaces, plus the existing TierClassifier unit suite.
 
-**Plans**: TBD (run `/gsd-discuss-phase 5` then `/gsd-plan-phase 5`)
+**Plans**: 4 plans (4 sequential waves — D-08 incremental, play-test-gated)
+Plans:
+
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — Branch + descriptor/projection foundation: LuminousBodyDescriptor + LuminousLod + LuminousDescriptorBuilder (single classify→project→appearance loop migrated from SkyboxRenderer) + unit tests, alongside the still-running skybox (no visual change) (wave 1)
+
+**Wave 2** *(blocked on Wave 1 + play-test)*
+
+- [ ] 05-02-PLAN.md — Post-process star glow + point lights: depth-aware luminous_pass.gdshader spatial quad (Camera3D child) + LuminousPassRenderer; near stars glow/halo, distant stars points, continuous point↔mesh handoff; supersedes Sky-shader star points (closes P1) (wave 2)
+
+**Wave 3** *(blocked on Wave 2 + play-test)*
+
+- [ ] 05-03-PLAN.md — Galaxy distance crossfade: port spiral/elliptical/tilt disc verbatim into luminous_pass.gdshader (disc fades out approaching / in leaving); REMOVE SkyboxRenderer + skybox.gdshader + Sky Environment (closes P2) (wave 3)
+
+**Wave 4** *(blocked on Wave 3 + play-test)*
+
+- [ ] 05-04-PLAN.md — Dither composition + cleanup: luminous pass composes in HDR before the 8-bit dither (D-05); remove dead WorldRenderer._lastRenderPositions cache; final per-tier parity/improvement play-test (CRT stays out per D-06) (wave 4)
 
 ## Backlog
 
@@ -243,7 +260,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Dynamic Skybox | 3/3 | Complete   | 2026-06-15 |
 | 3. Cross-Galaxy Travel | 3/3 | UAT partial (3/7 pass) — gated on the render debts (post-overhaul) | — |
 | 4. Flight Model v2 — tier & target-aware speed | 2/2 | Complete   | 2026-06-17 |
-| 5. Rendering Overhaul | 0/0 | Not planned | — |
+| 5. Rendering Overhaul | 0/4 | Planned (4 waves) | — |
 
 Plans:
 
