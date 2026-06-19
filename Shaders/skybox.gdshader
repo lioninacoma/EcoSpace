@@ -65,6 +65,12 @@ uniform int   galaxy_types[MAX_GALAXIES];
 /// xyz = disc normal (world-space unit vector), w = procedural arm seed (D-29).
 uniform vec4  galaxy_orientations[MAX_GALAXIES];
 
+/// Per-galaxy LOD crossfade weight from LuminousLod.GalaxyDiscWeight (D-13 groundwork).
+/// 0 = galaxy suppressed (inside SOI or fading in); 1 = galaxy fully visible.
+/// Multiplied into the galaxy contribution so the disc fades in/out continuously
+/// instead of popping on SOI boundary crossing (Pitfall 2 / RESEARCH Pattern 2).
+uniform float galaxy_disc_weights[MAX_GALAXIES];
+
 /// Number of valid galaxies in the arrays above. Shader loops only up to this count.
 uniform int   galaxy_count = 0;
 
@@ -188,7 +194,7 @@ void sky()
         } else {
             galaxy_bright = 0.0;
         }
-        col += galaxy_colors[i].rgb * galaxy_bright;
+        col += galaxy_colors[i].rgb * galaxy_bright * galaxy_disc_weights[i];
     }
 
     COLOR = col;

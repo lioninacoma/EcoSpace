@@ -9,7 +9,7 @@
 [ext_resource type="Script" uid="uid://db0taudntiicx" path="res://Scripts/Render/SkyboxRenderer.cs" id="7_skybox"]
 [ext_resource type="Shader" uid="uid://b2ogcviap8k7w" path="res://Shaders/skybox.gdshader" id="8_skyshdr"]
 [ext_resource type="Script" uid="uid://d0s2gbtdy25og" path="res://Scripts/Render/LuminousDescriptorBuilder.cs" id="9_lumdescbld"]
-[ext_resource type="Script" uid="uid://lumpassrend01" path="res://Scripts/Render/LuminousPassRenderer.cs" id="10_lumpassrnd"]
+[ext_resource type="Script" uid="uid://tsi6i4rux5yk" path="res://Scripts/Render/LuminousPassRenderer.cs" id="10_lumpassrnd"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("8_skyshdr")
@@ -22,6 +22,7 @@ shader_parameter/galaxy_colors = PackedColorArray(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 shader_parameter/galaxy_sizes = PackedFloat32Array(0, 0, 0, 0)
 shader_parameter/galaxy_types = PackedInt32Array(0, 0, 0, 0)
 shader_parameter/galaxy_orientations = PackedVector4Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+shader_parameter/galaxy_disc_weights = PackedFloat32Array(0, 0, 0, 0)
 shader_parameter/galaxy_count = 0
 
 [sub_resource type="Sky" id="Sky_main"]
@@ -191,7 +192,7 @@ SpeedPerTarget = 1.0
 
 [node name="SkyboxRenderer" type="Node" parent="." unique_id=-1293967282]
 script = ExtResource("7_skybox")
-WorldPath = NodePath("..")
+BuilderPath = NodePath("LuminousDescriptorBuilder")
 
 [node name="LuminousDescriptorBuilder" type="Node" parent="." unique_id=-1293967270]
 process_priority = -10
