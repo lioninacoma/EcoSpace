@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 current_phase: 05
-current_phase_name: rendering-overhaul
+current_phase_name: Rendering Overhaul
 status: not-planned
-stopped_at: Phase 5 restructured — Rendering Overhaul defined, awaiting discuss/plan
-last_updated: "2026-06-19T00:00:00.000Z"
+stopped_at: Phase 5 context gathered (scope reframed to post-process unified renderer)
+last_updated: "2026-06-19T06:48:36.207Z"
 last_activity: 2026-06-19
-last_activity_desc: Phase 05 replaced (findability bundle → Rendering Overhaul); render debts un-bundled
+last_activity_desc: Phase 05 replaced; render debts un-bundled into standalone todos
 progress:
   total_phases: 9
   completed_phases: 4
@@ -161,9 +161,9 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-19
-Stopped at: Phase 5 restructured (quick delete-phase5-add-rendering-overhaul)
-Resume file: .planning/phases/05-rendering-overhaul/ (scaffold only — run discuss/plan)
+Last session: 2026-06-19T06:48:36.199Z
+Stopped at: Phase 5 context gathered (scope reframed to post-process unified renderer)
+Resume file: .planning/phases/05-rendering-overhaul/05-CONTEXT.md
 Prior resume note: Old Phase 5 (findability bundle) deleted after the StarPointRenderer
 dead-end; its three render problems are now standalone debts in `.planning/todos/pending/`.
 New Phase 5 = "Rendering Overhaul" (full rewrite: WorldRenderer + post-process +
