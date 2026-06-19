@@ -43,6 +43,13 @@
     <Compile Include="..\Scripts\Math\UniMath.cs" />
     <!-- LuminousLod: pure distance→LOD-weight curves; no Godot dependency, unit-testable. -->
     <Compile Include="..\Scripts\Render\LuminousLod.cs" />
+    <!-- LuminousBodyDescriptor: plain data struct; depends on Godot.Color/Vector3/Vector4 via GodotSharp. -->
+    <Compile Include="..\Scripts\Render\LuminousBodyDescriptor.cs" />
+    <!-- GameWorld + TestSetup: needed to compile LuminousDescriptorBuilder (_world field type). -->
+    <Compile Include="..\Scripts\GameWorld.cs" />
+    <Compile Include="..\Scripts\TestSetup.cs" />
+    <!-- LuminousDescriptorBuilder: Godot Node with static ComputeDescriptor helper under test. -->
+    <Compile Include="..\Scripts\Render\LuminousDescriptorBuilder.cs" />
   </ItemGroup>
 
 </Project>
