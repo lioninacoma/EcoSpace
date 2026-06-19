@@ -1,7 +1,6 @@
 // luminous_pass.gdshader
-// Depth-aware spatial quad pass for EcoSpace — draws star glow/halo (near) and points (far)
-// and galaxy disc/points for all luminous bodies, composited additively before the CanvasLayer
-// dither pass (D-05 ordering: transparent 3D pass < glow < CanvasLayer).
+// Depth-aware spatial quad pass for EcoSpace — draws near-star glow/halo only.
+// Galaxies are rendered entirely in skybox.gdshader (D-13 / Plan 3 narrowing).
 //
 // TECHNIQUE — "advanced post-processing" pattern (Godot docs):
 //   Camera3D-child Node3D hosts a 2×2 QuadMesh with FlipFaces=true.
@@ -29,16 +28,22 @@
 //   semantic as EYEDIR in a sky shader.  Computed once per fragment and stored in
 //   `world_view_dir` for all subsequent dot-product tests.
 //
-// LOD FADE (D-03 / RND-07):
+// LOD FADE + DEPTH GATE BLEND (D-11 / D-03 / RND-07 / Plan 3):
 //   lod_fade = 1.0 - star_lod_weights[i]: when LodWeight=1 (star very near, mesh dominant),
 //   the post-process contribution fades to 0 so only the body_lit mesh is visible.
 //   When LodWeight=0 (star far away), lod_fade=1 so the point/glow is fully visible.
-//   This continuous blend is the only mechanism — no discrete SOI-boundary swap (D-03).
 //
-// GALAXY STUB (Plan 2):
-//   Galaxy disc helper functions are included verbatim from skybox.gdshader (D-59 TILT_FLOOR
-//   guard, d>0.0 antipodal ghost gate).  The full procedural disc is wired in Plan 3.
-//   In Plan 2, galaxies render as a faint point-disc weighted by galaxy_disc_weights.
+//   is_near = star_lod_weights[i]: used to relax the sky_pixel depth gate for near stars.
+//   Far stars (is_near≈0): glow only paints on sky pixels, preventing bleed over geometry.
+//   Near stars (is_near→1): glow paints over the visible mesh as a halo.
+//   When LodWeight=1 (mesh dominant): vis=1 but lod_fade=0, so vis*lod_fade=0 — halo gone.
+//   This continuous blend drives the three-stage star handoff (D-11): pop-free by construction.
+//
+// GALAXIES REMOVED (D-13 / Plan 3):
+//   Galaxy rendering belongs entirely to the sky shader (shader_type sky renders at infinite
+//   depth behind all geometry automatically).  All galaxy uniforms, helper functions, and the
+//   galaxy loop have been removed from this pass.  LuminousPassRenderer no longer pushes
+//   galaxy uniforms.
 //
 // DO NOT add hint_depth_texture to dithering.gdshader (canvas_item) — Pitfall 1 / bug #74464.
 
@@ -63,92 +68,11 @@ uniform float star_sizes[MAX_STARS];
 
 /// LOD weight from LuminousLod.StarMeshWeight: 0 = far/point-dominant, 1 = near/mesh-dominant.
 /// lod_fade = 1 - star_lod_weights[i] so the post-process glow fades as the mesh takes over.
+/// is_near  = star_lod_weights[i] relaxes the sky_pixel gate so the halo wraps the mesh.
 uniform float star_lod_weights[MAX_STARS];
 
 /// Number of valid entries in the star arrays above.
 uniform int   star_count = 0;
-
-// ── Galaxy uniforms ────────────────────────────────────────────────────────────
-const int MAX_GALAXIES = 4;
-
-/// World-space unit directions ship→galaxy center.
-uniform vec3  galaxy_dirs[MAX_GALAXIES];
-
-/// RGB = BaseColor, A = ApparentBrightness.
-uniform vec4  galaxy_colors[MAX_GALAXIES];
-
-/// Angular disc half-size in (1 - cos θ) smoothstep space.
-uniform float galaxy_sizes[MAX_GALAXIES];
-
-/// LOD weight from LuminousLod.GalaxyDiscWeight: 0 = inside galaxy (no disc), 1 = far (full disc).
-uniform float galaxy_disc_weights[MAX_GALAXIES];
-
-/// 0 = spiral, 1 = elliptical (D-29).
-uniform int   galaxy_types[MAX_GALAXIES];
-
-/// xyz = disc normal (world-space unit vector), w = procedural arm seed (D-29).
-uniform vec4  galaxy_orientations[MAX_GALAXIES];
-
-/// Number of valid entries in the galaxy arrays above.
-uniform int   galaxy_count = 0;
-
-// ── Galaxy disc constants (verbatim from skybox.gdshader) ─────────────────────
-const float GALAXY_LOD_THRESHOLD = 2e-4;  // sub-pixel point → structured disc threshold
-const float GALAXY_DISC_SCALE    = 80.0;  // angular→UV scale; tune for arm/disc appearance
-const float TILT_FLOOR           = 0.15;  // D-59: minimum tilt compression — MUST stay > 0
-                                           // removing this causes ring-collapse (T-05-03)
-const float detail_blend         = 0.35;  // D-54: bounded grain overlay strength [0..1]
-
-// ── Galaxy helper functions (verbatim from skybox.gdshader) ───────────────────
-
-/// Returns a 2D disc-plane UV for eye_dir relative to a galaxy at galaxy_dir,
-/// with D-59 safe-basis tilt foreshortening via disc_normal.
-///
-/// Basis is built from galaxy_dir ONLY — NEVER from disc_normal (fef1d91 ring-collapse
-/// landmine: building from disc_normal degenerates when disc_normal ≈ world-up).
-/// TILT_FLOOR clamps foreshortening so it never reaches zero (T-05-03).
-/// Caller MUST gate on dot(eye_dir, galaxy_dir) > 0 (front hemisphere only) to prevent
-/// the perpendicular projection from ghosting the disc onto the antipode (Pitfall 4).
-vec2 galaxy_disc_coords_tilted(vec3 eye_dir, vec3 galaxy_dir, vec3 disc_normal) {
-    // 1. Stable face-on tangent basis from galaxy_dir (never from disc_normal — D-59 rule)
-    vec3 up0 = abs(galaxy_dir.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
-    vec3 t1  = normalize(cross(up0, galaxy_dir));
-    vec3 t2  = cross(galaxy_dir, t1);
-    // View-plane offset of the eye ray from the galaxy center.
-    vec3 delta = eye_dir - dot(eye_dir, galaxy_dir) * galaxy_dir;
-    vec2 uv = vec2(dot(delta, t1), dot(delta, t2));
-
-    // 2. D-59 tilt foreshortening via disc_normal's in-plane projection
-    vec2  disc_normal_uv  = vec2(dot(disc_normal, t1), dot(disc_normal, t2));
-    float disc_normal_len = length(disc_normal_uv);
-    if (disc_normal_len > 0.001) {
-        vec2  minor_axis  = disc_normal_uv / disc_normal_len;
-        // tilt_factor: face-on = 1 (circular), edge-on = 0 (collapsed)
-        float tilt_factor = abs(dot(disc_normal, galaxy_dir));
-        float safe_tilt   = clamp(tilt_factor, TILT_FLOOR, 1.0);
-        float minor_comp  = dot(uv, minor_axis);
-        vec2  major_dir   = vec2(-minor_axis.y, minor_axis.x);
-        float major_comp  = dot(uv, major_dir);
-        uv = minor_axis * minor_comp * safe_tilt + major_dir * major_comp;
-    }
-    return uv;
-}
-
-/// Returns [0,1] brightness for a procedural 2-arm spiral galaxy at disc-plane UV.
-float spiral_galaxy(vec2 uv, float seed) {
-    float r     = length(uv);
-    float theta = atan(uv.y, uv.x);
-    float disc  = exp(-r * r * 4.0);
-    float arms  = 0.5 + 0.5 * sin(2.0 * theta - 8.0 * r + seed * 6.28318);
-    float grain = fract(sin(r * 37.0 + seed * 13.0 + theta * 7.0) * 43758.5453);
-    return disc * mix(arms, grain, smoothstep(0.2, 0.6, r));
-}
-
-/// Returns [0,1] brightness for a procedural elliptical galaxy at disc-plane UV.
-float elliptical_galaxy(vec2 uv) {
-    float r = length(vec2(uv.x * 1.6, uv.y));
-    return exp(-r * r * 3.0);
-}
 
 // ── Vertex stage ───────────────────────────────────────────────────────────────
 
@@ -167,7 +91,7 @@ void fragment() {
     // ── Depth sample (scale-independent sky-pixel gate — Pitfall 5) ───────────
     // Forward+ reversed-Z: far plane = 0.0, near plane = 1.0.
     // raw_depth < 1e-6 → far plane → empty sky pixel → glow allowed.
-    // raw_depth > 1e-6 → foreground geometry present → suppress glow.
+    // raw_depth > 1e-6 → foreground geometry present → suppress glow (for far stars).
     float raw_depth = texture(depth_texture, SCREEN_UV).x;
     bool  sky_pixel = (raw_depth < 1e-6);
 
@@ -200,7 +124,7 @@ void fragment() {
         return;
     #endif
 
-    // ── Star loop ──────────────────────────────────────────────────────────────
+    // ── Star loop (near-star glow/halo only — D-11 / Plan 3) ──────────────────
     for (int i = 0; i < star_count; i++) {
         // dot(world_view_dir, star_dirs[i]) → cos of angle between view ray and star direction.
         // Approaches 1.0 when looking directly at the star.
@@ -214,59 +138,20 @@ void fragment() {
         float halo_size = star_sizes[i] * 8.0;
         float halo      = smoothstep(1.0 - halo_size, 1.0, d) * 0.3;
 
-        // Depth occlusion gate: only paint on empty-sky pixels (Pitfall 5 / D-03).
-        // Uses the scale-independent sky_pixel flag (raw_depth < 1e-6).
-        float vis = sky_pixel ? 1.0 : 0.0;
-
         // LOD fade: glow/point fades OUT as the star mesh takes over (D-03 / RND-07).
         // lod_fade = 1 when LodWeight=0 (far, point dominant); 0 when LodWeight=1 (near, mesh dominant).
         float lod_fade = 1.0 - star_lod_weights[i];
 
+        // Depth gate blend (RESEARCH Pattern 4 / D-11 / Plan 3):
+        //   is_near blends between sky-gated (far star) and fully open (near star halo).
+        //   Far star (is_near=0): only paint on sky pixels — prevents glow bleeding over geometry.
+        //   Near star (is_near=1): paint over the star mesh — the halo wraps the visible sphere.
+        //   Product vis * lod_fade = 0 at LodWeight=1: glow fully gone when mesh dominates.
+        //   Pop-free by construction (D-11): glow and mesh cross-fade continuously via lod_fade.
+        float is_near = star_lod_weights[i];
+        float vis     = mix(sky_pixel ? 1.0 : 0.0, 1.0, is_near);
+
         col.rgb += star_colors[i].rgb * (star_colors[i].a * (disc + halo) * vis * lod_fade);
-    }
-
-    // ── Galaxy loop ────────────────────────────────────────────────────────────
-    for (int i = 0; i < galaxy_count; i++) {
-        float disc_w = galaxy_disc_weights[i];
-        // Inside the home galaxy (disc_w ≈ 0) — skip entirely (home-galaxy suppression).
-        if (disc_w < 0.001) continue;
-
-        float size       = galaxy_sizes[i];
-        float d          = dot(world_view_dir, galaxy_dirs[i]);
-        float point_disc = smoothstep(1.0 - size, 1.0, d);
-
-        float galaxy_bright;
-        if (size < GALAXY_LOD_THRESHOLD) {
-            // Sub-pixel / tiny apparent size: render as a point identical to star.
-            galaxy_bright = point_disc * galaxy_colors[i].a;
-        } else if (d > 0.0) {
-            // FRONT HEMISPHERE ONLY — d > 0.0 gate prevents disc from painting its antipode
-            // (Pitfall 4 / skybox.gdshader line 165 / d>0.0 Antipodal Ghost Gate).
-            float seed     = galaxy_orientations[i].w;
-            vec3  disc_nrm = galaxy_orientations[i].xyz;
-
-            // D-59 safe-basis tilt: UV from galaxy_dir basis, minor axis compressed by disc_normal.
-            // world_view_dir replaces normalize(EYEDIR) — same world-space semantic, spatial-safe.
-            vec2  uv = galaxy_disc_coords_tilted(world_view_dir, galaxy_dirs[i], disc_nrm);
-            uv /= max(size * GALAXY_DISC_SCALE, 0.001);
-
-            float disc_bright;
-            if (galaxy_types[i] == 0)
-                disc_bright = spiral_galaxy(uv, seed);
-            else
-                disc_bright = elliptical_galaxy(uv);
-
-            // D-54: bounded value-noise grain MULTIPLIED into disc_bright.
-            float grain = fract(sin(dot(uv, vec2(12.9898, 78.233))) * 43758.5453);
-            disc_bright *= mix(1.0, 0.55 + 0.45 * grain, detail_blend);
-
-            // Blend: 30% point (center highlight + star-matching handoff) + 70% disc structure.
-            galaxy_bright = mix(disc_bright, point_disc, 0.3) * galaxy_colors[i].a;
-        } else {
-            galaxy_bright = 0.0;
-        }
-
-        col.rgb += galaxy_colors[i].rgb * galaxy_bright * disc_w;
     }
 
     // ── Output ─────────────────────────────────────────────────────────────────
