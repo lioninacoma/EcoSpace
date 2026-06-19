@@ -5,10 +5,10 @@ milestone_name: milestone
 current_phase: 05
 current_phase_name: Rendering Overhaul
 status: executing
-stopped_at: Phase 5 context gathered (scope reframed to post-process unified renderer)
+stopped_at: Phase 5 paused mid-execution — 05-01 done; 05-02 play-test reversed the architecture (sky shader for distant bodies + post-process for glow/halo); replanning 2-4
 last_updated: "2026-06-19T12:51:29.586Z"
 last_activity: 2026-06-19
-last_activity_desc: Phase 05 execution started
+last_activity_desc: Phase 05 paused for replan — 05-02 play-test reversed architecture to sky-shader + post-process-glow split
 progress:
   total_phases: 9
   completed_phases: 4
@@ -28,12 +28,37 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 
 ## Current Position
 
-Phase: 05 (Rendering Overhaul) — EXECUTING
-Plan: 2 of 4
-Status: 05-01 complete — plan 2 of 4 next (05-02 LuminousPassRenderer)
-Last activity: 2026-06-19 — 05-01 descriptor foundation complete; play-test APPROVED (D-08 Plan 1)
+Phase: 05 (Rendering Overhaul) — EXECUTION PAUSED FOR REPLAN (2026-06-19)
+Plan: 1 of 4 complete; 2–4 to be REPLANNED around a revised architecture
+Status: 05-02 play-test surfaced an architecture reversal — see below.
+Last activity: 2026-06-19 — 05-02 play-test rejected; user chose to replan plans 2–4
 
-Next: `/gsd-discuss-phase 5` (recommended, scope is large) then `/gsd-plan-phase 5`.
+### ARCHITECTURE REVERSAL (decided 2026-06-19, user-driven at 05-02 play-test)
+
+The original phase frame ("replace the Sky skybox with a unified depth-aware
+post-process luminous pass"; discussion-log line 53; D-08/D-09) is REVERSED.
+Play-testing 05-02 showed the post-process spatial quad inherently CANNOT occlude
+behind opaque meshes — distant stars/galaxies paint in front of planets. A
+`shader_type sky` renders at infinite distance behind all geometry automatically,
+which is the correct tool for distant bodies.
+
+**New target architecture (to drive the replan of 2–4):**
+- **Sky shader** (keep/refeed the existing `skybox.gdshader` — do NOT delete it; reverses D-09)
+  renders DISTANT stars + galaxies, fed by the Plan-1 `LuminousBodyDescriptor` pipeline
+  (single source of truth — 05-01 survives intact and stays the feed).
+- **Post-process shader** (`luminous_pass.gdshader`) narrows to GLOW / HALO around near
+  stars only (a screen-space effect — its correct use).
+- Plan 1 (descriptor pipeline) is unchanged and reused. Plans 3 (was "remove skybox") and
+  4 must be reworked: skybox stays, galaxy disc stays in the sky shader.
+
+**Partial 05-02 work already committed (reusable, NOT reverted):**
+- 8d28b90 `luminous_pass.gdshader` (will narrow to glow/halo)
+- f6287c3 `LuminousPassRenderer.cs` + Main.tscn wiring (will repurpose)
+- 22e4bc8 EYEDIR→world_view_dir fix (spatial-shader-safe view ray)
+05-02 has NO SUMMARY and is NOT marked complete — it is being redesigned.
+
+Next: `/gsd-discuss-phase 5` to record the revised decisions (supersede D-08/D-09),
+then `/gsd-plan-phase 5` to regenerate plans 2–4. Plan 1 stays done.
 Blocking constraint carried forward: do NOT reintroduce the manual clip-space billboard
 MultiMesh (StarPointRenderer) anti-pattern — see the render debts and prior HANDOFF.
 
