@@ -16,11 +16,18 @@
 //   Sky-pixel gate is scale-independent (raw depth, not linear depth) so it works correctly
 //   across all coordinate spaces (PlanetSpace render factor 1e-8 through Galaxy space).
 //
-// EYEDIR IN SPATIAL FRAGMENT (Open Question 1):
-//   EYEDIR is documented as world-space in shader_type spatial fragments (same meaning as the
-//   sky shader built-in).  If it turns out to be screen-locked instead of world-locked, the
-//   fallback is to uncomment the DEBUG_EYEDIR block, confirm in-game, then replace EYEDIR with
-//   (INV_VIEW_MATRIX * vec4(0,0,-1,0)).xyz in the dot-product expressions.
+// WORLD VIEW RAY RECONSTRUCTION (Open Question 1 — RESOLVED):
+//   EYEDIR is NOT available in shader_type spatial fragments — it is a built-in exclusive to
+//   shader_type sky.  Using EYEDIR in a spatial shader causes a compile error at runtime.
+//   Resolution: reconstruct the per-fragment world-space view ray from screen coordinates.
+//
+//   Method (chosen for reliability on a screen-filling bypass quad):
+//     1. Build NDC from SCREEN_UV and raw_depth (already available).
+//     2. Unproject to view space via INV_PROJECTION_MATRIX.
+//     3. Rotate to world space via INV_VIEW_MATRIX with w=0 (direction, not position).
+//   This gives a world-space direction FROM the camera THROUGH the fragment — the same
+//   semantic as EYEDIR in a sky shader.  Computed once per fragment and stored in
+//   `world_view_dir` for all subsequent dot-product tests.
 //
 // LOD FADE (D-03 / RND-07):
 //   lod_fade = 1.0 - star_lod_weights[i]: when LodWeight=1 (star very near, mesh dominant),
@@ -164,31 +171,41 @@ void fragment() {
     float raw_depth = texture(depth_texture, SCREEN_UV).x;
     bool  sky_pixel = (raw_depth < 1e-6);
 
-    // Linear depth retained for debugging / future tuning.
+    // Unproject fragment to view space for lin_depth AND world view ray.
     // "render units" = metres × per-space render factor (1e-8 for star/galaxy space).
     vec3  ndc       = vec3(SCREEN_UV * 2.0 - 1.0, raw_depth);
     vec4  view      = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
     view.xyz       /= view.w;
     float lin_depth = -view.z;   // positive = distance from camera in render units
 
-    // ── DEBUG: EYEDIR sanity check (Open Question 1) ──────────────────────────
-    // Set DEBUG_EYEDIR to 1 to confirm EYEDIR is world-space on the quad.
-    // A smooth world-space gradient (not screen-locked) confirms EYEDIR is correct.
-    // If the gradient is screen-locked (stays fixed as you rotate), switch star/galaxy
-    // dot-product to use: normalize((INV_VIEW_MATRIX * vec4(0.0,0.0,-1.0,0.0)).xyz)
+    // ── World-space view direction (EYEDIR replacement — Open Question 1 resolved) ──
+    // EYEDIR is only available in shader_type sky; in shader_type spatial we reconstruct
+    // the world-space direction from camera through the fragment using INV_VIEW_MATRIX.
+    //
+    // w=0 → rotate only (no translation); normalize before use.
+    // Handedness: Godot world space is right-handed (+Y up, -Z forward).
+    // star_dirs[] are world-space unit vectors built by LuminousDescriptorBuilder via
+    // UniMath (LCA frame walk), same coordinate system → no sign flip needed.
+    vec3 world_view_dir = normalize((INV_VIEW_MATRIX * vec4(view.xyz, 0.0)).xyz);
+
+    // ── DEBUG: world view ray sanity check (Open Question 1 — replaces EYEDIR debug) ──
+    // Set DEBUG_EYEDIR to 1 to verify world_view_dir is world-locked (not screen-locked).
+    // Rotating the ship should make the gradient move — if it stays fixed, the quad
+    // transform bypasses INV_VIEW_MATRIX (unlikely for Camera3D-child quads but verify).
     // Default: DEBUG_EYEDIR = 0 (production mode).
     #define DEBUG_EYEDIR 0
     #if DEBUG_EYEDIR
-        ALBEDO = normalize(EYEDIR) * 0.5 + 0.5;
+        ALBEDO = world_view_dir * 0.5 + 0.5;
         ALPHA  = 1.0;
         return;
     #endif
 
     // ── Star loop ──────────────────────────────────────────────────────────────
     for (int i = 0; i < star_count; i++) {
-        // dot(normalize(EYEDIR), star_dirs[i]) → cos of angle between view ray and star direction.
+        // dot(world_view_dir, star_dirs[i]) → cos of angle between view ray and star direction.
         // Approaches 1.0 when looking directly at the star.
-        float d    = dot(normalize(EYEDIR), star_dirs[i]);
+        // world_view_dir replaces EYEDIR (sky-shader-only built-in — see header comment).
+        float d    = dot(world_view_dir, star_dirs[i]);
         float disc = smoothstep(1.0 - star_sizes[i], 1.0, d);
 
         // Glow halo: wider softened ring around the point core.
@@ -215,7 +232,7 @@ void fragment() {
         if (disc_w < 0.001) continue;
 
         float size       = galaxy_sizes[i];
-        float d          = dot(normalize(EYEDIR), galaxy_dirs[i]);
+        float d          = dot(world_view_dir, galaxy_dirs[i]);
         float point_disc = smoothstep(1.0 - size, 1.0, d);
 
         float galaxy_bright;
@@ -229,7 +246,8 @@ void fragment() {
             vec3  disc_nrm = galaxy_orientations[i].xyz;
 
             // D-59 safe-basis tilt: UV from galaxy_dir basis, minor axis compressed by disc_normal.
-            vec2  uv = galaxy_disc_coords_tilted(normalize(EYEDIR), galaxy_dirs[i], disc_nrm);
+            // world_view_dir replaces normalize(EYEDIR) — same world-space semantic, spatial-safe.
+            vec2  uv = galaxy_disc_coords_tilted(world_view_dir, galaxy_dirs[i], disc_nrm);
             uv /= max(size * GALAXY_DISC_SCALE, 0.001);
 
             float disc_bright;
