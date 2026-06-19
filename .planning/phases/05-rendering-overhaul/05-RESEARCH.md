@@ -1,8 +1,13 @@
 # Phase 5: Rendering Overhaul - Research
 
-**Researched:** 2026-06-19
-**Domain:** Godot 4.6 Forward+ post-process rendering — luminous-body descriptor pipeline, depth-aware screen-space pass, skybox replacement
-**Confidence:** MEDIUM (architecture from codebase inspection HIGH; Godot 4.6-specific API behaviour MEDIUM/LOW due to rapidly-evolving engine internals)
+**Researched:** 2026-06-19 (revised — overwrites stale pre-05-02 document)
+**Domain:** Godot 4.6 Forward+ rendering pipeline, sky shaders, spatial post-process composition, LOD blending
+**Confidence:** HIGH (grounded in live codebase code read + Godot 4 rendering model)
+
+> **This document REPLACES the previous 05-RESEARCH.md.** The prior version described an
+> architecture (unified depth-aware post-process pass replacing the sky shader) that the 05-02
+> play-test **disproved**. All content below is grounded in the REVISED architecture from
+> 05-CONTEXT.md (post-revision). Do NOT use the old file; it has been overwritten.
 
 ---
 
@@ -11,38 +16,38 @@
 
 ### Locked Decisions
 
-- **D-01** Consolidate, preserve precision math. Rewrite the structure; preserve UniMath LCA-relative walks, floating-origin loop, StarRendering, TierClassifier, body_lit.gdshader.
-- **D-02** One descriptor, shared by all drawers. Each frame, each luminous body is described once (direction, angular size, brightness, color, distance LOD weight). Collapses `_skyDirs` + `_lastRenderPositions` into one source.
-- **D-03** Crossfades are distance-driven, continuous, and depth-aware. Star near↔far and galaxy far↔near are smooth functions of distance, not discrete SOI-boundary swaps. Post-process pass must read the depth buffer.
-- **D-04** No-regression bar, improvement welcome; judged by per-tier in-game play-test.
-- **D-05** Glow/point/galaxy pass composes in HDR/linear BEFORE the dither quantizes the whole frame. New pass + dither pass must be ordered correctly.
-- **D-06** CRT scanlines (RND-01) OUT OF SCOPE.
-- **D-07** Remove SkyboxRenderer + skybox.gdshader; keep WorldRenderer meshes. Descriptor that fed the Sky shader now feeds post-process pass.
-- **D-08** One phase, 4 sequential play-test-gated plans:
-  1. Branch + descriptor/projection foundation (alongside still-running skybox; no visual change)
-  2. Post-process star glow + point lights (depth-aware; replace Sky-shader star points)
-  3. Galaxy distance crossfade (disc fades out approaching; remove skybox)
-  4. Dither composition + cleanup
-- **D-09** Fold P1 (galaxy-space-star-meshes-invisible) + P2 (galaxy-visibility-in-universe-space) in; close them here.
-- **D-10** Work on branch `phase-05-rendering-overhaul`.
-- ⛔ NO manual clip-space billboard MultiMesh (StarPointRenderer anti-pattern).
-- ✅ UniMath LCA-relative precision math preserved.
-- ✅ StarRendering single source of truth for appearance.
-- ✅ 8-bit dither (D-27), unit-space render, per-space 1e-8 render factors, 1e6 camera far plane, body_lit.gdshader.
-- ✅ D-21 instant exact-match (no palette cross-dissolve; D-03's LOD blend is in HDR before quantization).
+- **D-01:** Architecturally a rewrite (one unified classify→describe→draw pipeline), but the hard-won primitives are preserved/extended: `UniMath` LCA-relative walks, the floating-origin per-frame sync loop, `StarRendering`, `TierClassifier`, `body_lit.gdshader`.
+- **D-02 (DELIVERED, Plan 1):** One descriptor (`LuminousBodyDescriptor`) shared by all drawers. Produced by `LuminousDescriptorBuilder` (process_priority=-10). Never re-classify per drawer.
+- **D-03 (RATIONALE UPDATED):** Crossfades are distance-driven and continuous. Occlusion handled per-layer: sky shader renders distant bodies behind all geometry automatically; near-star glow is screen-space; meshes are depth-sorted by the mesh renderer.
+- **D-04:** Acceptance bar = "nothing gets worse," judged subjectively per tier at each plan's play-test gate. No pixel-matching.
+- **D-05 (SCOPE NARROWED):** Near-star glow/halo pass composes in HDR/linear BEFORE dither quantizes the frame. Ordering of glow pass vs dither pass must be correct.
+- **D-06:** CRT scanlines out of scope — deferred.
+- **D-07 (REVERSED from original):** Keep `skybox.gdshader` + `SkyboxRenderer` + Sky `Environment`. Do NOT remove the skybox. Refeed it from `LuminousDescriptorBuilder.Descriptors` instead of its own `SyncSkyPoints` cache.
+- **D-08 (REVISED):** 4 sequential play-test-gated plans. Plan 1 done. Plans 2-4 per the findability-first re-slice.
+- **D-09 (REVISED):** Fold P1 (galaxy-space-star-meshes-invisible) + P2 (galaxy-visibility-in-universe-space) in here. Skybox is NOT removed.
+- **D-10:** Branch `phase-05-rendering-overhaul`. Full revert trivial.
+- **D-11:** Three-stage continuous star handoff: FAR=sky-shader point; MID=sky point fades out / post-process glow fades in; NEAR=WorldRenderer sphere mesh + glow. Weights from descriptor `LodWeight` (`LuminousLod.StarMeshWeight`).
+- **D-12:** Near stars (parent sun + in-SOI siblings) render as sphere meshes + post-process glow. The 05-02 missing-sun regression is in-scope to fix here.
+- **D-13:** Galaxies rendered in sky shader (procedural disc). Distance crossfade: far disc fades out as constituent stars take over approaching; fades back in leaving. Fix the "galaxy pops out of nowhere" bug (crossfade-threshold / antipodal-gate seen at 05-02 play-test).
+- **Carried forward — NEVER re-litigate:**
+  - No manual clip-space billboard MultiMesh (abandoned `StarPointRenderer` anti-pattern).
+  - `UniMath` LCA-relative precision math preserved (CLAUDE.md ss"Position Math").
+  - `StarRendering` is the single source of truth for star appearance.
+  - 8-bit dither, unit-space render, per-space `1e-8` render factors, `1e6` camera far plane, `body_lit.gdshader` space-independent shading.
+  - `EYEDIR` is sky-shader-only; in `shader_type spatial` reconstruct world view ray via `normalize((INV_VIEW_MATRIX * vec4(view.xyz, 0.0)).xyz)` (05-02 fix commit 22e4bc8).
 
 ### Claude's Discretion
 
-- Exact post-process technique for feeding N projected luminous-body positions to a full-screen shader — flag for research; must be depth-aware.
-- Depth-buffer access in the post-process pass (Godot 4.6 Forward+ DEPTH_TEXTURE / screen-space) and correct ordering relative to dither pass.
-- Exact glow/halo kernel, distance→LOD-weight curves for star mesh↔point and galaxy disc↔stars crossfades, always-visible brightness floor (P1).
-- Galaxy placeholder representation in post (reuse procedural disc look vs simpler sprite) and disc↔stars crossfade thresholds.
-- How the descriptor/projection is structured for unit-testability (extend TierClassifier tests with representation/LOD-weight logic).
+- Exact mechanism for feeding the descriptor array into `skybox.gdshader` uniforms.
+- Near-star glow/halo kernel and exact `LodWeight` thresholds for the point->glow->mesh stages.
+- Galaxy disc crossfade thresholds and antipodal/threshold fix for "pops out of nowhere".
+- Whether 05-02 `LuminousPassRenderer` node is repurposed or its quad is reworked; correct ordering of glow pass vs dither pass.
+- Always-visible brightness floor for distant star findability (P1).
 
 ### Deferred Ideas (OUT OF SCOPE)
 
-- CRT scanline effect (RND-01) — own later task.
-- `galaxy-disc-tilt-foreshortening` — RESOLVED-PENDING-VERIFY; re-confirm after skybox rework.
+- CRT scanline effect (RND-01) — deferred to its own later task (D-06).
+- `galaxy-disc-tilt-foreshortening` — re-confirm after the refeed, not actively reworked.
 - Procedural universe generation, cockpit art, economy, combat.
 
 </user_constraints>
@@ -52,13 +57,13 @@
 
 | ID | Description | Research Support |
 |----|-------------|------------------|
-| RND-02 | Bodies in current render tier as sphere meshes; bodies one tier out deferred to sky/post | Descriptor D-02 unifies tier classification; WorldRenderer keeps meshes; post-process covers the rest |
-| RND-04 | Current system's star(s) rendered as bright emissive sphere meshes with lighting effects | body_lit.gdshader preserved; glow/halo post-process wraps mesh depth-aware |
-| RND-05 | Dynamic sky (now: post-process pass) represents bodies outside current tier as distant light points | Post-process luminous pass replaces skybox; star_dirs/galaxy_dirs → LuminousBodyDescriptor |
-| RND-07 | Sky↔mesh handoff is visually continuous — no pop, jump, or flicker on tier crossing | D-02 single descriptor guarantees continuous representation; distance LOD weight replaces discrete swap |
-| RND-01 | 8-bit dithered look (CRT deferred) | D-05 HDR-before-dither ordering; dithering.gdshader unchanged |
-| RND-03 | Planets rendered as sphere meshes with dithering and 8-bit palette | Unchanged; WorldRenderer + body_lit.gdshader preserved |
-| RND-06 | 1:1-scale unit-space render with bounded far plane | 1e-8 render factors + 1e6 far plane preserved unchanged |
+| RND-02 | Bodies in the current render tier are rendered as sphere-mesh geometry; bodies one tier out are in the skybox | Sky-shader refeed covers distant tier; WorldRenderer near-star mesh fix covers in-tier stars (D-12) |
+| RND-04 | Current system's star(s)/sun(s) rendered as bright, light-emitting sphere meshes casting light | WorldRenderer emissive star mesh path already exists; D-12 ensures parent sun renders up close (the 05-02 regression) |
+| RND-05 | Dynamic spherical skybox represents bodies just outside the current render tier; never drifts with camera rotation | `skybox.gdshader` with `EYEDIR` (world-fixed in sky shaders) handles this; refeed from descriptor |
+| RND-07 | Skybox-mesh handoff is visually continuous; no pop, jump, or flicker when crossing a scale boundary | Three-stage blend (D-11) via `LodWeight` from `LuminousDescriptorBuilder` — same numbers fed to different drawers |
+| RND-01 | Floating origin: player at coordinate origin, world translated each frame, no precision jitter | Already done Phase 1; WorldRenderer preserves this; do not break |
+| RND-03 | Planets rendered as sphere meshes with dithering and 8-bit palette | Already done; `dithering.gdshader` + `body_lit.gdshader`; glow must compose before dither (D-05) |
+| RND-06 | Unit-space 1:1 render, per-space render factors, camera far <= 1e6 render units | Already done Phase 1; refeed must not change this |
 
 </phase_requirements>
 
@@ -66,19 +71,19 @@
 
 ## Summary
 
-Phase 5 replaces the current two-renderer architecture (WorldRenderer meshes + SkyboxRenderer Sky-shader points) with a single unified pipeline: **classify → describe once → draw with multiple drawers**. The structural problem is that the existing Sky `shader_type sky` renders behind everything and cannot interact with depth, so glow cannot wrap around near meshes and galaxy/star crossfades are impossible. The solution is a **depth-aware post-process pass** that runs after the 3D scene but before the 8-bit dither.
+Phase 5 delivers a **descriptor-driven two-layer luminous-body renderer**. Plan 1 (complete) built the `LuminousBodyDescriptor` pipeline — every luminous body is described once per frame with direction, angular size, brightness, color, and LOD weight. Plans 2-4 consume that pipeline.
 
-The key technical facts established by this research:
+The architecture has two drawers plus the existing mesh path:
 
-1. **`hint_depth_texture` does NOT work in `canvas_item` shaders** (Godot bug #74464). Depth-aware post-processing must use a `MeshInstance3D` quad (shader_type spatial) with `POSITION = vec4(VERTEX.xy, 1.0, 1.0)` to bypass transforms and write directly to clip space — this is the "advanced post-processing" pattern in official Godot docs and is confirmed working in Forward+.
+1. **Sky shader (`skybox.gdshader`, KEPT)** — draws distant stars as points and galaxies as procedural discs. It renders at infinite distance behind all geometry automatically (`shader_type sky` semantic) so no depth-occlusion hacks are needed. Refeed its uniforms from `LuminousDescriptorBuilder.Descriptors` instead of `SkyboxRenderer`'s own `SyncSkyPoints` loop.
 
-2. **The existing `PostProcessRenderer` ColorRect (dithering.gdshader) reads `hint_screen_texture`**, which captures the 3D scene **after WorldEnvironment glow/tonemap** has been applied. Adding a luminous-body quad *ahead* of the ColorRect in draw order, using `render_mode unshaded, additive`, composes glow/halo in the 3D scene's sRGB-space buffer — not a separate HDR pass. To truly compose in HDR/linear (D-05), a SubViewport strategy or CompositorEffect would be needed. **Practical recommendation: use a spatial quad with additive blend mode placed as a WorldRenderer child** — this renders during the 3D transparent pass (after opaque geometry, before glow/env effects), so the luminous contribution is naturally included in glow. This achieves D-05's intent (luminous contributes before dither quantizes) without requiring CompositorEffect.
+2. **Post-process glow (`luminous_pass.gdshader`, repurposed from 05-02)** — draws glow/halo around near stars in screen space. It is a Camera3D-child spatial quad with `blend_add` that composes additively into the HDR 3D buffer before the CanvasLayer dither quantizes it.
 
-3. **Uniform arrays (the existing `star_dirs` / `star_colors` / `star_sizes` pattern) remain the right technique** for feeding N body descriptors to a post-process pass. The 65 KB uniform buffer limit allows ~1365 vec4s; 8 stars × 4 vec4s + 4 galaxies × 6 vec4s = ~56 vec4s total — well within budget. No texture buffer needed.
+3. **Mesh path (`WorldRenderer`)** — draws planets and near stars as sphere meshes. D-12 requires the parent sun to render as a mesh (fixes the 05-02 missing-sun regression); the existing `GetOrCreateMesh` path already handles emissive star materials but the body selection logic must include stars whose `LodWeight` signals near-mesh dominance.
 
-4. **Galaxy disc logic from `skybox.gdshader`** (procedural spiral/elliptical disc with D-59 tilt foreshortening) is directly reusable in the new post-process shader — the math is screen-space and does not depend on `EYEDIR` being a sky-shader built-in; it can be rewritten using a world-space direction uniform.
+The three-stage star handoff (D-11) is continuous by construction: sky point fades out via `1 - LodWeight`, glow fades in as `LodWeight` approaches 1 with a `lod_fade` blend, and the mesh dominates at `LodWeight = 1`. All three drawers read the same descriptor — the same `Direction`, `Brightness`, and `AngularSize` — so no pop is possible.
 
-**Primary recommendation:** Build a single new `LuminousPassRenderer` (spatial shader quad, camera child) that reads the depth texture, samples screen_texture for blending, receives the unified descriptor arrays, draws glow/point/halo for stars and disc for galaxies, and renders in the 3D transparent pass so WorldEnvironment glow picks it up naturally before the CanvasLayer dither pass reads it.
+**Primary recommendation:** Refeed `SkyboxRenderer.SyncSkyPoints` from `LuminousDescriptorBuilder.Descriptors` (drop the internal classify loop), add `galaxy_disc_weights` to `skybox.gdshader` to fix the galaxy-pop bug, extend `WorldRenderer.SyncBodies` to include near stars as sphere meshes (D-12), then narrow `luminous_pass.gdshader` to near-star glow/halo with the relaxed depth gate for mesh halos (Plan 3), and finally wire the HDR-before-dither composition and clean up dead code (Plan 4).
 
 ---
 
@@ -86,50 +91,36 @@ The key technical facts established by this research:
 
 | Capability | Primary Tier | Secondary Tier | Rationale |
 |------------|-------------|----------------|-----------|
-| Floating-origin mesh sync (planets, near stars) | WorldRenderer (3D world) | — | Unchanged; meshes stay in floating-origin space |
-| Body appearance values (brightness, size, color) | StarRendering (pure static) | — | Single source of truth; feed to all drawers |
-| Tier/distance classification | TierClassifier (pure, tested) | LuminousBodyDescriptor | Classify first, then extend to LOD weight |
-| Per-frame descriptor computation | LuminousBodyDescriptor builder (Render layer) | WorldRenderer (mesh side) | One pass; replaces two parallel caches |
-| Post-process star glow/point, galaxy disc | LuminousPassRenderer (spatial quad in 3D) | — | Depth-aware; in 3D transparent pass before glow |
-| 8-bit dither quantisation | PostProcessRenderer (CanvasLayer ColorRect) | — | Unchanged; runs after 3D scene incl. luminous pass |
-| Precision position math | UniMath (global, pure) | — | Mandatory for all projection; no alternatives |
-| Sky background (starfield) | REMOVED (D-07) | — | SkyboxRenderer + skybox.gdshader deleted in Plan 3 |
+| Distant star points (sky-fixed, behind all geometry) | Sky shader (`skybox.gdshader`) | — | `shader_type sky` renders at infinite distance; EYEDIR is world-fixed automatically; no depth hacks needed |
+| Galaxy procedural disc (far) | Sky shader (`skybox.gdshader`) | — | Same reasons as distant stars; disc already implemented in skybox.gdshader |
+| Near-star glow / halo | Post-process pass (`luminous_pass.gdshader`) | — | Screen-space effect; composes additively over the 3D scene before dither quantizes; correct use of the spatial quad |
+| Planet sphere meshes | WorldRenderer (mesh path) | — | Floating-origin sync, `body_lit.gdshader` Lambert shading — unchanged |
+| Near-star sphere meshes | WorldRenderer (mesh path) | Post-process glow wraps them | Stars at `LodWeight >= threshold`; `GetOrCreateMesh` already creates emissive star mats |
+| HDR->8-bit dither quantization | CanvasLayer dither (`dithering.gdshader`) | — | Runs last, over the fully-composed HDR 3D buffer + glow; must NOT add hint_depth_texture here (Godot bug #74464) |
+| Descriptor production (single source of truth) | LuminousDescriptorBuilder (Node, priority=-10) | — | Must run before all drawers; already wired in Main.tscn |
 
 ---
 
 ## Standard Stack
 
-### Core (all preserved/reused — no new packages)
+### Core (no new packages — all in-engine or already in codebase)
 
-| Component | Version | Purpose | Status |
-|-----------|---------|---------|--------|
-| Godot 4.6.2 Mono | 4.6.2 | Engine, Forward+ DX12, spatial/canvas shaders | Locked [VERIFIED: project.godot] |
-| C# 12 / .NET 8.0 | net8.0 | Game logic, renderer classes | Locked [VERIFIED: EcoSpace.csproj] |
-| GDShader (GLSL subset) | Godot 4.6 | Shader language for all .gdshader files | Locked [ASSUMED] |
-| UniMath / UniVec3 | codebase | LCA-relative position math | Locked [VERIFIED: codebase] |
-| StarRendering | codebase | Brightness/size single source of truth | Locked [VERIFIED: codebase] |
-| TierClassifier | codebase | Space classification, 30+ tests | Locked/extend [VERIFIED: codebase] |
-| PostProcessRenderer + dithering.gdshader | codebase | 8-bit dither; run unchanged after new pass | Locked [VERIFIED: codebase] |
-| body_lit.gdshader | codebase | Lambert shading for planet/body meshes | Locked [VERIFIED: codebase] |
+| Component | Location | Purpose | Status |
+|-----------|----------|---------|--------|
+| `LuminousBodyDescriptor` | `Scripts/Render/LuminousBodyDescriptor.cs` | Per-body typed descriptor (D-02 feed) | DONE (Plan 1) |
+| `LuminousLod` | `Scripts/Render/LuminousLod.cs` | Pure distance-to-LOD-weight curves | DONE (Plan 1) |
+| `LuminousDescriptorBuilder` | `Scripts/Render/LuminousDescriptorBuilder.cs` | Per-frame classify+project loop; process_priority=-10 | DONE (Plan 1) |
+| `SkyboxRenderer` | `Scripts/Render/SkyboxRenderer.cs` | Sky uniform push; **refeed from Descriptors[]** | TO MODIFY (Plan 2) |
+| `skybox.gdshader` | `Shaders/skybox.gdshader` | Distant-star points + galaxy discs; **add galaxy_disc_weights** | TO MODIFY (Plan 2/4) |
+| `LuminousPassRenderer` | `Scripts/Render/LuminousPassRenderer.cs` | Camera3D-child spatial quad; **narrow to near-star glow/halo** | TO MODIFY (Plan 3) |
+| `luminous_pass.gdshader` | `Shaders/luminous_pass.gdshader` | Screen-space glow/halo; **narrow scope + fix depth gate** | TO MODIFY (Plan 3) |
+| `WorldRenderer` | `Scripts/Render/WorldRenderer.cs` | Floating-origin mesh sync; **add near-star mesh rendering** | TO MODIFY (Plan 2) |
+| `StarRendering` | `Scripts/Render/StarRendering.cs` | Single source of truth for appearance | PRESERVE UNCHANGED |
+| `TierClassifier` | `Scripts/TierClassifier.cs` | Pure body-space classifier | PRESERVE UNCHANGED |
+| `PostProcessRenderer` | `Scripts/Render/PostProcessRenderer.cs` | Dither host | PRESERVE UNCHANGED |
+| `dithering.gdshader` | `Shaders/dithering.gdshader` | 8-bit ordered dither | PRESERVE UNCHANGED |
 
-### New Components (Phase 5 introduces)
-
-| Component | Kind | Purpose |
-|-----------|------|---------|
-| `LuminousBodyDescriptor` (struct/class, C#) | New | Per-body: direction, angular-size, brightness, color, LOD weight, type |
-| `LuminousDescriptorBuilder` (C#, Render namespace) | New | Per-frame classify+project loop; replaces SkyboxRenderer._skyDirs + WorldRenderer._lastRenderPositions |
-| `LuminousPassRenderer` (Node3D child, spatial shader quad) | New | Depth-aware post-process star glow/halo + galaxy disc; draws in 3D transparent pass |
-| `luminous_pass.gdshader` (spatial, unshaded+additive) | New | Screen-space point/glow/galaxy-disc with hint_depth_texture |
-
-### No New Packages Required
-
-This phase is a pure codebase restructure. No NuGet packages, no Godot asset library packages.
-
----
-
-## Package Legitimacy Audit
-
-> Not applicable — no external packages are introduced. All dependencies are codebase-internal or the existing locked runtime (Godot 4.6.2 Mono, .NET 8.0).
+No external packages needed. This phase is entirely intra-project. [VERIFIED: codebase read]
 
 ---
 
@@ -138,249 +129,194 @@ This phase is a pure codebase restructure. No NuGet packages, no Godot asset lib
 ### System Architecture Diagram
 
 ```
-PER FRAME (_Process)
-─────────────────────────────────────────────────────────────────────
-GameWorld.GameObjects (read-only)
-          │
-          ▼
-  LuminousDescriptorBuilder
-  ┌───────────────────────────────────────────────────┐
-  │ For each body:                                    │
-  │   TierClassifier.Classify() → SkyTier            │
-  │   UniMath.RelativePosition() → direction UniVec3  │
-  │   StarRendering.AngularRadius() → angular size    │
-  │   StarRendering.ApparentBrightness() → brightness │
-  │   DistanceLODWeight(dist) → [0..1]                │
-  └──────────┬────────────────────────────────────────┘
-             │  LuminousBodyDescriptor[]
-             ├──────────────────────────────────────────►  WorldRenderer
-             │                                             (meshes: planets,
-             │                                              near stars — unchanged)
-             │
-             └──────────────────────────────────────────►  LuminousPassRenderer
-                                                           (spatial quad, camera child)
-                                                           reads:  hint_depth_texture
-                                                                   hint_screen_texture (optional)
-                                                           draws:  star point/glow/halo
-                                                                   galaxy disc/crossfade
-                                                           blend:  additive (3D transparent pass)
-                                                                   → WorldEnvironment glow picks it up
-
-3D RENDER PASS ORDER (Forward+ DX12)
-─────────────────────────────────────────────────────────────────────
-  [1] Depth prepass
-  [2] Opaque 3D (WorldRenderer meshes: planets, star spheres, body_lit)
-  [3] Sky (REMOVED in Plan 3 — SkyboxRenderer + skybox.gdshader deleted)
-  [4] Transparent 3D  ←── LuminousPassRenderer quad renders HERE
-  [5] WorldEnvironment glow / tonemap (picks up glow from step 4)
-  [6] CanvasLayer 2D  ←── PostProcessRenderer dithering.gdshader
-      (hint_screen_texture captures 3D scene + luminous pass + glow)
+Frame N:
+                    GameWorld.GameObjects
+                           |
+                  LuminousDescriptorBuilder (priority=-10)
+                    |- UniMath.RelativePosition (LCA path)
+                    |- StarRendering.AngularRadius/ApparentBrightness
+                    |- LuminousLod.StarMeshWeight / GalaxyDiscWeight
+                    +-> Descriptors[] (Direction, AngularSize, Brightness, BaseColor, LodWeight, BodyType)
+                                 |
+               +-----------------+----------------------------------+
+               v                 v                                  v
+        SkyboxRenderer    LuminousPassRenderer               WorldRenderer
+       (refeed: drop       (narrow: glow/halo              (extend: near stars
+        SyncSkyPoints,      for near stars only,             as sphere meshes,
+        read Descriptors    blend_add spatial quad)           LodWeight gate)
+        for dist stars                |                            |
+        + galaxies)                   | blend_add HDR              |
+               |                     v                            v
+               v            3D transparent pass         3D opaque pass
+        skybox.gdshader     (glow quad: additively       (planets, near-star
+        (shader_type sky,    over 3D scene before         sphere meshes write
+         EYEDIR world-fixed, bloom)                       depth, occlude sky)
+         renders at inf dist)  |                               |
+               |               +----------composed-------------+
+               v                              |
+        Background color buf       WorldEnvironment glow
+        (drawn first, behind        (HDR bloom over full
+         all geometry)               3D buffer)
+                                              |
+                                  CanvasLayer / dithering.gdshader
+                                  (8-bit ordered dither: last pass,
+                                   reads hint_screen_texture over bloom)
+                                              |
+                                         Final frame
 ```
 
-### Recommended Project Structure
+### Render Pass Ordering (Forward+ confirmed from existing shader headers)
 
-```
-Scripts/Render/
-├── WorldRenderer.cs           # Keep; remove _lastRenderPositions cache (collapse into descriptor)
-├── StarRendering.cs           # Keep unchanged
-├── PostProcessRenderer.cs     # Keep unchanged
-├── SkyboxRenderer.cs          # DELETED in Plan 3
-├── LuminousBodyDescriptor.cs  # New: per-body data struct
-├── LuminousDescriptorBuilder.cs  # New: per-frame classify+project loop
-└── LuminousPassRenderer.cs    # New: Node3D, spatial quad, pushes descriptor arrays to shader
+[VERIFIED: skybox.gdshader line 26 "Sky renders BEFORE the 3D scene and the CanvasLayer post-process"; luminous_pass.gdshader header "Camera3D-child Node3D, this quad renders in the 3D transparent pass — BEFORE WorldEnvironment glow and BEFORE the CanvasLayer dither"]
 
-Shaders/
-├── luminous_pass.gdshader     # New: shader_type spatial, depth-aware glow+disc
-├── dithering.gdshader         # Keep unchanged
-├── body_lit.gdshader          # Keep unchanged
-└── skybox.gdshader            # DELETED in Plan 3
-```
+1. **Sky pass** — `skybox.gdshader` (`shader_type sky`) renders at the celestial sphere (infinite distance) before all 3D geometry. Star points and galaxy discs appear here. Result is in the background color buffer.
+2. **3D opaque pass** — planet meshes and near-star sphere meshes. These occlude the sky automatically because they write depth.
+3. **3D transparent pass** — `luminous_pass.gdshader` Camera3D-child spatial quad with `blend_add, depth_test_disabled`. Near-star glow/halo composes additively over the 3D scene (sky + opaque geometry). Runs BEFORE WorldEnvironment glow.
+4. **WorldEnvironment glow** — built-in Godot bloom. Processes the HDR 3D buffer (sky + meshes + glow quad additive contribution). This is why the glow quad must fire in step 3 as a spatial pass, not in a CanvasLayer — it feeds the bloom.
+5. **CanvasLayer dither** — `dithering.gdshader` (canvas_item) reads `hint_screen_texture` over the post-bloom buffer and quantizes to the 8-bit palette. This is the final pass.
 
-### Pattern 1: The Unified Descriptor (D-02)
+**Critical:** The dither shader MUST NOT add `hint_depth_texture` (confirmed limitation: Godot bug #74464, canvas_item shaders cannot bind depth buffer in Forward+). This is already respected in the existing code. [VERIFIED: dithering.gdshader — no hint_depth_texture present]
 
-**What:** A single C# struct built once per frame per body, consumed by both WorldRenderer (mesh side) and LuminousPassRenderer (post-process side). Replaces the dual-cache (`_skyDirs` in SkyboxRenderer, `_lastRenderPositions` in WorldRenderer).
+### Pattern 1: Refeed SkyboxRenderer from Descriptors (Plan 2)
 
-**When to use:** Every frame, every body, before any drawing.
+**What:** Replace `SkyboxRenderer.SyncSkyPoints` (which runs its own classify+project loop) with a loop that reads `LuminousDescriptorBuilder.Descriptors[]` directly and pushes them to the sky ShaderMaterial uniforms.
 
+**When to use:** Plan 2 refactoring of SkyboxRenderer.
+
+**Key insight from code read:** `SkyboxRenderer` currently does its own `UniMath.RelativePosition` loop and `TierClassifier.Classify` check (lines 149-237). `LuminousDescriptorBuilder` already does ALL of this work at priority=-10. After the refeed, `SkyboxRenderer.SyncSkyPoints` becomes a simple loop over `_builder.Descriptors[]`.
+
+**What to preserve:** The `_skyDirs` RND-07 cache and `GetSkyDirection` accessor remain; they are consumed by the handoff baseline in future phases. Populate `_skyDirs[d.BodyIndex] = d.Direction` in the new loop for Star descriptors.
+
+**What changes:** The internal classify+project loop is removed. `SkyboxRenderer` no longer needs `_world` or `_cam` for direction math — only `_builder` reference and `_skyMat`.
+
+**Pre-requisite fix:** `Main.tscn` line 193 sets `process_mode = 4` (DISABLED) on `SkyboxRenderer`. This MUST be reset to `process_mode = 0` (INHERIT) or removed for the refeed to work. [VERIFIED: Main.tscn line 193]
+
+**Refeed pattern skeleton:**
 ```csharp
-// Source: derived from existing SkyboxRenderer.SyncSkyPoints pattern + new LOD field
-public struct LuminousBodyDescriptor
+// Source: synthesis from SkyboxRenderer.cs (live) + LuminousDescriptorBuilder.cs (live)
+private void SyncSkyPoints()
 {
-    public int      BodyIndex;
-    public Vector3  Direction;       // world-space unit vector, ship→body (from UniMath)
-    public float    AngularSize;     // smoothstep space: (1 - cos theta), floored at pixel
-    public float    Brightness;      // [0,1] from StarRendering.ApparentBrightness
-    public Color    BaseColor;       // body.BaseColor
-    public float    LodWeight;       // 0 = point/disc only; 1 = mesh only; blend in between
-    public UniObject.Type BodyType;  // Star vs Galaxy
-    public int      GalaxyType;      // spiral=0, elliptical=1 (for galaxies)
-    public Vector4  GalaxyOrientation; // xyz=disc_normal, w=seed (for galaxies)
-    public double   DistanceMeters;  // for LOD weight computation
-}
-```
+    if (_builder == null || _skyMat == null) return;
+    _skyDirs.Clear();   // RND-07 cache cleared each frame
+    int count = 0, galCount = 0;
 
-**Key invariant:** `LodWeight` is a smooth function of `DistanceMeters`, not a SOI-boundary flag. Same numbers → different drawers → pops are mathematically impossible.
+    for (int i = 0; i < _builder.DescriptorCount; i++)
+    {
+        ref var d = ref _builder.Descriptors[i];
 
-### Pattern 2: Distance LOD Weight Curve
-
-**What:** Maps `distanceMeters` to a scalar `[0..1]` where 0 = "distant body, post-process only" and 1 = "near body, mesh only". Values in between drive crossfade alpha.
-
-**When to use:** For stars: blend between point/glow (low LOD weight) and mesh+glow (high LOD weight). For galaxies: blend between disc placeholder (high LOD weight = far) and no disc (low LOD weight = inside, individual stars take over).
-
-```csharp
-// Source: [ASSUMED] — thresholds to be tuned in play-test (D-04)
-// Smoothstep crossfade: near star at < NearFadeStart gets full mesh; beyond NearFadeEnd is point-only
-static float StarLodWeight(double distMeters)
-{
-    const double NearFadeStart = 5e12;  // ~0.5 light-year — tune in play-test
-    const double NearFadeEnd   = 5e13;  // ~5 light-years
-    float t = (float)Math.Clamp((distMeters - NearFadeStart) / (NearFadeEnd - NearFadeStart), 0.0, 1.0);
-    return 1.0f - t;  // 1 = near (mesh), 0 = far (point)
-}
-
-// Galaxy: disc appears when far from galaxy centre; fades out as you enter the galaxy
-static float GalaxyDiscWeight(double distMeters, double galaxySoiMeters)
-{
-    // disc fully visible when dist > 0.5 * SOI; fades to 0 when dist < 0.1 * SOI
-    float t = (float)Math.Clamp((distMeters - 0.1 * galaxySoiMeters) / (0.4 * galaxySoiMeters), 0.0, 1.0);
-    return t;
-}
-```
-
-**Note:** These threshold values are `[ASSUMED]` starting points. Play-test gates in each plan will calibrate them.
-
-### Pattern 3: Depth-Aware Post-Process Quad (CRITICAL — new technique)
-
-**What:** A `MeshInstance3D` with a `QuadMesh` (2×2, Flip Faces enabled), added as a **child of the Camera3D** in the scene tree. Uses `shader_type spatial` with vertex stage that writes directly to clip space. This is the **only way to sample `hint_depth_texture` in Godot 4 Forward+** — `canvas_item` shaders cannot access the depth buffer (Godot issue #74464). [CITED: docs.godotengine.org/en/stable/tutorials/shaders/advanced_postprocessing.html]
-
-**When to use:** Plan 2 — when the LuminousPassRenderer node is built.
-
-```glsl
-// Source: [CITED: docs.godotengine.org/en/stable/tutorials/shaders/advanced_postprocessing.html]
-shader_type spatial;
-render_mode unshaded, fog_disabled, blend_add, depth_test_disabled, depth_draw_never;
-
-uniform sampler2D depth_texture   : hint_depth_texture;
-uniform sampler2D screen_texture  : hint_screen_texture, repeat_disable, filter_nearest;
-
-// Luminous body descriptor arrays (same structure as SkyboxRenderer pushed to skybox.gdshader)
-const int MAX_STARS    = 8;
-const int MAX_GALAXIES = 4;
-uniform vec3  star_dirs[MAX_STARS];
-uniform vec4  star_colors[MAX_STARS];    // rgb=BaseColor, a=brightness
-uniform float star_sizes[MAX_STARS];     // (1 - cos theta) smoothstep space
-uniform float star_lod_weights[MAX_STARS]; // 0=far/point, 1=near/mesh
-uniform int   star_count = 0;
-
-uniform vec3  galaxy_dirs[MAX_GALAXIES];
-uniform vec4  galaxy_colors[MAX_GALAXIES];
-uniform float galaxy_sizes[MAX_GALAXIES];
-uniform float galaxy_disc_weights[MAX_GALAXIES]; // 0=inside/no-disc, 1=far/full-disc
-uniform int   galaxy_types[MAX_GALAXIES];
-uniform vec4  galaxy_orientations[MAX_GALAXIES];
-uniform int   galaxy_count = 0;
-
-void vertex() {
-    // Bypass all transforms — write directly to clip space.
-    // VERTEX.xy on a 2x2 QuadMesh is in [-1,1]. w=1.0 → NDC depth at far plane.
-    POSITION = vec4(VERTEX.xy, 1.0, 1.0);
-}
-
-void fragment() {
-    vec4 col = vec4(0.0);
-
-    // --- Depth sample (for occlusion: skip glow where geometry is close) ---
-    float raw_depth = texture(depth_texture, SCREEN_UV).x;
-    // Convert to linear depth (view-space Z). Forward+ uses reversed-Z (near=1, far=0).
-    vec3  ndc       = vec3(SCREEN_UV * 2.0 - 1.0, raw_depth);
-    vec4  view      = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
-    float lin_depth = -view.z / view.w;   // positive = distance from camera in metres (render units)
-
-    // --- Star loop ---
-    for (int i = 0; i < star_count; i++) {
-        float d    = dot(normalize(EYEDIR), star_dirs[i]);   // EYEDIR available in spatial fragment
-        float disc = smoothstep(1.0 - star_sizes[i], 1.0, d);
-
-        // Glow halo: wider softened ring around the point core
-        float halo_size = star_sizes[i] * 8.0;   // tune in play-test
-        float halo = smoothstep(1.0 - halo_size, 1.0, d) * 0.3;
-
-        // Depth gate: suppress glow/point if a mesh is in front (renders behind near geometry)
-        // star_dirs[i] encodes a world-space direction; lin_depth check is approximate but sufficient
-        float vis = (lin_depth > 0.5) ? 1.0 : 0.0;   // 0.5 render units ~ close geometry present
-
-        float alpha  = star_colors[i].a * (disc + halo) * vis;
-        // LOD blend: fade point/glow out as star approaches (mesh takes over)
-        float lod_fade = 1.0 - star_lod_weights[i];
-        col.rgb += star_colors[i].rgb * alpha * lod_fade;
-    }
-
-    // --- Galaxy loop ---
-    for (int i = 0; i < galaxy_count; i++) {
-        float d         = dot(normalize(EYEDIR), galaxy_dirs[i]);
-        float disc_w    = galaxy_disc_weights[i];
-
-        if (disc_w < 0.001) continue;  // inside galaxy — no disc
-
-        float size      = galaxy_sizes[i];
-        float point_disc = smoothstep(1.0 - size, 1.0, d);
-
-        float galaxy_bright;
-        if (size < 2e-4) {
-            galaxy_bright = point_disc * galaxy_colors[i].a;
-        } else if (d > 0.0) {
-            // Reuse procedural disc logic from skybox.gdshader (same UV derivation)
-            // [galaxy_disc_coords_tilted + spiral_galaxy / elliptical_galaxy — copy verbatim]
-            galaxy_bright = point_disc * galaxy_colors[i].a;  // placeholder; Plan 3 adds disc
-        } else {
-            galaxy_bright = 0.0;
+        if (d.BodyType == UniObject.Type.Star && count < MaxStars)
+        {
+            _dirs[count]   = d.Direction;
+            _sizes[count]  = d.AngularSize;
+            // Brightness floor for findability (P1) [ASSUMED play-test knob]:
+            float displayAlpha = Mathf.Max(d.Brightness, MinVisibleBrightness);
+            _colors[count] = new Color(d.BaseColor.R, d.BaseColor.G, d.BaseColor.B, displayAlpha);
+            _skyDirs[d.BodyIndex] = d.Direction;   // RND-07 handoff cache
+            count++;
         }
-
-        col.rgb += galaxy_colors[i].rgb * galaxy_bright * disc_w;
+        else if (d.BodyType == UniObject.Type.Galaxy && galCount < MaxGalaxies)
+        {
+            // Home-galaxy suppression already handled by LuminousDescriptorBuilder.
+            // Do NOT add a second ancestor check here.
+            _galDirs[galCount]         = d.Direction;
+            _galSizes[galCount]        = d.AngularSize;
+            _galColors[galCount]       = d.BaseColor;
+            _galTypes[galCount]        = d.GalaxyType;
+            _galOrientations[galCount] = d.GalaxyOrientation;
+            _galDiscWeights[galCount]  = d.LodWeight;   // NEW: GalaxyDiscWeight crossfade
+            galCount++;
+        }
     }
-
-    ALBEDO = col.rgb;
-    ALPHA  = 1.0;  // additive blend; alpha is ignored by blend_add
+    // Push to _skyMat (same pattern as existing SkyboxRenderer lines 240-257)
 }
 ```
 
-**Depth occlusion note:** `lin_depth` is in render units (scaled by the per-space factor). "Geometry is in front" means `lin_depth < expected_star_dist_in_render_units`. Since stars are always far beyond the far plane in render units, a simpler check "is there any foreground geometry at this pixel?" uses the raw depth: `raw_depth < 1.0` (not at the far value) means opaque geometry exists. Tune this with play-test.
+### Pattern 2: Add galaxy_disc_weights to skybox.gdshader (D-13, Plan 2)
 
-### Pattern 4: `EYEDIR` in Spatial Shader Fragment
+**What:** `skybox.gdshader` currently has no `galaxy_disc_weights` array — it renders every non-suppressed galaxy at full opacity. This causes the "galaxy pops out of nowhere" bug: when the ship exits the galaxy SOI, the home-galaxy suppression guard (in `LuminousDescriptorBuilder`) stops firing and the galaxy suddenly appears at full opacity in one frame.
 
-**What:** In a `shader_type spatial` fragment, the built-in `EYEDIR` is the normalized view direction in **world space** — identical in meaning to EYEDIR in the sky shader. This means the dot-product test `dot(EYEDIR, star_dirs[i])` from `skybox.gdshader` works unchanged in the new spatial shader. [CITED: docs.godotengine.org/en/stable/tutorials/shaders/shader_reference/spatial_shader.html] [ASSUMED — verify in Godot 4.6 specifically; API may differ from 4.4 docs]
+**Root cause from code read:** `skybox.gdshader` galaxy loop final line (line 191): `col += galaxy_colors[i].rgb * galaxy_bright;` — no weight applied. `luminous_pass.gdshader` already has this uniform (line 83: `uniform float galaxy_disc_weights[MAX_GALAXIES]`) and applies it (line 269: `col.rgb += galaxy_colors[i].rgb * galaxy_bright * disc_w;`). The fix is to add the same pattern to `skybox.gdshader`. [VERIFIED: skybox.gdshader line 191; luminous_pass.gdshader line 83 + 269]
 
-### Pattern 5: Descriptor Push — C# to Shader
+**GLSL change:**
+```glsl
+// Add after galaxy_orientations declaration in skybox.gdshader:
+uniform float galaxy_disc_weights[MAX_GALAXIES];
 
-**What:** The same `SetShaderParameter` pattern used by `SkyboxRenderer` applies to `LuminousPassRenderer`. The spatial shader's `ShaderMaterial` receives packed arrays.
-
-```csharp
-// Source: mirrors existing SkyboxRenderer.SyncSkyPoints pattern [VERIFIED: codebase]
-// In LuminousPassRenderer._Process or SyncDescriptor():
-_mat.SetShaderParameter("star_dirs",        _starDirs);      // Vector3[]
-_mat.SetShaderParameter("star_colors",      _starColors);    // Color[]
-_mat.SetShaderParameter("star_sizes",       _starSizes);     // float[]
-_mat.SetShaderParameter("star_lod_weights", _starLodWeights); // float[]
-_mat.SetShaderParameter("star_count",       starCount);
-// ...galaxies similarly
+// In galaxy loop final line, change:
+//   col += galaxy_colors[i].rgb * galaxy_bright;
+// to:
+col += galaxy_colors[i].rgb * galaxy_bright * galaxy_disc_weights[i];
 ```
 
-Arrays are pre-allocated at MaxStars / MaxGalaxies capacity; same pattern as existing code. Uniform buffer usage: 8 stars × ~4 vec4s + 4 galaxies × ~6 vec4s ≈ 56 vec4s × 16 bytes = ~896 bytes — far below the 65 KB limit. [VERIFIED: codebase — existing arrays work; budget calc ASSUMED]
+**Also add the Main.tscn sub_resource default:** `shader_parameter/galaxy_disc_weights = PackedFloat32Array(0, 0, 0, 0)` to the ShaderMaterial_sky sub_resource.
 
-### Pattern 6: Descriptor Builder — Replacing Two Caches
+**C# side:** Add `private readonly float[] _galDiscWeights = new float[MaxGalaxies];` to `SkyboxRenderer`, push via `_skyMat.SetShaderParameter("galaxy_disc_weights", _galDiscWeights)`.
 
-**What:** `LuminousDescriptorBuilder` is a new C# class in the `Render` namespace that runs once per frame, iterates `GameObjects`, calls `TierClassifier.Classify`, calls `UniMath.RelativePosition` for direction, calls `StarRendering.*` for appearance, and produces a `LuminousBodyDescriptor[]`. Both WorldRenderer and LuminousPassRenderer consume this instead of maintaining their own parallel caches.
+### Pattern 3: Near-Star Mesh Rendering in WorldRenderer (D-12, Plan 2)
 
-**Key contract:** read-only consumer of `GameWorld` state. Must NOT call `TranslatePos` or mutate `UniVec3`. [VERIFIED: codebase — same constraint as existing renderers]
+**What:** `WorldRenderer.SyncBodies` renders the ship's parent and its siblings — whatever shares the ship's parent frame. The parent sun renders as a mesh in Star space. The 05-02 missing-sun regression: when `LuminousPassRenderer` is active as a Camera3D-child quad, it may cover the sun's sky pixels, OR the sun mesh may be present but its `EmissionEnergyMultiplier` is set from `StarRendering.ApparentBrightness` which could be near-zero at close range if `distMeters` is computed wrongly.
+
+**Diagnosis from code read (WorldRenderer.cs:480-488):** `EmissionEnergyMultiplier = StarRendering.ApparentBrightness(body.Luminosity, distMeters)` where `distMeters = relUnits.Magnitude() * ship.LocalPos.Scale`. For the parent star (isParent=true), `relUnits = ship.LocalPos.ToDouble3Units() * -1.0` (line 461). If the ship is very close to the star, `distMeters` approaches 0 and `ApparentBrightness` returns 0 (its guard: `if (distMeters <= 1e-30) return 0f`). This is the likely root cause of the missing sun. When the ship is inside the star's atmosphere (distMeters < 1e30), brightness floors to zero.
+
+**The fix:** The emissive multiplier for a near star should be clamped to a minimum visible value (not zero) when the ship is inside or very close to the star body. The geometry is correct; only the brightness is wrong.
+
+```csharp
+// In WorldRenderer.RenderBodyAt, replace (line 487):
+//   starMat.EmissionEnergyMultiplier = StarRendering.ApparentBrightness(body.Luminosity, distMeters);
+// with:
+float brightness = StarRendering.ApparentBrightness(body.Luminosity, distMeters);
+// Floor emissive energy so the star is always visibly bright when we're right next to it
+// [ASSUMED play-test calibration knob: NearStarEmissionFloor = 0.8f]
+starMat.EmissionEnergyMultiplier = Mathf.Max(brightness, NearStarEmissionFloor);
+```
+
+**Additional D-12 coverage:** WorldRenderer currently renders parent + siblings via `TierClassifier.CurrentTierMesh`. Stars ARE in this set when in Star space — so the mesh IS spawned. The issue is purely the brightness. No topology change to `SyncBodies` is needed to fix D-12; it is a brightness-floor fix on `RenderBodyAt`.
+
+### Pattern 4: Near-Star Glow — Depth Gate Relaxation for Halo (D-11, Plan 3)
+
+**What:** The 05-02 `luminous_pass.gdshader` uses `bool sky_pixel = (raw_depth < 1e-6)` to gate glow — only empty sky pixels get glow. For distant stars (sky points), this is correct. For near stars with a visible sphere mesh, this gate must be relaxed so the glow paints over the mesh as a halo effect.
+
+**Current behavior (05-02 shader, line 219):** `float vis = sky_pixel ? 1.0 : 0.0;` — hard gate for all stars regardless of LOD weight.
+
+**Revised behavior (Plan 3):**
+```glsl
+// Source: synthesis from luminous_pass.gdshader (live) fragment loop
+float lod_fade = 1.0 - star_lod_weights[i];  // 1=far/glow dominant, 0=near/mesh dominant
+float is_near  = star_lod_weights[i];          // 1=mesh taking over, 0=sky point only
+
+// Far stars: sky-pixel gate prevents painting over geometry
+// Near stars: gate relaxed so glow halos over the star mesh
+float vis = mix(sky_pixel ? 1.0 : 0.0, 1.0, is_near);
+
+col.rgb += star_colors[i].rgb * (star_colors[i].a * (disc + halo) * vis * lod_fade);
+```
+
+**Note on the product:** When `LodWeight = 1` (near, mesh dominant): `lod_fade = 0` AND `vis = 1` — but the product `vis * lod_fade = 0`, so the glow contribution is zero. This ensures the post-process glow fully fades out precisely when the mesh is dominant, with the halo brief during the transition window. Pop-free by construction.
+
+### Pattern 5: Always-Visible Brightness Floor for Distant Stars (P1 debt fix)
+
+**What:** Distant stars in Galaxy space have near-zero `ApparentBrightness` at light-year distances. The sky-shader `star_sizes` are already floored at one pixel (in `LuminousDescriptorBuilder.PixelAngularSize()`). But the BRIGHTNESS (alpha channel) is near zero, making the pixel-sized disc invisible.
+
+**Key insight:** The fix is a display-floor on the `BaseColor.A` value pushed to sky uniforms — NOT a change to `StarRendering.ApparentBrightness` (which must stay physically correct for the mesh path). Apply the floor only when packing `_colors[count]` in the `SkyboxRenderer` refeed:
+
+```csharp
+// In SkyboxRenderer.SyncSkyPoints (after refeed):
+private const float MinVisibleBrightness = 0.05f;  // [ASSUMED play-test knob]
+// ...
+float displayAlpha = Mathf.Max(d.Brightness, MinVisibleBrightness);
+_colors[count] = new Color(d.BaseColor.R, d.BaseColor.G, d.BaseColor.B, displayAlpha);
+```
+
+**What does NOT change:** `LuminousBodyDescriptor.Brightness` field remains physically accurate. `WorldRenderer` still uses `d.Brightness` (via `StarRendering.ApparentBrightness`) for the mesh emissive multiplier (correct physics). Only the sky-point display alpha gets the floor.
 
 ### Anti-Patterns to Avoid
 
-- **Anti-pattern: `hint_depth_texture` in a `canvas_item` shader.** Godot bug #74464 breaks shader compilation in Forward+. The spatial quad is the only valid depth-access approach. [CITED: github.com/godotengine/godot/issues/74464]
-- **Anti-pattern: Absolute-from-root metres before subtracting.** `UniVec3` cast to double before LCA walk → catastrophic cancellation at Universe scale. Always `UniMath.RelativePosition` first, `ToDouble3()` after. [VERIFIED: codebase — CLAUDE.md + UniMath.cs docs]
-- **Anti-pattern: Manual clip-space billboard MultiMesh (StarPointRenderer).** The prior `StarPointRenderer` dead-end. Locked ⛔ constraint. Depth-aware spatial quad is the allowed alternative. [VERIFIED: codebase — HANDOFF + STATE.md]
-- **Anti-pattern: Two renderers pushing the same body.** In Plans 1-2, the sky shader and new pass coexist. The descriptor builder feeds BOTH. Do not run the classify+project loop twice — both renderers read from the same `LuminousBodyDescriptor[]` built once per frame.
-- **Anti-pattern: Discrete LOD swap on SOI boundary.** Pops. The old D-22 approach. Use the continuous `DistanceLodWeight()` curve instead (D-03).
-- **Anti-pattern: Galaxy mesh in `WorldRenderer`.** D-28/T-03-06 guard. Galaxies are post-process only. `WorldRenderer` already has the `body.ObjectType == UniObject.Type.Galaxy` skip guard — preserve it.
+- **Running the classify+project loop twice per frame.** `LuminousDescriptorBuilder` runs at priority=-10. `SkyboxRenderer`, `LuminousPassRenderer`, and `WorldRenderer` MUST NOT call `BuildDescriptors()` themselves. They read `Descriptors[]` read-only. (Documented in source headers of all three consumers.)
+- **Using `EYEDIR` in a `shader_type spatial` shader.** `EYEDIR` is only available in `shader_type sky`. The fix is already in `luminous_pass.gdshader` (commit 22e4bc8): `normalize((INV_VIEW_MATRIX * vec4(view.xyz, 0.0)).xyz)`. Do not regress this.
+- **Adding `hint_depth_texture` to `dithering.gdshader`.** Canvas_item shaders cannot bind the depth buffer in Godot 4 Forward+ (bug #74464). The depth texture is only accessible from `shader_type spatial` or `shader_type sky`. [VERIFIED: dithering.gdshader — no hint_depth_texture]
+- **Absolute-from-root UniVec3 subtraction.** Always use `UniMath.RelativePosition` for cross-space directions. Never form `bodyPos - shipPos` directly across spaces (catastrophic cancellation at ~1e30 m). [VERIFIED: CLAUDE.md ss"Position Math"]
+- **Adding a second home-galaxy suppression check in SkyboxRenderer after the refeed.** `LuminousDescriptorBuilder.BuildDescriptors` already handles this (lines 125-127). The descriptor for the home galaxy does not appear in `Descriptors[]` when the ship is inside it. A second check in `SkyboxRenderer` is dead code and adds confusion.
+- **Near-star glow on ALL pixels regardless of LodWeight.** For distant stars (sky points), glow must only paint on sky pixels. Only for near stars (LodWeight > 0) should the gate be relaxed for the halo effect. Treating all stars as "near" would paint glow over foreground geometry for distant sky-point stars.
 
 ---
 
@@ -388,194 +324,254 @@ Arrays are pre-allocated at MaxStars / MaxGalaxies capacity; same pattern as exi
 
 | Problem | Don't Build | Use Instead | Why |
 |---------|-------------|-------------|-----|
-| Cross-space position → screen direction | Custom absolute-from-root metres accumulation | `UniMath.RelativePosition` → `ToDouble3()` | Catastrophic cancellation at ~1e30 m Universe scale |
-| Star brightness/size | Custom inverse-square math | `StarRendering.ApparentBrightness` + `AngularRadius` | Single source of truth; ensures mesh + sky match |
-| Body tier classification | Custom space comparison switch | `TierClassifier.Classify` | 30+ green tests; pure; extensible |
-| Depth-aware post-process | `canvas_item` + `hint_depth_texture` | Spatial quad (`shader_type spatial`, camera child) | canvas_item depth access broken in Forward+ (bug #74464) |
-| Galaxy disc math | Rewrite spiral/elliptical from scratch | Copy `spiral_galaxy` / `elliptical_galaxy` / `galaxy_disc_coords_tilted` from `skybox.gdshader` | Already debugged, has D-59 tilt fix, TILT_FLOOR anti-collapse guard |
-| LOD weight curve | Per-body special-case branches | `DistanceLodWeight(distMeters)` smooth function | Pops are impossible when LOD is continuous |
-| Descriptor array sizing | Dynamically allocate per frame | Pre-allocated `Vector3[MaxStars]` / `Color[MaxStars]` etc. (same as SkyboxRenderer) | Avoids steady GC pressure per WR-01 |
+| Per-body classify + project | Custom loop per drawer | `LuminousDescriptorBuilder.Descriptors[]` (Plan 1, done) | Classifying once per frame prevents pop and eliminates duplicate UniMath walks |
+| Star appearance math | Custom brightness/size formulas | `StarRendering.ApparentBrightness` / `StarRendering.AngularRadius` | Single source of truth; changing one changes both mesh and sky coherently |
+| LOD curves | Custom distance-to-weight functions | `LuminousLod.StarMeshWeight` / `LuminousLod.GalaxyDiscWeight` | Unit-tested, guarded against NaN, continuously differentiable |
+| Galaxy disc UV | Custom projection math | `galaxy_disc_coords_tilted` function in `skybox.gdshader` | Handles D-59 safe-basis tilt, TILT_FLOOR guard, antipodal ghost gate |
+| Galaxy disc pattern | Custom noise / procedural | `spiral_galaxy` / `elliptical_galaxy` in `skybox.gdshader` | Proven; verified not to produce the ring-collapse bug (fef1d91) |
+| World view ray in spatial shader | Custom matrix math | `normalize((INV_VIEW_MATRIX * vec4(view.xyz, 0.0)).xyz)` (22e4bc8 fix) | Already in `luminous_pass.gdshader`; exact pattern proven in play-test |
 
-**Key insight:** The structural complexity of this phase is about *plumbing* (who builds the descriptor, who consumes it, how the quad gets added to the scene) not novel algorithms. The math already exists and is tested.
+**Key insight:** Every piece of math in this phase either exists as a reusable function in the codebase or is a simple uniform-pass operation. The work is wiring (connecting drawers to consume the descriptor), not new mathematical invention.
 
 ---
 
 ## Common Pitfalls
 
-### Pitfall 1: Depth Texture in canvas_item Shader Breaks Compilation
+### Pitfall 1: SkyboxRenderer has process_mode = 4 (Disabled) — it never runs
 
-**What goes wrong:** Adding `uniform sampler2D depth_texture : hint_depth_texture;` to `dithering.gdshader` (a `canvas_item` shader) causes a shader compilation crash in Godot 4 Forward+ (bug #74464). The entire 3D scene may stop rendering.
+**What goes wrong:** `Main.tscn` line 193 sets `process_mode = 4` on `SkyboxRenderer`. Mode 4 in Godot is `PROCESS_MODE_DISABLED` — `_Process` is never called. After the refeed, if this is not fixed, `SkyboxRenderer` still won't push any uniforms to the sky shader.
 
-**Why it happens:** `canvas_item` shaders run in the 2D rendering pipeline which does not have the depth buffer bound. The hint tells the compiler to expect a depth buffer binding that never arrives.
+**Why it happened:** During the 05-02 experiment, `SkyboxRenderer` was likely disabled to prevent it from fighting with `LuminousPassRenderer`. After the architecture reversal, the skybox is the primary distant-body drawer again, so it needs to run.
 
-**How to avoid:** All depth-reading code lives in the new `luminous_pass.gdshader` (`shader_type spatial`). The dithering shader remains untouched.
+**How to avoid:** Plan 2 task must reset `process_mode` in `Main.tscn` for the `SkyboxRenderer` node (remove the `process_mode = 4` line, or set it to `process_mode = 0` which inherits from parent). [VERIFIED: Main.tscn line 193]
 
-**Warning signs:** Shader compilation errors mentioning depth textures, or the 3D scene rendering black.
+**Warning signs:** Stars and galaxies don't update directions as the ship moves; sky appears frozen or stuck at initial positions.
 
-### Pitfall 2: EYEDIR Not Available in All Fragment Contexts
+### Pitfall 2: galaxy_disc_weights missing from skybox.gdshader causes the "pop" bug
 
-**What goes wrong:** `EYEDIR` is a built-in in sky shaders and in spatial fragment shaders on full-screen quads. However, if the quad mesh is not properly set up as a camera child with the bypass vertex trick, frustum culling may cull the quad entirely — no fragment shader runs.
+**What goes wrong:** Without `galaxy_disc_weights`, the galaxy disc renders at full opacity the instant the home-galaxy suppression guard lifts (when the ship exits the galaxy SOI). One frame: suppressed (not in Descriptors). Next frame: non-ancestor, appears at full disc opacity. Single-frame pop.
 
-**Why it happens:** `QuadMesh` with `POSITION = vec4(VERTEX.xy, 1.0, 1.0)` bypasses Godot's visibility/culling. Without that vertex trick, the quad at world origin may be outside the frustum.
+**Why it happens:** `skybox.gdshader` applies no fade to galaxy rendering — `galaxy_bright * galaxy_disc_weights` is not in the shader. The `LuminousDescriptorBuilder` home-galaxy suppression creates a hard boundary at the SOI edge.
 
-**How to avoid:** Use the exact vertex shader: `POSITION = vec4(VERTEX.xy, 1.0, 1.0);` with `render_mode unshaded, fog_disabled` on a 2×2 QuadMesh with Flip Faces enabled, added as a child of `Camera3D` in `Main.tscn`.
+**The boundary problem:** `LuminousLod.GalaxyDiscWeight(dist, soiMeters)` at `dist = soiMeters`: the ramp is from `0.1*soi` to `0.5*soi`, so at `1.0*soi` the value is already 1.0 (full weight). When the body first appears in Descriptors at `dist = soi`, it appears at `LodWeight = 1.0`. The pop occurs here.
 
-**Warning signs:** Star glow not visible at all; no shader artifacts.
+**Fix:** After adding `galaxy_disc_weights` to the sky shader, also adjust the `LuminousLod.GalaxyDiscWeight` fade band to include the SOI boundary — e.g., ramp from `0.5*soi` to `1.2*soi` so the disc fades in gradually after the SOI exit. [ASSUMED — exact band is a play-test calibration knob]
 
-### Pitfall 3: LuminousPassRenderer and WorldRenderer Double-Update
+**Warning signs:** Flying out of a galaxy causes the disc to suddenly appear at full brightness in a single frame.
 
-**What goes wrong:** In Plans 1–2 (skybox still running), three renderers run per frame: SkyboxRenderer, WorldRenderer, and LuminousDescriptorBuilder. If the descriptor builder is called inside both WorldRenderer and LuminousPassRenderer, the classify+project loop runs twice per frame.
+### Pitfall 3: Near-star glow depth gate prevents halo over the star mesh
 
-**Why it happens:** Each renderer calls the builder independently without sharing the output.
+**What goes wrong:** The current `luminous_pass.gdshader` `sky_pixel` gate (`raw_depth < 1e-6`) prevents glow from painting over any geometry pixel. For near stars with a visible sphere mesh, glow appears only in the ring around the mesh, not as a halo over the visible star disc.
 
-**How to avoid:** Make `LuminousDescriptorBuilder` a separate `Node` that runs first in `_Process` and stores the descriptor array as a field. Both WorldRenderer and LuminousPassRenderer read that field (read-only). Execution order: sort node positions or use Godot's process priority.
+**Why it happens:** The sky_pixel gate was correct for the original scope (distant stars as sky points). For near stars with a mesh, the mesh surface pixels have `raw_depth > 1e-6`, so the gate suppresses glow exactly there.
 
-**Warning signs:** CPU performance regression (double classify+project loop is ~2× body iterations).
+**How to avoid:** Plan 3 modifies the gate to use `is_near = star_lod_weights[i]` to blend between gated (far) and ungated (near) behavior. The `lod_fade` product zeroes out the contribution fully when the mesh is dominant (`LodWeight = 1`), so the halo only appears during the transition window.
 
-### Pitfall 4: Galaxy Antinode Ghost (Pitfall 7 from skybox.gdshader)
+**Warning signs:** Near stars look like glowing rings with dark star-shaped holes in the center.
 
-**What goes wrong:** The procedural galaxy disc logic in `skybox.gdshader` has a `d > 0.0` gate. Without this gate, the disc renders on BOTH hemispheres (the galaxy and its antipodal ghost). This must be preserved in `luminous_pass.gdshader`.
+### Pitfall 4: WorldRenderer near-star emissive brightness goes to zero when close
 
-**Why it happens:** The perpendicular-projection UV derivation returns a value even when `EYEDIR` points away from the galaxy.
+**What goes wrong:** When the ship is INSIDE or very close to a star (distMeters near 0), `StarRendering.ApparentBrightness(luminosity, distMeters)` returns 0 (the guard `if (distMeters <= 1e-30) return 0f` fires, or the inverse-square flux overflows the log scale). The star mesh has `EmissionEnergyMultiplier = 0` and renders as a black sphere.
 
-**How to avoid:** Copy the exact `d > 0.0` guard from `skybox.gdshader` line 165 into the galaxy disc branch of `luminous_pass.gdshader`.
+**Root cause from code:** `WorldRenderer.RenderBodyAt` line ~487: `starMat.EmissionEnergyMultiplier = StarRendering.ApparentBrightness(body.Luminosity, distMeters)`. When the ship clips into the star, `distMeters` can reach zero.
 
-**Warning signs:** Galaxy disc visible in all directions simultaneously; huge sky-spanning ring artifact.
+**How to avoid:** Add `NearStarEmissionFloor` clamp in `RenderBodyAt` for star meshes: `Mathf.Max(brightness, NearStarEmissionFloor)`. This is the D-12 fix. [ASSUMED floor value: 0.8f — play-test knob]
 
-### Pitfall 5: Depth Occlusion Threshold vs Render Scale
+**Warning signs:** Flying close to the home star causes it to fade to black or become a dark sphere. This was reported as the "missing sun" 05-02 regression.
 
-**What goes wrong:** The depth buffer value for "a planet is in front of this pixel" depends on the per-space render factor (1e-8). A planet at render radius 637 units in Planet space produces a linear depth of 637 render units. A star point occlusion threshold written for Star space may be wrong in Planet space.
+### Pitfall 5: Double classify+project loop per frame
 
-**Why it happens:** Linear depth is in render units, not metres; the render factor differs per space.
+**What goes wrong:** After the refeed, a developer adds back a classify loop to `SkyboxRenderer` "for safety," causing both `LuminousDescriptorBuilder` AND `SkyboxRenderer` to run `UniMath.RelativePosition` for every body every frame. This doubles the math cost and can cause subtle discrepancies if the results differ (e.g., due to a frame boundary where the ship just crossed an SOI).
 
-**How to avoid:** Occlusion check: use the raw (nonlinear) depth. Raw depth approaching 1.0 (near plane, reversed-Z) means close geometry; raw depth near 0.0 (far plane) means empty sky. Use `raw_depth < (1.0 - epsilon)` to detect "foreground geometry exists at this pixel" regardless of scale. This is scale-independent.
+**How to avoid:** `SkyboxRenderer.SyncSkyPoints` after the refeed must contain NO calls to `UniMath.RelativePosition`, `TierClassifier.Classify`, or `GameObjects` iteration. It reads `_builder.Descriptors[]` and pushes to `_skyMat`. That is all.
 
-**Warning signs:** Star points visible through planets; or star glow absent even in empty sky.
+**Warning signs:** `GD.Print` shows classify logs running twice per frame; CPU cost doubles; sky and mesh positions subtly disagree after SOI transitions.
 
-### Pitfall 6: Plan 3 Removes Skybox Before Luminous Pass is Fully Tested
+### Pitfall 6: RND-07 sky direction cache (_skyDirs) must be rebuilt in the refeed loop
 
-**What goes wrong:** If `SkyboxRenderer` and `skybox.gdshader` are deleted in Plan 2 instead of Plan 3, there is no fallback when the new luminous pass has bugs — the sky is just black.
+**What goes wrong:** When `SkyboxRenderer.SyncSkyPoints` is refactored, the `_skyDirs` dictionary (line 85 of `SkyboxRenderer.cs`) that backs the `GetSkyDirection()` accessor is not populated. Plan 3 (handoff baseline) will read `GetSkyDirection(bodyIdx)` and always get `false`, breaking the pop-free handoff mechanism.
 
-**Why it happens:** Temptation to clean up before verifying the replacement.
+**How to avoid:** In the new refeed loop, for each Star descriptor processed, add: `_skyDirs[d.BodyIndex] = d.Direction;`. This mirrors lines 230-231 of the current `SkyboxRenderer`.
 
-**How to avoid:** D-08 strictly gates: Plan 2 = add luminous pass alongside skybox; Plan 3 = remove skybox. The play-test gate between Plans 2 and 3 confirms the new pass covers what the skybox was drawing before the old code is removed.
-
-**Warning signs:** Pure black sky with some galaxy space stars missing.
+**Warning signs:** `SkyboxRenderer.GetSkyDirection(anyIndex, out _)` always returns `false` after the refeed.
 
 ---
 
 ## Code Examples
 
-### Projection: World-Space Direction from UniMath (migrate from SkyboxRenderer)
-
-```csharp
-// Source: [VERIFIED: codebase] — SkyboxRenderer.SyncSkyPoints, lines 168-179
-// This pattern is the blueprint for LuminousDescriptorBuilder.Build()
-bool hasLca = UniMath.RelativePosition(ship, body, objs, out UniVec3 relUni);
-Double3 delta = hasLca ? relUni.ToDouble3() : Double3.Zero;
-double len = hasLca ? delta.Magnitude() : 0.0;
-
-Vector3 dir3;
-if (!hasLca || len < 1e-30)
-    dir3 = Vector3.Up;
-else {
-    Double3 dir = delta * (1.0 / len);
-    dir3 = new Vector3((float)dir.X, (float)dir.Y, (float)dir.Z);
-}
-```
-
-### Depth Linearization in Spatial Shader (Forward+, reversed-Z)
+### Example 1: skybox.gdshader galaxy_disc_weights addition (D-13)
 
 ```glsl
-// Source: [CITED: docs.godotengine.org/en/stable/tutorials/shaders/advanced_postprocessing.html]
-// Godot 4.3+ uses reversed-Z: near plane = 1.0, far plane = 0.0.
-float raw_depth = texture(depth_texture, SCREEN_UV).x;
-vec3  ndc       = vec3(SCREEN_UV * 2.0 - 1.0, raw_depth);
-vec4  view      = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
-view.xyz       /= view.w;
-float lin_depth = -view.z;   // positive = distance from camera in render units
-// "No foreground geometry" check (scale-independent):
-bool  sky_pixel = (raw_depth < 1e-6);   // raw_depth ≈ 0 = far plane = empty sky
+// Source: synthesis from skybox.gdshader (live) + luminous_pass.gdshader (live)
+// Add after galaxy_orientations uniform:
+uniform float galaxy_disc_weights[MAX_GALAXIES];
+
+// In galaxy loop, replace:
+//   col += galaxy_colors[i].rgb * galaxy_bright;
+// with:
+col += galaxy_colors[i].rgb * galaxy_bright * galaxy_disc_weights[i];
 ```
 
-### Bypass Vertex Trick (Camera-Child Quad)
+### Example 2: Main.tscn ShaderMaterial_sky default for new uniform
+
+```gdscript
+// In Main.tscn sub_resource ShaderMaterial_sky, add:
+shader_parameter/galaxy_disc_weights = PackedFloat32Array(0, 0, 0, 0)
+```
+
+### Example 3: SkyboxRenderer — new _galDiscWeights field + push
+
+```csharp
+// Source: live SkyboxRenderer.cs — new field mirrors _galSizes etc.
+private readonly float[] _galDiscWeights = new float[MaxGalaxies];
+// In SyncSkyPoints galaxy branch:
+_galDiscWeights[galCount] = d.LodWeight;   // GalaxyDiscWeight value
+// In push block:
+_skyMat.SetShaderParameter("galaxy_disc_weights", _galDiscWeights);
+```
+
+### Example 4: WorldRenderer near-star emissive floor (D-12)
+
+```csharp
+// Source: live WorldRenderer.RenderBodyAt (~line 487)
+// Replace:
+//   starMat.EmissionEnergyMultiplier = StarRendering.ApparentBrightness(body.Luminosity, distMeters);
+// With:
+private const float NearStarEmissionFloor = 0.8f;  // [ASSUMED play-test knob]
+// ...
+float brightness = StarRendering.ApparentBrightness(body.Luminosity, distMeters);
+starMat.EmissionEnergyMultiplier = Mathf.Max(brightness, NearStarEmissionFloor);
+```
+
+### Example 5: luminous_pass.gdshader near-star depth gate blend (Plan 3)
 
 ```glsl
-// Source: [CITED: docs.godotengine.org/en/stable/tutorials/shaders/advanced_postprocessing.html]
-shader_type spatial;
-render_mode unshaded, fog_disabled, blend_add, depth_test_disabled, depth_draw_never;
+// Source: live luminous_pass.gdshader fragment star loop (~line 204-226)
+// Replace the vis line and add is_near:
+float lod_fade = 1.0 - star_lod_weights[i];  // 0=near mesh dominant, 1=far glow dominant
+float is_near  = star_lod_weights[i];          // 0=far, 1=near mesh taking over
 
-void vertex() {
-    // VERTEX.xy on a 2x2 QuadMesh is in [-1,1] NDC.
-    // w=1.0 places this at the far plane depth without clipping.
-    POSITION = vec4(VERTEX.xy, 1.0, 1.0);
-}
-```
+// Far stars: only paint on sky pixels (background behind geometry)
+// Near stars: paint over everything for halo around visible star mesh
+float vis = mix(sky_pixel ? 1.0 : 0.0, 1.0, is_near);
 
-### Adding the Quad to Main.tscn (C# setup in LuminousPassRenderer._Ready)
-
-```csharp
-// Source: [ASSUMED] — derived from Godot 4 advanced post-processing pattern
-// Add LuminousPassRenderer as a child of Camera3D; it creates its own quad.
-public override void _Ready()
-{
-    var quad = new QuadMesh { Size = new Vector2(2f, 2f), FlipFaces = true };
-    var mesh = new MeshInstance3D { Mesh = quad };
-
-    _mat = new ShaderMaterial
-    {
-        Shader = GD.Load<Shader>("res://Shaders/luminous_pass.gdshader")
-    };
-    mesh.MaterialOverride = _mat;
-    AddChild(mesh);   // LuminousPassRenderer is a child of Camera3D
-}
-```
-
-### TierClassifier Extension — LOD Weight (new pure method)
-
-```csharp
-// Source: [ASSUMED] — to be added to TierClassifier.cs or a companion LuminousLod.cs
-// Pure, no Godot types, unit-testable.
-public static class LuminousLod
-{
-    // Star LOD: 1 = near (mesh dominant), 0 = far (point/glow dominant)
-    // Thresholds are [ASSUMED] starting points; tune in play-test.
-    private const double StarNearStart = 5e12;   // ~0.5 ly
-    private const double StarNearEnd   = 5e13;   // ~5 ly
-
-    public static float StarMeshWeight(double distMeters)
-    {
-        double t = Math.Clamp((distMeters - StarNearStart) / (StarNearEnd - StarNearStart), 0.0, 1.0);
-        return (float)(1.0 - t);   // 1 = mesh, 0 = point
-    }
-
-    // Galaxy disc: 1 = far from galaxy (disc visible), 0 = inside galaxy (disc hidden)
-    public static float GalaxyDiscWeight(double distMeters, double galaxySoiMeters)
-    {
-        double fadeStart = 0.1 * galaxySoiMeters;
-        double fadeEnd   = 0.5 * galaxySoiMeters;
-        double t = Math.Clamp((distMeters - fadeStart) / (fadeEnd - fadeStart), 0.0, 1.0);
-        return (float)t;
-    }
-}
+col.rgb += star_colors[i].rgb * (star_colors[i].a * (disc + halo) * vis * lod_fade);
+// Note: when LodWeight=1, lod_fade=0 and vis=1, but product is 0 — glow fully gone at near.
+// Pop-free by construction: glow and mesh fade in/out continuously via lod_fade.
 ```
 
 ---
 
-## State of the Art
+## State of the Art (Godot 4 relevant)
 
 | Old Approach | Current Approach | When Changed | Impact |
 |--------------|------------------|--------------|--------|
-| `shader_type sky` for background star points | `shader_type spatial` quad for depth-aware post-process | Phase 5 | Depth buffer access, foreground occlusion, glow compositing |
-| Discrete SOI-boundary tier swap (D-22) | Continuous distance LOD weight crossfade (D-03) | Phase 5 | Pops impossible by construction |
-| Two parallel caches (`_skyDirs` + `_lastRenderPositions`) | One `LuminousBodyDescriptor[]` per frame (D-02) | Phase 5 | Single source of truth; structural alignment |
-| SkyboxRenderer + WorldRenderer independently classify bodies | LuminousDescriptorBuilder runs once; both renderers consume | Phase 5 | Eliminates double classify+project; consistent data |
+| Per-drawer classify+project loop | Single `LuminousDescriptorBuilder` shared loop at priority=-10 | Plan 1 (05-01) complete | Eliminates dual caches; pops mathematically impossible |
+| SkyboxRenderer with own classify loop | Refeed from Descriptors[] | Plan 2 (this phase) | SkyboxRenderer becomes a "uniform pusher" only |
+| No fade on galaxy disc | Continuous `galaxy_disc_weights` crossfade | Plan 2 (D-13) | Fixes "galaxy pops out of nowhere" on SOI crossing |
+| luminous_pass draws distant stars + galaxies | luminous_pass narrowed to near-star glow/halo | Plan 3 (D-11 rework) | Correct use of each shader type by what it must occlude against |
+| WorldRenderer emissive brightness = 0 at close range | Emissive floor clamp in RenderBodyAt | Plan 2 (D-12) | Fixes 05-02 missing-sun regression |
 
-**Deprecated/outdated for Phase 5:**
-- `SkyboxRenderer.cs` — deleted in Plan 3 (D-07)
-- `Shaders/skybox.gdshader` — deleted in Plan 3 (D-07); galaxy disc logic is copied into `luminous_pass.gdshader`
-- `WorldRenderer._lastRenderPositions` dictionary — collapsed into the descriptor (D-02); the `GetRenderPosition` accessor may be simplified or removed
-- `SkyboxRenderer._skyDirs` dictionary — collapsed into the descriptor (D-02); `GetSkyDirection` accessor removed
+**Deprecated/removed in this phase:**
+- `SkyboxRenderer` internal classify+project loop — replaced by reading Descriptors[].
+- `LuminousPassRenderer` galaxy uniforms and galaxy loop — galaxy drawing moves entirely to sky shader.
+
+---
+
+## Runtime State Inventory
+
+This is a graphics/rendering refactor with no persistent external state. All state lives in the Godot scene graph and C# object fields, reset each game session.
+
+| Category | Items Found | Action Required |
+|----------|-------------|------------------|
+| Stored data | None — no database, no files, no serialized render state | None |
+| Live service config | None | None |
+| OS-registered state | None | None |
+| Secrets/env vars | None | None |
+| Build artifacts | `Main.tscn` has `process_mode = 4` on `SkyboxRenderer` — it is currently DISABLED | Fix in Plan 2: remove or set to 0 so it processes |
+
+---
+
+## Validation Architecture
+
+### Test Framework
+
+| Property | Value |
+|----------|-------|
+| Framework | xUnit 2.x (EcoSpace.Tests project, net8.0) |
+| Config file | `EcoSpace.Tests/EcoSpace.Tests.csproj` |
+| Quick run command | `dotnet test EcoSpace.Tests/EcoSpace.Tests.csproj --no-build -v quiet` |
+| Full suite command | `dotnet test EcoSpace.Tests/EcoSpace.Tests.csproj -v normal` |
+
+### Phase Requirements to Test Map
+
+| Req ID | Behavior | Test Type | Automated Command | File Exists? |
+|--------|----------|-----------|-------------------|-------------|
+| RND-07 / D-11 | `LuminousLod.StarMeshWeight` returns 1 at near dist, 0 at far | unit | `dotnet test ... --filter "LuminousLodTests"` | Yes (LuminousLodTests.cs) |
+| RND-07 / D-13 | `LuminousLod.GalaxyDiscWeight` returns 0 inside SOI, 1 far | unit | `dotnet test ... --filter "LuminousLodTests"` | Yes (LuminousLodTests.cs) |
+| D-02 | Descriptor direction uses LCA path, not absolute-from-root | unit | `dotnet test ... --filter "LuminousDescriptorBuilderTests"` | Yes (LuminousDescriptorBuilderTests.cs) |
+| D-12 | Near sun renders as mesh with visible brightness (visual) | manual play-test | Play-test Plan 2 gate: fly close to home star | Visual only |
+| D-11 | Point->glow->mesh blend is pop-free (visual) | manual play-test | Play-test Plan 3 gate: approach/leave star slowly | Visual only |
+| D-13 | Galaxy disc fades in/out without pop (visual) | manual play-test | Play-test Plan 4 gate: exit/enter galaxy SOI | Visual only |
+| D-05 | Glow composes before dither (no quantization on glow halo) | manual play-test | Play-test Plan 4 gate | Visual only |
+
+### Sampling Rate
+
+- **Per task commit:** `dotnet test EcoSpace.Tests/EcoSpace.Tests.csproj --no-build -v quiet` (47 tests, <5s)
+- **Per wave merge:** Same
+- **Phase gate:** Full suite green AND per-plan visual play-test approved before advancing to next plan
+
+### Wave 0 Gaps
+
+None — the existing 47 tests cover the descriptor pipeline (Plans 2-4 consume it without changing it). Visual / shader behavior is not unit-testable in isolation from the Godot renderer. If Plan 2 adds a brightness-floor helper method to `SkyboxRenderer`, add a unit test for the floor clamp logic.
+
+---
+
+## Security Domain
+
+Security enforcement is not applicable to a local game rendering pipeline with no external inputs, network traffic, or user-provided data. All inputs to the rendering system are authored test data loaded from `TestSetup.cs`.
+
+---
+
+## Package Legitimacy Audit
+
+No external packages are introduced in Phase 5. This phase modifies existing Godot C# source files and GLSL shaders only. No `npm install`, `pip install`, or `dotnet add package` operations are required.
+
+**Packages removed due to SLOP verdict:** None
+**Packages flagged as suspicious SUS:** None
+
+---
+
+## Environment Availability
+
+| Dependency | Required By | Available | Version | Fallback |
+|------------|------------|-----------|---------|----------|
+| Godot 4.6.2 Mono | All rendering changes | Assumed present | 4.6.2 | None — required |
+| .NET 8.0 SDK | dotnet test | Assumed present | 8.0.x | None — required |
+| DirectX 12 GPU | Forward+ renderer | Assumed present | Windows 11 | None — required for Forward+ |
+
+All dependencies are the project's existing runtime. No new tools required.
+
+---
+
+## Open Questions
+
+1. **SkyboxRenderer process_mode = 4 (Disabled) — needs confirmation before Plan 2 implementation**
+   - What we know: `Main.tscn` line 193 sets `process_mode = 4` on `SkyboxRenderer`, which disables `_Process` entirely. [VERIFIED: Main.tscn]
+   - What's unclear: Was this intentionally left disabled to prevent SkyboxRenderer and LuminousPassRenderer from both pushing to the sky in 05-02?
+   - Recommendation: Plan 2 must reset `process_mode` to 0 (inherit) and verify that SkyboxRenderer runs each frame after the refeed.
+
+2. **GalaxyDiscWeight fade band needs extension to cover the SOI boundary**
+   - What we know: `LuminousLod.GalaxyDiscWeight(soiMeters, soiMeters)` returns 1.0 (the ramp tops out at `0.5*soi`, well below the `1.0*soi` SOI boundary). When the home galaxy first appears in Descriptors (at dist = soiMeters), it appears at full disc weight. [VERIFIED: LuminousLod.cs lines 65-71]
+   - Recommendation: Extend the GalaxyDiscWeight fade band to cover the SOI boundary region. Possible knob: change `fadeEnd` from `0.5*soi` to `1.1*soi` so the ramp includes the SOI crossing. [ASSUMED — play-test knob]
+
+3. **LuminousPassRenderer galaxy loop — remove entirely in Plan 3 or leave as a stub?**
+   - What we know: `LuminousPassRenderer` currently handles galaxy rendering via `galaxy_disc_weights` (luminous_pass.gdshader lines 229-269). After the revised architecture, galaxies belong entirely to the sky shader path.
+   - Recommendation: Remove the galaxy loop and galaxy uniforms from `LuminousPassRenderer` and `luminous_pass.gdshader` in Plan 3. The sky shader handles them. Keeping the stub would mean two shaders both claiming to draw galaxies — a source of future confusion.
+
+4. **Near-star mesh from descriptor: WorldRenderer needs direction-based placement**
+   - What we know: `WorldRenderer.RenderBodyAt` derives mesh position from `LocalPos.ToLocalDoubleUnits` (parent-frame relative position). For near stars that ARE already in the parent+siblings render set (in Star space), this is correct and no change is needed. The D-12 fix is specifically the `EmissionEnergyMultiplier` floor, not a position change.
+   - Clarification: After deeper code review, D-12 does NOT require a new "RenderBodyAtDescriptor" overload. The star IS in the render set via the existing `SyncBodies` parent+siblings loop. The bug was purely the brightness floor.
 
 ---
 
@@ -583,145 +579,60 @@ public static class LuminousLod
 
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
-| A1 | `EYEDIR` built-in is available in `shader_type spatial` fragment shaders on the quad mesh in Godot 4.6 | Architecture Patterns – Pattern 3 | EYEDIR may need to be derived from VERTEX/camera manually; straightforward to fix but requires shader rewrite |
-| A2 | `blend_add` render_mode on a spatial shader quad works as expected in Forward+ DX12 without alpha sorting issues | Architecture Patterns – Pattern 3 | Additive blend on transparent pass may require explicit depth_test_disabled; test in Plan 2 |
-| A3 | Star LOD fade thresholds (5e12m–5e13m) produce visually acceptable crossfade in the authored scene | Code Examples – LuminousLod | Wrong thresholds → stars pop in/out visibly; tunable in play-test (D-04) |
-| A4 | Galaxy disc weight thresholds (0.1×SOI to 0.5×SOI) produce correct fade | Code Examples – LuminousLod | Wrong thresholds → disc persists inside galaxy or disappears too early; tunable in play-test (D-04) |
-| A5 | The spatial quad approach (camera child) is sufficient for depth occlusion without CompositorEffect | Architecture Patterns | CompositorEffect is GPU-thread-based and requires high pipeline knowledge; if occlusion quality is insufficient, CompositorEffect is the fallback |
-| A6 | WorldEnvironment glow in Main.tscn picks up the additive luminous pass output naturally (because the quad renders in the 3D transparent pass before glow) | Architecture Diagram | If glow does not capture the luminous pass, a second glow-like effect must be baked into `luminous_pass.gdshader` directly |
-| A7 | Raw depth ≈ 0.0 (far plane) is a reliable "empty sky pixel" indicator in Godot 4.6 Forward+ reversed-Z | Pitfall 5 / Pattern 3 | Different sky clearing behaviour may populate far-plane depth differently; verify in Plan 2 |
-
----
-
-## Open Questions
-
-1. **Does `EYEDIR` exist in `shader_type spatial` fragment on a quad, or must it be derived?**
-   - What we know: EYEDIR is documented for sky shaders and is described as "world-space view direction" in Godot 4.x spatial docs.
-   - What's unclear: Godot 4.6-specific availability in a quad-spatial fragment vs sky shader context.
-   - Recommendation: In Plan 2, add a debug colour that visualises `EYEDIR` directly (output it as ALBEDO.rgb) to confirm it is world-space as expected. If not, derive from `(INV_VIEW_MATRIX * vec4(0,0,-1,0)).xyz`.
-
-2. **Does WorldEnvironment glow pick up the additive luminous pass?**
-   - What we know: Glow runs after the 3D transparent pass in Forward+. The spatial quad renders in the transparent pass. Additive blend adds to the colour buffer.
-   - What's unclear: Whether Godot's glow threshold samples the pre-composite or post-composite buffer.
-   - Recommendation: In Plan 2 play-test, set star brightness very high and confirm glow halos appear. If not, bake a Gaussian blur halo kernel directly into `luminous_pass.gdshader` (fallback not required for D-05's intent — the dither still captures it after the 3D scene).
-
-3. **Can the galaxy disc logic from `skybox.gdshader` be ported verbatim?**
-   - What we know: `galaxy_disc_coords_tilted`, `spiral_galaxy`, `elliptical_galaxy` are pure math functions with no sky-shader-specific built-ins. `EYEDIR` in skybox maps to `EYEDIR` in spatial fragment (or derived equivalent).
-   - What's unclear: Whether the angular-size units in `(1-cos theta)` smoothstep space transfer correctly to the new context (the `GALAXY_DISC_SCALE=80.0` tuning constant may need recalibration).
-   - Recommendation: Copy verbatim in Plan 3; recalibrate `GALAXY_DISC_SCALE` during play-test.
-
----
-
-## Environment Availability
-
-> Step 2.6: SKIPPED — this phase is a pure codebase restructure with no external tool dependencies. All runtime dependencies (Godot 4.6.2 Mono, .NET 8.0 SDK, DirectX 12) are confirmed present by the fact that the existing codebase builds and runs. No CLI tools, databases, or external services are required.
-
----
-
-## Validation Architecture
-
-> `workflow.nyquist_validation` is explicitly `false` in `.planning/config.json`. Formal test framework is skipped per config. This section covers what CAN vs CANNOT be unit-tested for this phase, so the planner can include appropriate checkpoints.
-
-### What CAN Be Unit-Tested (extend existing xUnit suite in EcoSpace.Tests)
-
-The key unit-testable seam is **pure C# logic with no Godot dependency** — same constraint as the existing `TierClassifier` and `UniMath` tests.
-
-| New Behavior | Test Type | File | Notes |
-|---|---|---|---|
-| `LuminousLod.StarMeshWeight(distMeters)` — returns 1.0 at ≤StarNearStart, 0.0 at ≥StarNearEnd, smooth in between | Unit | `LuminousLodTests.cs` | Pure math, no Godot |
-| `LuminousLod.GalaxyDiscWeight(distMeters, soiMeters)` — returns 0.0 inside galaxy, 1.0 when far | Unit | `LuminousLodTests.cs` | Pure math, no Godot |
-| `LuminousDescriptorBuilder.Build()` — produces correct descriptor fields from a mock hierarchy | Unit | `LuminousDescriptorBuilderTests.cs` | Requires mock `List<UniObject>` like UniMathTests |
-| Descriptor direction field = UniMath.RelativePosition output | Unit | `LuminousDescriptorBuilderTests.cs` | Same hierarchy as UniMathTests |
-| StarRendering.ApparentBrightness / AngularRadius (existing, regression guard) | Unit | `TierClassifierTests.cs` (existing) | Already covered |
-| TierClassifier.Classify (existing, regression guard) | Unit | `TierClassifierTests.cs` (existing) | Already covered; run in Plan 1 to confirm no regression |
-
-**Test framework:** xUnit + GodotSharp linked via `EcoSpace.Tests.csproj`. Run with `dotnet test`. [VERIFIED: codebase — EcoSpace.Tests/ exists, 30+ tests passing]
-
-**Run command:** `dotnet test C:/Users/frede/workspace/godot/eco-space/EcoSpace.Tests/EcoSpace.Tests.csproj`
-
-### What CANNOT Be Unit-Tested (must be play-tested in-engine)
-
-| Behavior | Why Not Unit-Testable | Verification Method |
-|---|---|---|
-| Spatial shader quad renders in the right pass | Godot rendering pipeline; no C# test hook | Plan 2 play-test: fly in Star space, confirm star glow |
-| Depth texture reads correctly (occlusion) | GPU/rendering; no simulation | Plan 2 play-test: fly behind a planet, confirm star glow absent |
-| Galaxy disc crossfade transitions smoothly | Visual continuity; no pixel test | Plan 3 play-test: fly from Universe into galaxy, confirm disc fades |
-| WorldEnvironment glow picks up luminous pass | Engine rendering order | Plan 2 play-test: verify glow halos appear |
-| Dither correctly quantizes the composed frame | D-05 ordering; visual | Plan 4 play-test: 8-bit palette looks consistent |
-| No skybox ghost after Plan 3 removal | Visual regression | Plan 3 play-test: all tiers, no black holes or missing bodies |
-| TILT_FLOOR (D-59) galaxy foreshortening preserved | Visual; angular geometry | Plan 3 play-test: galaxy at 45° angle still looks tilted |
-| Sibling stars visible from Galaxy space (P1) | [ASSUMED] floor brightness | Plan 2 play-test: Galaxy space → stars visible as points |
-| Galaxies visible from Universe space (P2) | Distance crossfade correctness | Plan 3 play-test: Universe space → 3 galaxies visible as discs |
-
-### Play-Test Gate Protocol (per D-08)
-
-Each plan's play-test covers:
-
-| Plan | Space to Test | Gate Question |
-|------|-------------|--------------|
-| Plan 1 | All tiers (no visual change) | Does the projection maths produce the same sky directions as SkyboxRenderer? (compare visually — sky unchanged) |
-| Plan 2 | Star space, Galaxy space | Star glow visible? Star point visible from Galaxy space (P1 closed)? Planets/near meshes still correct? |
-| Plan 3 | Galaxy space, Universe space | Galaxy discs visible from Universe space (P2 closed)? Disc fades correctly approaching? Old skybox gone with no artifacts? |
-| Plan 4 | All tiers | Dither palette consistent edge-to-edge? No banding seams between luminous pass and rest of scene? Final parity/improvement pass. |
-
----
-
-## Security Domain
-
-> `security_enforcement: true` in config. ASVS Level 1 applies.
-
-| ASVS Category | Applies | Standard Control |
-|---------------|---------|-----------------|
-| V2 Authentication | No | No auth in rendering layer |
-| V3 Session Management | No | No session state |
-| V4 Access Control | No | Single-player game, no multi-user |
-| V5 Input Validation | Minimal | Shader array sizes clamped by MaxStars/MaxGalaxies constants (existing T-03-01 guard); `(uint)i < (uint)Count` bounds checks preserved |
-| V6 Cryptography | No | No cryptographic operations |
-
-**Known threat patterns for this stack:**
-
-| Pattern | STRIDE | Standard Mitigation |
-|---------|--------|---------------------|
-| Shader loop DoS (unbounded star/galaxy count) | Denial of Service | MaxStars=8, MaxGalaxies=4 constants in shader and C# — already in existing codebase; preserve in new pass |
-| Null UniObject in GameObjects list | Elevation of Privilege | `if (body == null) continue;` guard — already present; preserve in descriptor builder |
-| LOD weight = NaN from zero-distance body | Tampering | Clamp LOD weight to [0,1]; guard `distMeters > 1e-30` before division (same as StarRendering.ApparentBrightness) |
+| A1 | MinVisibleBrightness = 0.05f is a good starting floor for distant star findability | Pattern 5 | Stars too bright (floor too high) or still invisible (floor too low) — play-test knob |
+| A2 | halo_size multiplier 8.0 and halo strength 0.3 in near-star glow kernel produce good results | Code Ex. 5 | Glow too large/small or dim/bright — play-test knob |
+| A3 | NearStarEmissionFloor = 0.8f is a good floor for near-star mesh visibility | Code Ex. 4 | Star mesh still dark (floor too low) or blows out to white (floor too high) — play-test knob |
+| A4 | GalaxyDiscWeight fadeEnd should be extended from 0.5*soi to ~1.1*soi to fix SOI-boundary pop | Open Question 2 | Galaxy may still pop on SOI exit if band mismatched — play-test knob |
+| A5 | SkyboxRenderer process_mode = 4 was set during 05-02 testing and should be reset to 0 for the refeed | Pitfall 1 | If intentionally disabled for a reason, resetting it breaks the intended 05-02 architecture — needs confirmation |
+| A6 | LuminousPassRenderer galaxy uniforms should be removed in Plan 3 | Open Question 3 | If galaxies need to appear in both drawers, removing them breaks that — verify intent |
 
 ---
 
 ## Sources
 
-### Primary (verified against codebase — HIGH confidence)
-- `Scripts/Render/SkyboxRenderer.cs` — classify→project→appearance loop blueprint for LuminousDescriptorBuilder
-- `Scripts/Render/WorldRenderer.cs` — mesh sync loop, render factors, GetRenderPosition accessor
-- `Scripts/Render/StarRendering.cs` — appearance rules (ApparentBrightness, AngularRadius, Exposure)
-- `Scripts/Render/PostProcessRenderer.cs` — dithering pass host; unchanged by phase 5
-- `Scripts/TierClassifier.cs` — tier classification; extend for LOD weight
-- `Shaders/skybox.gdshader` — galaxy disc math reusable verbatim (spiral/elliptical/tilt)
-- `Shaders/dithering.gdshader` — 8-bit dither; hint_screen_texture reads after 3D scene
-- `Shaders/body_lit.gdshader` — Lambert shading; unchanged
-- `Scripts/Math/UniMath.cs` — LCA-relative position math; mandatory projection path
-- `Main.tscn` — scene structure; Camera3D, CanvasLayer, glow settings
-- `EcoSpace.Tests/TierClassifierTests.cs`, `UniMathTests.cs` — existing test patterns
+### Primary (HIGH confidence — live codebase read, authoritative for this project)
 
-### Secondary (official docs — MEDIUM confidence)
-- [Advanced Post-Processing — Godot docs](https://docs.godotengine.org/en/stable/tutorials/shaders/advanced_postprocessing.html) — spatial quad + depth texture technique
-- [Custom Post-Processing — Godot docs](https://docs.godotengine.org/en/stable/tutorials/shaders/custom_postprocessing.html) — CanvasLayer approach limitations (no depth access)
-- [The Compositor — Godot docs](https://docs.godotengine.org/en/stable/tutorials/rendering/compositor.html) — CompositorEffect for deeper pipeline access (noted as fallback)
-- [Spatial Shaders — Godot docs 4.4](https://docs.godotengine.org/en/4.4/tutorials/shaders/shader_reference/spatial_shader.html) — EYEDIR, render modes, blend modes
+| File | What was verified |
+|------|------------------|
+| `Scripts/Render/LuminousBodyDescriptor.cs` | Descriptor struct fields, BaseColor.A=Brightness packing convention |
+| `Scripts/Render/LuminousLod.cs` | StarMeshWeight/GalaxyDiscWeight curves, threshold knobs, zero-distance guards |
+| `Scripts/Render/LuminousDescriptorBuilder.cs` | BuildDescriptors loop, home-galaxy suppression, process_priority=-10, Descriptors[] shape |
+| `Scripts/Render/SkyboxRenderer.cs` | SyncSkyPoints loop, _skyDirs cache, uniform push pattern |
+| `Shaders/skybox.gdshader` | Uniform declarations, galaxy_disc_weights ABSENCE confirmed (line 191 has no weight), EYEDIR availability |
+| `Scripts/Render/LuminousPassRenderer.cs` | Camera3D-child quad setup, descriptor read pattern, galaxy uniforms present |
+| `Shaders/luminous_pass.gdshader` | Depth gate, world_view_dir reconstruction, star loop, galaxy loop with disc_w, blend_add |
+| `Scripts/Render/WorldRenderer.cs` | SyncBodies parent+siblings logic, RenderBodyAt emissive star path, brightness formula |
+| `Scripts/Render/StarRendering.cs` | ApparentBrightness formula, zero-distance guard (returns 0f), Exposure knob |
+| `Scripts/TierClassifier.cs` | SkyTier enum, Classify logic |
+| `Scripts/Render/PostProcessRenderer.cs` | dithering.gdshader host, CanvasLayer ordering |
+| `Shaders/dithering.gdshader` | canvas_item shader confirmed — no hint_depth_texture |
+| `Main.tscn` | process_mode=4 on SkyboxRenderer (DISABLED), LuminousPassRenderer as Camera3D child, process_priority=-10 on builder |
+| `.planning/phases/05-rendering-overhaul/05-CONTEXT.md` | All locked decisions D-01 through D-14, architecture revision rationale |
+| `.planning/phases/05-rendering-overhaul/05-01-SUMMARY.md` | Plan 1 deliverables, what was tested and play-test approved |
+| `CLAUDE.md` | Position math mandatory rules, namespace conventions, coding style |
+| `.planning/todos/pending/galaxy-space-star-meshes-invisible.md` | Root cause analysis of P1 debt (emissive brightness + sub-pixel) |
+| `.planning/todos/pending/galaxy-visibility-in-universe-space.md` | Root cause analysis of P2 debt (no mesh + skybox gap in Universe space) |
 
-### Tertiary (web search — LOW confidence; marked ASSUMED in findings)
-- [Godot issue #74464](https://github.com/godotengine/godot/issues/74464) — canvas_item depth texture broken in Forward+
-- [Godot forum: hint_screen_texture glow](https://forum.godotengine.org/t/how-do-i-make-sure-the-hdr-glow-bloom-effect-doesnt-get-applied-to-certain-canvas-layers/106258) — glow + CanvasLayer ordering
+### Secondary (MEDIUM confidence — inferred from shader comments referencing Godot sources)
+
+- `skybox.gdshader` header: "EYEDIR is world-space in Godot 4 sky shaders — NOT camera-relative." [CITED: skybox.gdshader line 8, citing godotengine.org/article/custom-sky-shaders-godot-4-0/]
+- `luminous_pass.gdshader` header: render ordering confirmed "BEFORE WorldEnvironment glow and BEFORE the CanvasLayer dither" [CITED: luminous_pass.gdshader header comment]
+- Godot canvas_item depth buffer limitation: Godot bug #74464 [CITED: luminous_pass.gdshader header comment line 43]
+- Godot Forward+ reversed-Z: far plane = 0.0, near plane = 1.0 [CITED: luminous_pass.gdshader lines 168-170, consistent with `raw_depth < 1e-6` sky-pixel gate]
 
 ---
 
 ## Metadata
 
 **Confidence breakdown:**
-- Standard stack: HIGH — all components are existing codebase
-- Architecture: HIGH (existing code) / MEDIUM (new spatial quad pattern, Godot 4.6-specific)
-- Pitfalls: HIGH — pitfalls 1/2/4/6 are codebase-verified; 3/5 MEDIUM
-- LOD thresholds: LOW — [ASSUMED]; calibrated by play-test
+- Standard stack: HIGH — all components are existing code, fully read from disk
+- Architecture: HIGH — render pass ordering confirmed from shader headers and existing behavior
+- Pitfalls: HIGH — most pitfalls derived from live code analysis (process_mode=4, galaxy_disc_weights absence, brightness=0 at close range)
+- LOD thresholds (MinVisibleBrightness, NearStarEmissionFloor, halo knobs): LOW — marked [ASSUMED], calibrated at each plan's play-test gate
 
 **Research date:** 2026-06-19
-**Valid until:** 2026-08-01 (Godot 4.6 is the locked engine version; no drift expected)
+**Valid until:** Grounded in the live codebase on branch `phase-05-rendering-overhaul`. Valid until files listed in Sources are modified. No external API dependency.
+
+---
+
+## RESEARCH COMPLETE
