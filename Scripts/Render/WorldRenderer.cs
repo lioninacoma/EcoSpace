@@ -90,6 +90,17 @@ namespace Render
 			set => StarRendering.Exposure = value;
 		}
 
+		/// <summary>
+		/// Minimum emissive energy multiplier for a near star mesh (D-12 missing-sun fix).
+		/// When the ship is very close to or inside a star, <see cref="StarRendering.ApparentBrightness"/>
+		/// approaches 0 (its distMeters≤1e-30 guard returns 0f), rendering the star mesh as a black
+		/// sphere. This floor clamps the emissive multiplier to a minimum visible value so the star
+		/// stays bright up close.
+		/// [ASSUMED play-test calibration knob — D-04]
+		/// Does NOT change <see cref="StarRendering.ApparentBrightness"/>; the physics stay exact.
+		/// </summary>
+		private const float NearStarEmissionFloor = 0.8f;
+
 		// ----- Shader-based body lighting exports (replaces Godot light nodes) ----
 
 		/// <summary>
@@ -484,7 +495,12 @@ namespace Render
 			if (isStar && mesh.MaterialOverride is StandardMaterial3D starMat)
 			{
 				double distMeters = relUnits.Magnitude() * ship.LocalPos.Scale;
-				starMat.EmissionEnergyMultiplier = StarRendering.ApparentBrightness(body.Luminosity, distMeters);
+				// D-12 missing-sun fix: floor the emissive multiplier so the star is always visibly
+				// bright when close/inside. StarRendering.ApparentBrightness returns 0 when
+				// distMeters ≤ 1e-30 (zero-distance guard), which makes the star mesh black at
+				// close range. NearStarEmissionFloor prevents this. Physics stay correct.
+				float brightness = StarRendering.ApparentBrightness(body.Luminosity, distMeters);
+				starMat.EmissionEnergyMultiplier = Mathf.Max(brightness, NearStarEmissionFloor);
 			}
 		}
 
