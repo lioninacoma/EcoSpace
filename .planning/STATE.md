@@ -4,17 +4,17 @@ milestone: v1.0
 milestone_name: milestone
 current_phase: 05
 current_phase_name: rendering-overhaul
-status: executing
-stopped_at: Phase 05 Plan 03 complete (3 of 4 plans done); Plan 4 (05-04) ready — HDR-before-dither + dead-code removal. Execution PAUSED at user's request after 05-03.
-last_updated: "2026-06-20T21:04:46.349Z"
+status: phase_complete
+stopped_at: Phase 05 COMPLETE (4 of 4 plans done). 05-04 finalization (D-05 composition lock + dead-cache removal) executed; final all-tier parity play-test APPROVED 2026-06-20. Ready for phase verification / transition.
+last_updated: "2026-06-20T21:30:00.000Z"
 last_activity: 2026-06-20
-last_activity_desc: Phase 05 execution resumed (wave continue)
+last_activity_desc: Phase 05 Plan 04 complete — D-05 glow-before-dither composition verified/locked, dead _lastRenderPositions cache removed (Hud accessors preserved); all-tier play-test APPROVED; Phase 5 Rendering Overhaul COMPLETE (4/4)
 progress:
   total_phases: 9
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 16
-  completed_plans: 15
-  percent: 44
+  completed_plans: 16
+  percent: 50
 ---
 
 # Project State
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 
 ## Current Position
 
-Phase: 05 (rendering-overhaul) — EXECUTING (paused after 05-03 at user request)
-Plan: 4 of 4 (3 complete, Plan 4 ready)
-Status: Executing Phase 05
-Last activity: 2026-06-20 — Phase 05 execution resumed (wave continue)
+Phase: 05 (rendering-overhaul) — COMPLETE (4 of 4 plans done)
+Plan: 4 of 4 (all complete)
+Status: Phase 05 complete — ready for verification / transition to Phase 06
+Last activity: 2026-06-20 — 05-04 finalization done + all-tier play-test APPROVED; Phase 5 Rendering Overhaul COMPLETE
 
 ### ARCHITECTURE REVERSAL (decided 2026-06-19, user-driven at 05-02 play-test)
 
@@ -210,9 +210,9 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-20T21:04:46.338Z
-Stopped at: Session resumed — Phase 05 at 3/4 plans; proceeding toward executing 05-04 (final finalization plan). Flagged uncommitted Main.tscn tweak (PsfLodRange=1.0 vs D-04-approved 0.6) for resolution in 05-04.
-Resume file: .planning/phases/05-rendering-overhaul/05-04-PLAN.md
+Last session: 2026-06-20T21:30:00.000Z
+Stopped at: Phase 05 COMPLETE (4/4). 05-04 executed (Task 1 verify-only D-05 composition lock; Task 2 02c24c9 dead _lastRenderPositions cache removed, GetRenderPosition now reads live mesh, Hud target circle preserved; Task 3 all-tier play-test APPROVED). PsfLodRange reverted to approved 0.6. Build 0/0, 48/48 green. SUMMARY c9fbebc. Next: /gsd-verify-work 5 or transition to Phase 06.
+Resume file: (none — phase complete)
 Prior resume note: 05-03 delivered: luminous_pass.gdshader narrowed to near-star PSF only (galaxy loop removed, D-13
 confirmed); screen-space aperture-diffraction PSF (inverse-cube core + diffraction spikes, aspect-corrected);
 per-pixel analytic depth occlusion via observer-unit RenderDistance (root cause: metres/scale*factor, NOT metres*factor);

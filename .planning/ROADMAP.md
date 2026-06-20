@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: Dynamic Skybox** - Shader-type sky updated on scale-tier transitions; only the next tier out (other systems' stars, then only galaxies) is projected onto a stable spherical skybox, with a visually continuous skybox↔mesh handoff (completed 2026-06-15)
 - [x] **Phase 3: Cross-Galaxy Travel** - Extend hand-authored data to galaxy/universe scale; full SOI chain validated at intergalactic distances (UAT paused 1/7 — gated on Phase 4 flight model) (completed 2026-06-17)
 - [x] **Phase 4: Flight Model v2 — tier & target-aware speed** - Per-tier speed ceiling + target-distance ease-out replacing the single global MaxSpeed; world-pinned target outline (minimal 999.1 slice); fixes in-system over-speed and the galaxy-SOI-exit dead zone within one envelope (COMPLETE 2026-06-17)
-- [ ] **Phase 5: Rendering Overhaul** - Foundational full rewrite that unifies world rendering, post-process (8-bit/dither/CRT), and body-lighting into one coherent multi-tier rendering layer; replaces the ad-hoc skybox-loop + per-tier WorldRenderer routing and gives the tracked render debts (galaxy-space star findability, Universe-space galaxy visibility) a robust base to be solved on — individually, in later phases, not all at once
+- [x] **Phase 5: Rendering Overhaul** - Foundational full rewrite that unifies world rendering, post-process (8-bit/dither/CRT), and body-lighting into one coherent multi-tier rendering layer; replaces the ad-hoc skybox-loop + per-tier WorldRenderer routing and gives the tracked render debts (galaxy-space star findability, Universe-space galaxy visibility) a robust base to be solved on — individually, in later phases, not all at once (completed 2026-06-20)
 
 ## Phase Details
 
@@ -143,7 +143,7 @@ Plans:
 
 **Verification**: in-game Godot play-test (GDShader/visual; not fully unit-testable) across all four spaces, plus the existing TierClassifier unit suite.
 
-**Plans**: 3/4 plans executed
+**Plans**: 4/4 plans complete
 Plans:
 
 **Wave 1**
@@ -160,7 +160,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 + play-test)*
 
-- [ ] 05-04-PLAN.md — HDR dither composition + cleanup: verify/lock the near-star glow pass composing in HDR before the 8-bit dither (D-05); remove the dead WorldRenderer._lastRenderPositions cache while keeping the Hud GetRenderPosition/GetRenderRadius accessors working (D-46); final per-tier parity/improvement play-test (CRT stays out per D-06) (wave 4)
+- [x] 05-04-PLAN.md — HDR dither composition + cleanup: verify/lock the near-star glow pass composing in HDR before the 8-bit dither (D-05); remove the dead WorldRenderer._lastRenderPositions cache while keeping the Hud GetRenderPosition/GetRenderRadius accessors working (D-46); final per-tier parity/improvement play-test (CRT stays out per D-06) (wave 4)
 
 ## Backlog
 
@@ -263,7 +263,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. Dynamic Skybox | 3/3 | Complete   | 2026-06-15 |
 | 3. Cross-Galaxy Travel | 3/3 | UAT partial (3/7 pass) — gated on the render debts (post-overhaul) | — |
 | 4. Flight Model v2 — tier & target-aware speed | 2/2 | Complete   | 2026-06-17 |
-| 5. Rendering Overhaul | 3/4 | In Progress|  |
+| 5. Rendering Overhaul | 4/4 | Complete   | 2026-06-20 |
 
 Plans:
 
