@@ -18,6 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Cross-Galaxy Travel** - Extend hand-authored data to galaxy/universe scale; full SOI chain validated at intergalactic distances (UAT paused 1/7 — gated on Phase 4 flight model) (completed 2026-06-17)
 - [x] **Phase 4: Flight Model v2 — tier & target-aware speed** - Per-tier speed ceiling + target-distance ease-out replacing the single global MaxSpeed; world-pinned target outline (minimal 999.1 slice); fixes in-system over-speed and the galaxy-SOI-exit dead zone within one envelope (COMPLETE 2026-06-17)
 - [x] **Phase 5: Rendering Overhaul** - Foundational full rewrite that unifies world rendering, post-process (8-bit/dither/CRT), and body-lighting into one coherent multi-tier rendering layer; replaces the ad-hoc skybox-loop + per-tier WorldRenderer routing and gives the tracked render debts (galaxy-space star findability, Universe-space galaxy visibility) a robust base to be solved on — individually, in later phases, not all at once (completed 2026-06-20)
+- [ ] **Phase 6: Targeting & Navigation HUD** - Extended targeting beyond the Phase-4 minimal slice: a hierarchy tree selector for any object across spaces (overrides D-12), a world-pinned target outline holding a minimum on-screen radius, and a name+distance label that tracks the body on screen (promoted from backlog 999.1, 2026-06-20)
 
 ## Phase Details
 
@@ -162,23 +163,25 @@ Plans:
 
 - [x] 05-04-PLAN.md — HDR dither composition + cleanup: verify/lock the near-star glow pass composing in HDR before the 8-bit dither (D-05); remove the dead WorldRenderer._lastRenderPositions cache while keeping the Hud GetRenderPosition/GetRenderRadius accessors working (D-46); final per-tier parity/improvement play-test (CRT stays out per D-06) (wave 4)
 
-## Backlog
+### Phase 6: Targeting & Navigation HUD — hierarchy tree selector + world-pinned target outline
 
-### Phase 999.1: Targeting & navigation HUD — hierarchy tree selector + world-pinned target outline (BACKLOG)
-
-**Goal:** A target/selection system beyond the Phase-1 minimal HUD, deferred from plan 01-04:
+**Goal:** A target/selection system beyond the Phase-1/Phase-4 minimal HUD, deferred from plan 01-04 (promoted from backlog 999.1):
 
   1. A folder/tree-structure menu to select **any** object in the universe hierarchy (across spaces) — overrides locked decision **D-12** (current-parent-space targeting only).
   2. A **world-pinned target outline** drawn around the selected body that holds a **minimum on-screen radius**, so a distant star/planet is always visible even as a sub-pixel speck.
   3. A **name + distance label pinned to the outline** that tracks the object on screen (moves with the body), augmenting the fixed-corner target readout + off-screen edge marker shipped in 01-04.
 
-  Cross-space constraint to resolve in planning: `WorldRenderer` only renders bodies in the ship's current space, so a cross-space target can show direction + distance (edge marker) but the 3D outline can only be drawn once that body enters the rendered set (i.e. once the ship is in its space).
-**Requirements:** TBD (extends HUD-04 + findability; revisits D-12)
-**Plans:** 2/2 plans complete
+**Depends on**: Phase 4 (target-distance ease-out + world-pinned target circle baseline, D-46) and Phase 5 (unified render layer / findability seams)
+**Requirements:** TBD (extends HUD-04 + findability; revisits D-12) — set in discuss/plan-phase
+**Origin**: deferred from plan 01-04 (Backlog 999.1, 2026-06-14); promoted 2026-06-20.
 
-Plans:
+**Cross-space constraint to resolve in planning:** `WorldRenderer` only renders bodies in the ship's current space, so a cross-space target can show direction + distance (edge marker) but the 3D outline can only be drawn once that body enters the rendered set (i.e. once the ship is in its space). This directly intersects the open render debt `galaxy-visibility-in-universe-space` (P2): galaxies have no mesh in Universe space, so today they are neither visible nor targetable (confirmed Phase 5 UAT Tests 6 & 8) — the tree selector can list them, but the world-pinned outline depends on that debt being resolved. Decide in discuss whether Phase 6 scopes to selectable-with-edge-marker for non-rendered bodies and defers the 3D outline for those to the galaxy-visibility phase.
 
-- [ ] TBD (promote with /gsd-review-backlog when ready)
+**Overlap to disambiguate in planning:** backlog 999.3 (distance-based cross-space target traversal + autopilot) also overrides D-12 via a distance-ranked candidate set. Phase 6 is the *manual tree selector + outline/label*; 999.3 is *distance-ranked selection + warp autopilot*. Settle the boundary (or fold) during discuss.
+
+**Plans:** TBD (run /gsd-discuss-phase 6 → /gsd-plan-phase 6)
+
+## Backlog
 
 ### Phase 999.2: Shader-rendered target-sphere outline (BACKLOG)
 
