@@ -172,14 +172,27 @@ Plans:
   3. A **name + distance label pinned to the marker** that tracks the object on screen (moves with the body), augmenting the fixed-corner target readout + off-screen edge marker shipped in 01-04.
 
 **Depends on**: Phase 4 (target-distance ease-out + target marker baseline, D-46) and Phase 5 (unified render layer / render-conversion conventions)
-**Requirements:** TBD (extends HUD-04 + findability; revisits D-12; supersedes the 2D D-46 circle) — set in discuss/plan-phase
+**Requirements:** extends HUD-04 + findability; revisits D-12; supersedes the 2D D-46 circle. Tracked via CONTEXT decisions: D-50/D-51/D-52/D-53 (3D marker), D-54/D-55/D-56 (cross-space selector), D-57 (tracking label).
 **Origin**: deferred from plan 01-04 (Backlog 999.1, 2026-06-14); 999.2 (shader sphere-outline marker) folded in; promoted 2026-06-20.
 
 **Key decision (user, 2026-06-20):** the target marker is computed directly from `UniObject` data (direction/distance via `UniMath`, size via the same render-factor math `WorldRenderer` uses to place/size a mesh) — it does **NOT** depend on the body being in the live rendered mesh set. This removes the old D-46 render-set gate and the dependency on the `galaxy-visibility-in-universe-space` render debt: a cross-space target (including a galaxy in Universe space, which has no mesh) still gets a correctly-placed, correctly-sized sphere-outline marker showing where it is, even though the body itself is not yet rendered there.
 
 **Overlap to disambiguate in planning:** backlog 999.3 (distance-based cross-space target traversal + autopilot) also overrides D-12 via a distance-ranked candidate set. Phase 6 is the *manual tree selector + sphere-outline marker + tracking label*; 999.3 is *distance-ranked selection + warp autopilot* (OUT of scope here). Settle the boundary during discuss.
 
-**Plans:** TBD (run /gsd-discuss-phase 6 → /gsd-plan-phase 6)
+**Plans:** 3 plans (3 waves)
+Plans:
+
+**Wave 1**
+
+- [ ] 06-01-PLAN.md — Cross-space selector core in Hud.cs: full-hierarchy candidate set (D-55) + SetTargetIndex/GetTargetCandidates + retire Tab cycle (D-56) + remove 2D DrawArc circle (D-50); ActiveTargetIndex contract preserved (wave 1)
+
+**Wave 2** *(blocked on Wave 1 — consumes the Hud selector API)*
+
+- [ ] 06-02-PLAN.md — TargetSelectorPanel UI: compact tier-grouped (GALAXY/STAR/PLANET) side panel with name+distance, toggled by Tab, cursor reconciled with the T-key mouse mode (D-54/D-55/D-56) + Main.tscn wiring + play-test (wave 2)
+
+**Wave 3** *(blocked on Wave 2 — shares Main.tscn; consumes cross-space ActiveTargetIndex)*
+
+- [ ] 06-03-PLAN.md — 3D sphere-outline marker computed from UniObject (UniMath + observer-unit math, no mesh needed, min-size floor — D-50/D-51/D-52) + target_outline.gdshader + name+distance tracking label (D-57) + Main.tscn wiring + play-test (wave 3)
 
 ## Backlog
 
