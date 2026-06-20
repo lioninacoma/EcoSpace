@@ -58,9 +58,34 @@ visually continuous (RND-07).
 - The handoff across the Galaxy↔Universe boundary is pop-free.
 - D-28 is revisited and the new decision recorded (supersede or scope it to a tier).
 
+## Post-overhaul observations (2026-06-20, Phase 5 UAT Tests 6 & 8)
+
+Confirmed again after the Phase 5 Rendering Overhaul (which intentionally did NOT close
+this debt). New, more specific symptoms to fold into the design fix:
+
+- **Approach (Test 6):** the galaxy disc fades out far too slowly — flying toward a
+  galaxy you are *surrounded by the galaxy "placeholder" disc* until it abruptly pops
+  away, and the galaxy's stars only become visible once you've entered the SOI. The
+  crossfade band ([0.5×SOI, 1.1×SOI], `LuminousLod.GalaxyDiscWeight`) and the
+  sky-disc→star-mesh handoff need rethinking so the disc recedes/parts as you enter
+  rather than enveloping the camera then popping.
+- **Departure (Test 6):** flying away, a near plane clips ~half the galaxy from
+  rendering in the back; turning the camera reveals a huge "half" galaxy representation
+  (disc geometry/extent is wrong relative to the camera near plane at the boundary).
+- **Targeting (Test 8):** galaxies cannot be targeted/cycled in Universe space — `root`
+  is selectable and gets a target circle, but galaxies are not. Same root cause: with no
+  galaxy mesh in Universe space there is no render position for the target circle (D-46
+  `GetRenderPosition`) to pin to. A galaxy-visibility fix and galaxy targetability should
+  be solved together.
+
+These reinforce design option 1/3 (mesh or hybrid promotion) over pure-skybox option 2 —
+the skybox-disc-only path is what produces both the envelop-then-pop and the half-galaxy
+clipping. Revisit the crossfade math and the near-plane/extent of the galaxy disc.
+
 ## Notes
 
 - Blocks UAT items 5, 6, 7 (intergalactic transit / far-end integration / crossing time).
 - Pairs naturally with a target-distance HUD readout (see
   [[flight-speed-model-tier-and-target-aware]]).
+- Galaxy targetability (Test 8) depends on this — solve targeting alongside visibility.
 - Requires in-game Godot verification.
