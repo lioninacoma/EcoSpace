@@ -148,21 +148,12 @@ namespace Render
 			_                        => StarRenderFactor,
 		};
 
-		/// <summary>
-		/// RND-07/D-21 handoff baseline: last render-space positions from SyncBodies, keyed by
-		/// body index. Persisted across frames (rebuilt each frame) so GetRenderPosition can be
-		/// called at a tier-crossing event that fires between frames. Cleared at the top of each
-		/// SyncBodies call, then repopulated for all bodies in the current render set (T-02-05
-		/// mitigation: keyed by validated body Index; no stale entries accumulate beyond one frame).
-		///
-		/// Phase 2 builds ONLY this data structure — it performs NO visible swap or crossfade
-		/// (D-21, D-24). Phase 3 reads it at a tier-crossing to get the mesh's render-space
-		/// position, then compares it with SkyboxRenderer.GetSkyDirection to align the promoted
-		/// mesh with the sky point on the same screen pixel for an instant exact-match swap.
-		/// Color match is automatic: both renderers read body.BaseColor (D-18).
-		/// Brightness match is automatic: both derive from body.Luminosity.
-		/// </summary>
-		private readonly Dictionary<int, Vector3> _lastRenderPositions = [];
+		// _lastRenderPositions removed (D-02 cleanup — Plan 4 of Phase 5):
+		// The dead per-frame cache was superseded by the LuminousBodyDescriptor's Direction
+		// (the single source of truth).  GetRenderPosition now reads the live mesh transform
+		// directly from _meshes, so no separate position cache is needed.
+		// The per-frame transient scratch _renderPositions (below) is still used within SyncBodies
+		// for star_dir computation and is NOT removed.
 
 		/// <summary>Per-body mesh instances: keyed by GameObjects index.</summary>
 		private readonly Dictionary<int, MeshInstance3D> _meshes = [];
@@ -211,7 +202,9 @@ namespace Render
 		/// and pushes per-body star_dir uniforms to the body_lit ShaderMaterials so the
 		/// Lambert terminator always faces the nearest star in every space.
 		/// Only bodies in the ship's current parent space are shown (RND-02).
-		/// Also persists render positions into _lastRenderPositions for RND-07/D-21 handoff.
+		/// The transient <c>_renderPositions</c> scratch collects positions within the frame
+		/// for star_dir computation; it is NOT persisted (the dead <c>_lastRenderPositions</c>
+		/// cache was removed in Plan 4 — D-02 cleanup).
 		/// </summary>
 		public void SyncBodies()
 		{
@@ -236,12 +229,9 @@ namespace Render
 			activeIndices.Clear();
 
 			// Collect per-body render positions for this frame (used for star_dir computation
-			// and persisted to _lastRenderPositions for RND-07/D-21 handoff baseline).
+			// within this frame only — the dead _lastRenderPositions persistence was removed in Plan 4).
 			var renderPositions = _renderPositions;
 			renderPositions.Clear();
-
-			// Clear persisted positions — rebuilt fresh each frame (T-02-05 mitigation).
-			_lastRenderPositions.Clear();
 
 			// Track whether the star is in the current render set.
 			bool starRendered = false;
@@ -314,35 +304,32 @@ namespace Render
 				mat.SetShaderParameter("ambient",      BodyAmbient);
 			}
 
-			// Persist render positions for the RND-07/D-21 handoff baseline accessor.
-			// Copied after all bodies are rendered so the full render set is captured.
-			foreach (var kvp in renderPositions)
-				_lastRenderPositions[kvp.Key] = kvp.Value;
 		}
 
-		// ----- RND-07/D-21 handoff baseline accessor ---------------------------
+		// ----- HUD accessor (D-46) -------------------------------------------
 
 		/// <summary>
-		/// Returns the last render-space position for the body currently tracked as a mesh.
-		/// Returns <c>true</c> and populates <paramref name="pos"/> when the body was in the
-		/// render set during the most-recent SyncBodies call; returns <c>false</c> (pos=default)
-		/// if the body is not currently rendered as a mesh.
+		/// Returns the current render-space position of the body's live mesh (D-02 cleanup —
+		/// cache-free thin accessor replacing the removed <c>_lastRenderPositions</c> dictionary).
+		/// Returns <c>true</c> and populates <paramref name="pos"/> from the live
+		/// <see cref="MeshInstance3D.Position"/> when the body has a visible mesh in the current
+		/// frame; returns <c>false</c> (pos=default) when the body is not currently rendered
+		/// as a mesh (different SOI space, galaxy, or not yet created).
 		///
-		/// This is the mesh-side of the two RND-07/D-21 baseline data sources. Phase 3 reads it
-		/// at a tier-crossing to get a mesh body's current render-space position, then compares it
-		/// with <see cref="SkyboxRenderer.GetSkyDirection"/> (the sky-point direction) so the
-		/// promoted sky point and the newly spawned mesh can be placed on the same screen pixel
-		/// for an instant exact-match swap with no crossfade (D-21). Phase 2 ONLY builds and
-		/// exposes this accessor; no visible swap is performed here (D-24).
-		/// Color match is automatic: both renderers read body.BaseColor (D-18).
-		/// Brightness match is automatic: both derive from body.Luminosity.
+		/// Used by <c>Hud._Draw</c> (D-46) to draw the world-pinned target circle. Reading the
+		/// mesh transform directly ensures the position is always frame-fresh without a separate
+		/// parallel cache that must be kept in sync.
 		/// </summary>
 		/// <param name="bodyIdx">The body index (UniObject.Index / GameObjects list key).</param>
-		/// <param name="pos">Receives the last render-space Vector3 position if found.</param>
-		/// <returns>True if the body was in the render set during the most-recent frame.</returns>
+		/// <param name="pos">Receives the current render-space Vector3 position if found.</param>
+		/// <returns>True if the body has a live visible mesh this frame.</returns>
 		public bool GetRenderPosition(int bodyIdx, out Vector3 pos)
 		{
-			if (_lastRenderPositions.TryGetValue(bodyIdx, out pos)) return true;
+			if (_meshes.TryGetValue(bodyIdx, out var mesh) && mesh.Visible)
+			{
+				pos = mesh.Position;
+				return true;
+			}
 			pos = default;
 			return false;
 		}
