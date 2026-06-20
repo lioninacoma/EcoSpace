@@ -6,15 +6,15 @@ current_phase: 05
 current_phase_name: rendering-overhaul
 status: executing
 stopped_at: Phase 05 Plan 03 complete (3 of 4 plans done); Plan 4 (05-04) ready — HDR-before-dither + dead-code removal. Execution PAUSED at user's request after 05-03.
-last_updated: "2026-06-19T20:00:00.000Z"
-last_activity: 2026-06-19
-last_activity_desc: Phase 05 Plan 03 complete — near-star PSF glow/halo (depth-occluded, LOD-ramp), galaxy disc fade fixed; 5-iteration play-test loop; play-test APPROVED
+last_updated: "2026-06-20T21:04:46.349Z"
+last_activity: 2026-06-20
+last_activity_desc: Phase 05 execution resumed (wave continue)
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 16
   completed_plans: 15
-  percent: 50
+  percent: 44
 ---
 
 # Project State
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 
 Phase: 05 (rendering-overhaul) — EXECUTING (paused after 05-03 at user request)
 Plan: 4 of 4 (3 complete, Plan 4 ready)
-Status: Executing Phase 05 — paused; resume at 05-04
-Last activity: 2026-06-19 — Phase 05 Plan 03 complete; play-test approved; paused at user request
+Status: Executing Phase 05
+Last activity: 2026-06-20 — Phase 05 execution resumed (wave continue)
 
 ### ARCHITECTURE REVERSAL (decided 2026-06-19, user-driven at 05-02 play-test)
 
@@ -210,8 +210,8 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-19T20:00:00.000Z
-Stopped at: Phase 05 Plan 03 complete (3 of 4 plans done); Plan 4 (05-04) ready — HDR-before-dither composition + dead-code removal. PAUSED at user's request.
+Last session: 2026-06-20T21:04:46.338Z
+Stopped at: Session resumed — Phase 05 at 3/4 plans; proceeding toward executing 05-04 (final finalization plan). Flagged uncommitted Main.tscn tweak (PsfLodRange=1.0 vs D-04-approved 0.6) for resolution in 05-04.
 Resume file: .planning/phases/05-rendering-overhaul/05-04-PLAN.md
 Prior resume note: 05-03 delivered: luminous_pass.gdshader narrowed to near-star PSF only (galaxy loop removed, D-13
 confirmed); screen-space aperture-diffraction PSF (inverse-cube core + diffraction spikes, aspect-corrected);
