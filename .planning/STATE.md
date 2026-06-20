@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 05
 current_phase_name: rendering-overhaul
 status: phase_complete
-stopped_at: Phase 05 COMPLETE (4 of 4 plans done). 05-04 finalization (D-05 composition lock + dead-cache removal) executed; final all-tier parity play-test APPROVED 2026-06-20. Ready for phase verification / transition.
-last_updated: "2026-06-20T21:30:00.000Z"
+stopped_at: Phase 6 context gathered
+last_updated: "2026-06-20T21:40:00.017Z"
 last_activity: 2026-06-20
-last_activity_desc: Phase 05 Plan 04 complete — D-05 glow-before-dither composition verified/locked, dead _lastRenderPositions cache removed (Hud accessors preserved); all-tier play-test APPROVED; Phase 5 Rendering Overhaul COMPLETE (4/4)
+last_activity_desc: 05-04 finalization done + all-tier play-test APPROVED; Phase 5 Rendering Overhaul COMPLETE
 progress:
-  total_phases: 9
+  total_phases: 8
   completed_phases: 5
   total_plans: 16
   completed_plans: 16
-  percent: 50
+  percent: 63
 ---
 
 # Project State
@@ -210,9 +210,9 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-20T21:30:00.000Z
-Stopped at: Phase 05 COMPLETE (4/4). 05-04 executed (Task 1 verify-only D-05 composition lock; Task 2 02c24c9 dead _lastRenderPositions cache removed, GetRenderPosition now reads live mesh, Hud target circle preserved; Task 3 all-tier play-test APPROVED). PsfLodRange reverted to approved 0.6. Build 0/0, 48/48 green. SUMMARY c9fbebc. Next: /gsd-verify-work 5 or transition to Phase 06.
-Resume file: (none — phase complete)
+Last session: 2026-06-20T21:40:00.008Z
+Stopped at: Phase 6 context gathered
+Resume file: .planning/phases/06-targeting-system/06-CONTEXT.md
 Prior resume note: 05-03 delivered: luminous_pass.gdshader narrowed to near-star PSF only (galaxy loop removed, D-13
 confirmed); screen-space aperture-diffraction PSF (inverse-cube core + diffraction spikes, aspect-corrected);
 per-pixel analytic depth occlusion via observer-unit RenderDistance (root cause: metres/scale*factor, NOT metres*factor);
