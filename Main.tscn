@@ -10,6 +10,7 @@
 [ext_resource type="Shader" uid="uid://b2ogcviap8k7w" path="res://Shaders/skybox.gdshader" id="8_skyshdr"]
 [ext_resource type="Script" uid="uid://d0s2gbtdy25og" path="res://Scripts/Render/LuminousDescriptorBuilder.cs" id="9_lumdescbld"]
 [ext_resource type="Script" uid="uid://tsi6i4rux5yk" path="res://Scripts/Render/LuminousPassRenderer.cs" id="10_lumpassrnd"]
+[ext_resource type="Script" path="res://Scripts/Hud/TargetSelectorPanel.cs" id="11_tgtpanel"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("8_skyshdr")
@@ -171,6 +172,23 @@ layout_mode = 0
 offset_left = 6.0
 offset_right = 10.0
 offset_bottom = 16.0
+
+[node name="TargetSelectorPanel" type="Control" parent="CanvasLayer" unique_id=-1293967281]
+layout_mode = 3
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -220.0
+offset_top = 40.0
+offset_right = 0.0
+offset_bottom = -10.0
+grow_horizontal = 0
+mouse_filter = 2
+script = ExtResource("11_tgtpanel")
+HudPath = NodePath("../Hud")
+FlightPath = NodePath("../../FlightController")
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=1364607324]
 environment = SubResource("Environment_r0du0")
