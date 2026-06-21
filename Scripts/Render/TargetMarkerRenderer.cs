@@ -59,6 +59,38 @@ namespace Render
         /// <summary>Fallback radius in metres for bodies without an authored RadiusMeters (Earth-radius).</summary>
         [Export] public float DefaultBodyRadius { get; set; } = 6.371e6f;
 
+        // ── Ring-thickness adaptive rim_width knobs ──────────────────────────────
+
+        /// <summary>
+        /// Minimum visible ring pixel thickness (D-52 ring floor, default ~2px).
+        /// The fresnel rim_width is widened automatically so the ring's screen-space
+        /// pixel thickness never falls below this value, regardless of how far away the
+        /// target is. Increase if the ring still looks faint on your display.
+        /// </summary>
+        [Export] public float MinRingThicknessPx { get; set; } = 2.0f;
+
+        /// <summary>
+        /// Baseline rim_width used for large / close-up targets where no minimum-thickness
+        /// widening is needed. Produces a thin, clean outline ring. (Default 0.25.)
+        /// </summary>
+        [Export] public float BaseRimWidth { get; set; } = 0.25f;
+
+        /// <summary>
+        /// Maximum rim_width the adaptive formula is allowed to reach.
+        /// Prevents the ring from growing into a filled disc for extremely small spheres.
+        /// (Default 0.85 — leaves a small darkened center even at the floor radius.)
+        /// </summary>
+        [Export] public float MaxRimWidth { get; set; } = 0.85f;
+
+        /// <summary>
+        /// Empirical scale constant relating rim_width to approximate ring pixel thickness.
+        /// ring_px ≈ pixelRadius × RimWidthScale × rim_width.
+        /// The relationship is slightly sub-linear near the silhouette; 1.0 is a safe
+        /// conservative default (may slightly over-widen; reduce toward 0.8 if the ring
+        /// looks too thick on close targets after testing).
+        /// </summary>
+        [Export] public float RimWidthScale { get; set; } = 1.0f;
+
         // ── Render factors (mirror WorldRenderer per-space values) ─────────────
 
         /// <summary>
@@ -224,6 +256,48 @@ namespace Render
             // Push phosphor-green outline color each frame.
             _outlineMaterial.SetShaderParameter("outline_color",
                 new Color(PhosphorGreen.R, PhosphorGreen.G, PhosphorGreen.B, 1.0f));
+
+            // ── Adaptive rim_width for minimum ring pixel thickness (D-52 ring floor) ──
+            // The fresnel band spans rim ∈ [0, rim_width] across the sphere surface.
+            // Its approximate screen-space pixel thickness is:
+            //   ring_px ≈ pixelRadius × RimWidthScale × rim_width
+            // To guarantee ring_px >= MinRingThicknessPx we solve for rim_width:
+            //   rim_width = MinRingThicknessPx / (pixelRadius × RimWidthScale)
+            // Clamped to [BaseRimWidth, MaxRimWidth] so:
+            //   - Near/large targets keep the clean thin ring (BaseRimWidth).
+            //   - Far/small targets auto-widen but never become a filled disc (MaxRimWidth).
+            // pixelRadius here is the *effective* pixel radius after the D-52 floor clamp,
+            // so the ring thickness floor is calibrated against the actual drawn size.
+            {
+                // Re-derive the effective pixel radius from the (possibly clamped) render radius r.
+                float rimPx = MinMarkerRadius; // safe fallback if camera unavailable
+                if (_camera != null)
+                {
+                    Vector3 camLocalForRim = _camera.GlobalTransform.AffineInverse() * markerPos;
+                    float depthForRim = -camLocalForRim.Z;
+                    if (depthForRim > 1e-4f)
+                    {
+                        var viewportForRim = GetViewport();
+                        Vector2 vpSizeForRim = viewportForRim != null
+                            ? viewportForRim.GetVisibleRect().Size
+                            : new Vector2(1152f, 648f);
+                        float fovRadForRim     = Mathf.DegToRad(_camera.Fov);
+                        float tanHalfFovForRim = Mathf.Tan(fovRadForRim * 0.5f);
+                        float refExtentForRim  = _camera.KeepAspect == Camera3D.KeepAspectEnum.Height
+                            ? vpSizeForRim.Y * 0.5f
+                            : vpSizeForRim.X * 0.5f;
+                        // Pixel radius of the marker as currently rendered (after D-52 clamp).
+                        rimPx = refExtentForRim * (r / depthForRim) / tanHalfFovForRim;
+                        rimPx = Mathf.Max(rimPx, MinMarkerRadius);
+                    }
+                }
+
+                float adaptiveRimWidth = rimPx * RimWidthScale > 0f
+                    ? Mathf.Clamp(MinRingThicknessPx / (rimPx * RimWidthScale), BaseRimWidth, MaxRimWidth)
+                    : BaseRimWidth;
+
+                _outlineMaterial.SetShaderParameter("rim_width", adaptiveRimWidth);
+            }
 
             // ── Tracking label (D-57) ─────────────────────────────────────────
             UpdateTrackingLabel(ship, targetObj, gameObjects, markerPos);

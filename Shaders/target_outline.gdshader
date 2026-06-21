@@ -15,8 +15,11 @@
 //
 // Uniforms:
 //   outline_color  – phosphor-green RGBA (source_color; pushed from TargetMarkerRenderer each frame)
-//   rim_width      – controls ring thickness; 0.0 = invisible, 1.0 = full hemisphere;
-//                    0.25 gives a thin, readable ring at typical screen sizes.
+//   rim_width      – controls ring thickness; 0.0 = invisible, 1.0 = full hemisphere.
+//                    Driven per-frame by TargetMarkerRenderer to enforce a minimum screen-space
+//                    ring thickness regardless of how small the projected sphere is.
+//                    At close range it stays near base_rim_width (thin clean outline);
+//                    at far range it auto-widens so the ring never falls below ~2 px thick.
 //
 // No depth_prepass or depth_draw_opaque: the outline must not occlude the body mesh behind
 // it (the marker encapsulates the body; the front face of the outline sits just outside
@@ -33,7 +36,9 @@ uniform vec4 outline_color : source_color = vec4(0.1, 1.0, 0.3, 1.0);
 // Rim/fresnel threshold controlling ring thickness.
 // dot(VIEW, NORMAL) in [0, 1]: 0 = grazing edge, 1 = directly facing camera.
 // Fragments with |dot| > rim_width are discarded (interior); only the rim ring remains.
-// 0.25 = thin ring; 0.4 = thicker band. Play-test [Export] knob on TargetMarkerRenderer.
+// This value is pushed per-frame from TargetMarkerRenderer using the adaptive formula:
+//   rim_width = clamp(MinRingThicknessPx / (pixelRadius * RimWidthScale), BaseRimWidth, MaxRimWidth)
+// so the ring pixel thickness ≈ pixelRadius * rim_width stays at or above MinRingThicknessPx.
 uniform float rim_width : hint_range(0.0, 1.0) = 0.25;
 
 void fragment()
