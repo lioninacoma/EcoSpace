@@ -11,6 +11,7 @@
 [ext_resource type="Script" uid="uid://d0s2gbtdy25og" path="res://Scripts/Render/LuminousDescriptorBuilder.cs" id="9_lumdescbld"]
 [ext_resource type="Script" uid="uid://tsi6i4rux5yk" path="res://Scripts/Render/LuminousPassRenderer.cs" id="10_lumpassrnd"]
 [ext_resource type="Script" uid="uid://col1yvsjghp65" path="res://Scripts/Hud/TargetSelectorPanel.cs" id="11_tgtpanel"]
+[ext_resource type="Script" uid="uid://ctgt3dmarker1" path="res://Scripts/Render/TargetMarkerRenderer.cs" id="12_tgtmarker"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("8_skyshdr")
@@ -173,6 +174,18 @@ offset_left = 6.0
 offset_right = 10.0
 offset_bottom = 16.0
 
+[node name="TrackingLabel" type="Label" parent="CanvasLayer" unique_id=-1293967280]
+modulate = Color(0.1, 1, 0.3, 1)
+layout_mode = 3
+anchors_preset = 0
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 300.0
+offset_bottom = 24.0
+mouse_filter = 2
+visible = false
+text = ""
+
 [node name="TargetSelectorPanel" type="Control" parent="CanvasLayer" unique_id=-1293967281]
 layout_mode = 3
 anchors_preset = 9
@@ -212,3 +225,10 @@ BuilderPath = NodePath("../LuminousDescriptorBuilder")
 [node name="LuminousDescriptorBuilder" type="Node" parent="." unique_id=-1293967270]
 process_priority = -10
 script = ExtResource("9_lumdescbld")
+
+[node name="TargetMarkerRenderer" type="Node3D" parent="." unique_id=-1293967260]
+script = ExtResource("12_tgtmarker")
+WorldPath = NodePath("..")
+HudPath = NodePath("CanvasLayer/Hud")
+CameraPath = NodePath("Camera3D")
+TrackingLabelPath = NodePath("CanvasLayer/TrackingLabel")
