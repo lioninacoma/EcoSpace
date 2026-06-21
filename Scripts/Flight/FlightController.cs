@@ -236,6 +236,14 @@ namespace Flight
 		/// <summary>Current ship attitude basis.</summary>
 		public Basis ShipBasis => _shipBasis;
 
+		/// <summary>
+		/// Set to true by TargetSelectorPanel when it opens, false when it closes.
+		/// When true, ALL flight input is suppressed so WASD drives the menu, not the ship.
+		/// This is the clean gate that prevents WASD from both navigating the menu and
+		/// driving the ship simultaneously (06-02 play-test rework requirement).
+		/// </summary>
+		public bool IsPanelOpen { get; set; } = false;
+
 		// ── Godot callbacks ──────────────────────────────────────────────────────
 
 		public override void _Ready()
@@ -288,6 +296,9 @@ namespace Flight
 			// before _UnhandledInput is called, so steering never reaches _UnhandledInput.
 			// _Input runs before GUI event dispatch and is never blocked by Control nodes.
 			//
+			// Suppress ALL steering when the target-selector panel is open (WASD drives the menu).
+			if (IsPanelOpen) return;
+			//
 			// Only accumulate steering when captured (mouse locked to window).
 			if (Input.MouseMode != Input.MouseModeEnum.Captured) return;
 
@@ -304,6 +315,11 @@ namespace Flight
 
 		public override void _UnhandledInput(InputEvent @event)
 		{
+			// Suppress T-key mouse-mode toggle while the target-selector panel is open.
+			// The panel owns the cursor while open; the T-key toggle resumes naturally
+			// when the panel closes and IsPanelOpen is reset to false.
+			if (IsPanelOpen) return;
+
 			// Toggle between Captured (steering active) and Visible (free cursor) with T key.
 			// When Captured: OS cursor is hidden/locked, relative mouse motion drives steering.
 			// When Visible:  OS cursor is free; no steering input accumulates.
@@ -326,6 +342,11 @@ namespace Flight
 		{
 			if (_world == null) return;
 			if (delta <= 0.0) return;
+
+			// When the target-selector panel is open, suppress all flight processing:
+			// WASD drives the menu, not the ship. Speed envelope and motion are frozen.
+			// The ship holds its current attitude and speed while the player picks a target.
+			if (IsPanelOpen) return;
 
 			HandleThrottleInput();
 			UpdateAttitude(delta);
