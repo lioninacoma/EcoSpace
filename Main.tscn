@@ -227,5 +227,6 @@ HudPath = NodePath("../CanvasLayer/Hud")
 CameraPath = NodePath("../Camera3D")
 TrackingLabelPath = NodePath("../CanvasLayer/TrackingLabel")
 MinMarkerRadius = 8.0
-MaxMarkerRadius = 200.0
+MaxMarkerRadius = 400.0
+MarkerPadding = 1.05
 BaseRimWidth = 0.6
