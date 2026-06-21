@@ -10,7 +10,7 @@
 [ext_resource type="Shader" uid="uid://b2ogcviap8k7w" path="res://Shaders/skybox.gdshader" id="8_skyshdr"]
 [ext_resource type="Script" uid="uid://d0s2gbtdy25og" path="res://Scripts/Render/LuminousDescriptorBuilder.cs" id="9_lumdescbld"]
 [ext_resource type="Script" uid="uid://tsi6i4rux5yk" path="res://Scripts/Render/LuminousPassRenderer.cs" id="10_lumpassrnd"]
-[ext_resource type="Script" path="res://Scripts/Hud/TargetSelectorPanel.cs" id="11_tgtpanel"]
+[ext_resource type="Script" uid="uid://col1yvsjghp65" path="res://Scripts/Hud/TargetSelectorPanel.cs" id="11_tgtpanel"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("8_skyshdr")
@@ -175,16 +175,13 @@ offset_bottom = 16.0
 
 [node name="TargetSelectorPanel" type="Control" parent="CanvasLayer" unique_id=-1293967281]
 layout_mode = 3
-anchors_preset = 1
-anchor_left = 0.0
-anchor_top = 0.0
-anchor_right = 0.0
+anchors_preset = 9
 anchor_bottom = 1.0
-offset_left = 0.0
-offset_top = 40.0
-offset_right = 220.0
-offset_bottom = -10.0
-grow_horizontal = 1
+offset_left = 5.0
+offset_top = 116.0
+offset_right = 225.0
+offset_bottom = -6.0
+grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("11_tgtpanel")
 HudPath = NodePath("../Hud")
