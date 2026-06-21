@@ -1,28 +1,39 @@
 using Godot;
+using System.Collections.Generic;
 
 namespace Hud
 {
     /// <summary>
-    /// Cross-space target selector panel (D-54 / 06-02).
+    /// Cross-space target selector panel (D-54 / 06-02 rework).
     ///
     /// Read-only consumer of GameWorld state — MUST NOT mutate sim state.
     ///
-    /// Displays a compact right-side panel grouped by tier (GALAXY / STAR / PLANET),
-    /// listing every targetable body with name + live distance. The active target row
-    /// is marked with a left-pointing glyph. The player selects via keyboard (Up/Down
-    /// + Enter) or mouse click; selection commits exclusively through Hud.SetTargetIndex
-    /// (never via direct GameObjects or LocalPos mutation — D-53).
+    /// Displays a compact LEFT-side hierarchical tree panel: galaxies expand into
+    /// stars, stars expand into planets. Only stars and planets are selectable
+    /// targets (galaxies are navigable containers — D-51 narrowed). Selection
+    /// commits exclusively through Hud.SetTargetIndex (never via direct
+    /// GameObjects or LocalPos mutation — D-53).
     ///
     /// Toggle: Tab (toggle_target_panel action from 06-01 project.godot).
-    ///   Open  → Input.MouseMode = Visible,  MouseFilter = Stop  (rows clickable; steering halts)
+    ///   Open  → Input.MouseMode = Visible,  MouseFilter = Stop  (rows clickable)
     ///   Close → Input.MouseMode = Captured, MouseFilter = Ignore (flight resumes)
+    ///
+    /// Tree navigation (WASD and arrow keys both work):
+    ///   w / Up    = move highlight UP within current level
+    ///   s / Down  = move highlight DOWN within current level
+    ///   a / Left  = go UP one tree level (back to parent / collapse branch)
+    ///   d / Right = descend into highlighted node's children
+    ///   Enter     = SELECT highlighted node (only stars/planets — galaxies are containers)
+    ///
+    /// Flight input suppression:
+    ///   All FlightController input (WASD throttle/roll, mouse steering) is suppressed
+    ///   while the panel is open via the FlightController.IsPanelOpen gate property.
     ///
     /// Cursor reconciliation with FlightController T-key mode:
     ///   Both this panel (_UnhandledInput: toggle_target_panel / Tab) and FlightController
     ///   (_UnhandledInput: T key) are in _UnhandledInput but handle DIFFERENT actions/keys,
-    ///   so they do not conflict. The panel always re-asserts MouseMode.Visible while open.
-    ///   The toggle event is marked handled via GetViewport().SetInputAsHandled() so it
-    ///   does not propagate further.
+    ///   so they do not conflict. The panel asserts MouseMode.Visible while open.
+    ///   The toggle event is marked handled via GetViewport().SetInputAsHandled().
     ///
     /// NEVER writes GameObjects[..] or .LocalPos = (D-53 anti-pattern).
     /// All distances via UniMath.Distance (LCA path — CLAUDE.md §Position Math).
@@ -37,7 +48,7 @@ namespace Hud
         /// <summary>NodePath to the Hud node for SetTargetIndex / GetTargetCandidates / ActiveTargetIndex.</summary>
         [Export] public NodePath HudPath { get; set; }
 
-        /// <summary>NodePath to the FlightController node (resolved but not mutated — reserved for future use).</summary>
+        /// <summary>NodePath to the FlightController node (for IsPanelOpen flight-gate).</summary>
         [Export] public NodePath FlightPath { get; set; }
 
         /// <summary>Phosphor-green CRT color for the panel (D-09). Defaults to the project standard.</summary>
@@ -47,18 +58,46 @@ namespace Hud
 
         private TestSetup _world;
         private Hud _hud;
-        // FlightController ref is held but not used to mutate state — reconciliation
-        // is achieved by restoring Input.MouseMode, not by calling any FlightController method.
         private Flight.FlightController _flight;
 
         // ── UI children ───────────────────────────────────────────────────────
 
         private VBoxContainer _vbox;
 
-        // ── Panel selection state ─────────────────────────────────────────────
+        // ── Tree state ────────────────────────────────────────────────────────
 
-        /// <summary>Keyboard highlight cursor within the visible body-row list (not the full VBox).</summary>
+        /// <summary>
+        /// Which level we are browsing:
+        ///   0 = galaxy list (top level)
+        ///   1 = star list under _expandedGalaxyIdx
+        ///   2 = planet list under _expandedStarIdx
+        /// </summary>
+        private int _treeLevel = 0;
+
+        /// <summary>Highlight row index within the current level's visible list.</summary>
         private int _highlightRow = 0;
+
+        /// <summary>GameObjects index of the galaxy whose children are currently expanded (level 1).</summary>
+        private int _expandedGalaxyIdx = -1;
+
+        /// <summary>GameObjects index of the star whose children are currently expanded (level 2).</summary>
+        private int _expandedStarIdx = -1;
+
+        // ── Flat list for the currently visible level (rebuilt each frame while open) ──
+
+        /// <summary>
+        /// Each entry in the current level's visible list:
+        ///   GobjIndex = GameObjects index of the body
+        ///   CandidatePos = position in Hud.GetTargetCandidates() (for SetTargetIndex), or -1 for galaxies (non-selectable)
+        /// </summary>
+        private readonly struct LevelEntry
+        {
+            public readonly int GobjIndex;
+            public readonly int CandidatePos; // -1 for galaxies (non-selectable containers)
+            public LevelEntry(int gobjIndex, int candidatePos) { GobjIndex = gobjIndex; CandidatePos = candidatePos; }
+        }
+
+        private List<LevelEntry> _currentLevelList = new List<LevelEntry>();
 
         // ── Godot callbacks ───────────────────────────────────────────────────
 
@@ -76,13 +115,13 @@ namespace Hud
             else
                 _hud = GetTree().Root.FindChild("Hud", true, false) as Hud;
 
-            // Resolve FlightController reference (not mutated — reserved)
+            // Resolve FlightController reference (for IsPanelOpen flight-gate)
             if (FlightPath != null && !FlightPath.IsEmpty)
                 _flight = GetNode<Flight.FlightController>(FlightPath);
             else
                 _flight = GetTree().Root.FindChild("FlightController", true, false) as Flight.FlightController;
 
-            // Build the VBoxContainer that holds tier headers + body rows
+            // Build the VBoxContainer that holds tree rows
             _vbox = new VBoxContainer();
             AddChild(_vbox);
 
@@ -107,26 +146,43 @@ namespace Hud
                 return;
             }
 
-            // Keyboard navigation while panel is open
+            // Keyboard navigation while panel is open.
+            // Both WASD and arrow keys work. WASD is consumed here before it
+            // reaches FlightController because IsPanelOpen suppresses FlightController
+            // input polling — the WASD actions are still dispatched by Godot but the
+            // FlightController early-returns on IsPanelOpen.
             if (!Visible) return;
 
-            if (@event.IsActionPressed("ui_up"))
+            bool isUp    = @event.IsActionPressed("ui_up")   || (@event is InputEventKey k1 && k1.PhysicalKeycode == Key.W && k1.Pressed && !k1.Echo);
+            bool isDown  = @event.IsActionPressed("ui_down")  || (@event is InputEventKey k2 && k2.PhysicalKeycode == Key.S && k2.Pressed && !k2.Echo);
+            bool isLeft  = @event.IsActionPressed("ui_left")  || (@event is InputEventKey k3 && k3.PhysicalKeycode == Key.A && k3.Pressed && !k3.Echo);
+            bool isRight = @event.IsActionPressed("ui_right") || (@event is InputEventKey k4 && k4.PhysicalKeycode == Key.D && k4.Pressed && !k4.Echo);
+
+            if (isUp)
             {
                 _highlightRow = Mathf.Max(0, _highlightRow - 1);
                 RefreshList();
                 GetViewport().SetInputAsHandled();
             }
-            else if (@event.IsActionPressed("ui_down"))
+            else if (isDown)
             {
-                var candidates = _hud?.GetTargetCandidates();
-                int count = candidates?.Count ?? 0;
-                _highlightRow = Mathf.Min(count - 1, _highlightRow + 1);
+                _highlightRow = Mathf.Min(_currentLevelList.Count - 1, _highlightRow + 1);
                 RefreshList();
+                GetViewport().SetInputAsHandled();
+            }
+            else if (isLeft)
+            {
+                NavigateUp();
+                GetViewport().SetInputAsHandled();
+            }
+            else if (isRight)
+            {
+                NavigateDown();
                 GetViewport().SetInputAsHandled();
             }
             else if (@event.IsActionPressed("ui_accept"))
             {
-                CommitSelection(_highlightRow);
+                CommitSelection();
                 GetViewport().SetInputAsHandled();
             }
         }
@@ -142,34 +198,22 @@ namespace Hud
 
         private void OpenPanel()
         {
-            // Sync highlight row to match the currently active target so the panel
-            // opens with the correct row pre-selected.
-            if (_hud != null && _world != null)
-            {
-                var objs = _world.GameObjects;
-                int shipIdx = _world.ShipIndex;
-                if ((uint)shipIdx < (uint)(objs?.Count ?? 0))
-                {
-                    int activeGobjIdx = _hud.ActiveTargetIndex;
-                    var candidates = _hud.GetTargetCandidates();
-                    for (int i = 0; i < candidates.Count; i++)
-                    {
-                        if (candidates[i] == activeGobjIdx)
-                        {
-                            _highlightRow = i;
-                            break;
-                        }
-                    }
-                }
-            }
+            // Reset tree to galaxy level when opening
+            _treeLevel = 0;
+            _expandedGalaxyIdx = -1;
+            _expandedStarIdx = -1;
+            _highlightRow = 0;
+
+            // Pre-select the row that matches the current active target if possible
+            SyncHighlightToActiveTarget();
 
             Visible = true;
             // MouseFilter.Stop: the panel captures clicks so body rows are clickable
-            // and mouse motion does not fall through to FlightController steering.
             MouseFilter = MouseFilterEnum.Stop;
-            // Free the cursor — steering stops automatically because FlightController._Input
-            // no-ops when MouseMode != Captured (line ~292 FlightController.cs).
+            // Free the cursor
             Input.MouseMode = Input.MouseModeEnum.Visible;
+            // Notify FlightController to suppress all flight input
+            if (_flight != null) _flight.IsPanelOpen = true;
 
             RefreshList();
         }
@@ -177,18 +221,296 @@ namespace Hud
         private void ClosePanel()
         {
             Visible = false;
-            // MouseFilter.Ignore: pass all mouse events through to the scene below
             MouseFilter = MouseFilterEnum.Ignore;
             // Restore flight mouse capture
             Input.MouseMode = Input.MouseModeEnum.Captured;
+            // Re-enable FlightController input
+            if (_flight != null) _flight.IsPanelOpen = false;
+        }
+
+        // ── Tree navigation ────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Navigates up one tree level (a / Left).
+        /// Level 2 → 1: collapse planets back to star list.
+        /// Level 1 → 0: collapse stars back to galaxy list.
+        /// Level 0: already at root — no-op.
+        /// </summary>
+        private void NavigateUp()
+        {
+            if (_treeLevel == 0) return;
+
+            if (_treeLevel == 2)
+            {
+                // Capture the star index before clearing it, so we can find its row after level change.
+                int prevStarIdx = _expandedStarIdx;
+                _treeLevel = 1;
+                _expandedStarIdx = -1;
+                // Rebuild the star list (level 1), then move highlight to the star we were under.
+                BuildCurrentLevelList();
+                _highlightRow = prevStarIdx >= 0 ? Mathf.Max(0, FindGobjInCurrentList(prevStarIdx)) : 0;
+            }
+            else // level 1 → 0
+            {
+                // Capture the galaxy index before clearing it.
+                int prevGalIdx = _expandedGalaxyIdx;
+                _treeLevel = 0;
+                _expandedGalaxyIdx = -1;
+                _expandedStarIdx = -1;
+                // Rebuild the galaxy list (level 0), then move highlight to the galaxy we were under.
+                BuildCurrentLevelList();
+                _highlightRow = prevGalIdx >= 0 ? Mathf.Max(0, FindGobjInCurrentList(prevGalIdx)) : 0;
+            }
+
+            _highlightRow = Mathf.Clamp(_highlightRow, 0, Mathf.Max(0, _currentLevelList.Count - 1));
+            RefreshList();
+        }
+
+        /// <summary>
+        /// Navigates down into the highlighted node's children (d / Right).
+        /// Level 0 → 1: expand a galaxy's stars.
+        /// Level 1 → 2: expand a star's planets.
+        /// Level 2: planets have no children — no-op (select with Enter instead).
+        /// Galaxies are containers, not selectable targets.
+        /// </summary>
+        private void NavigateDown()
+        {
+            if (_currentLevelList.Count == 0) return;
+            _highlightRow = Mathf.Clamp(_highlightRow, 0, _currentLevelList.Count - 1);
+            var entry = _currentLevelList[_highlightRow];
+
+            if (_treeLevel == 0)
+            {
+                // Descend into galaxy's children (stars in this galaxy)
+                var objs = _world?.GameObjects;
+                if (objs == null) return;
+                if ((uint)entry.GobjIndex >= (uint)objs.Count) return;
+                var gobj = objs[entry.GobjIndex];
+                if (gobj == null || gobj.ObjectType != UniObject.Type.Galaxy) return;
+
+                _expandedGalaxyIdx = entry.GobjIndex;
+                _treeLevel = 1;
+                _highlightRow = 0;
+                BuildCurrentLevelList();
+                RefreshList();
+            }
+            else if (_treeLevel == 1)
+            {
+                // Descend into star's children (planets)
+                var objs = _world?.GameObjects;
+                if (objs == null) return;
+                if ((uint)entry.GobjIndex >= (uint)objs.Count) return;
+                var gobj = objs[entry.GobjIndex];
+                if (gobj == null || gobj.ObjectType != UniObject.Type.Star) return;
+
+                // Only descend if this star has planet children
+                BuildPlanetListForStar(entry.GobjIndex, out var planets);
+                if (planets.Count == 0) return;
+
+                _expandedStarIdx = entry.GobjIndex;
+                _treeLevel = 2;
+                _highlightRow = 0;
+                BuildCurrentLevelList();
+                RefreshList();
+            }
+            // Level 2: planets have no children; player uses Enter to select
+        }
+
+        // ── Selection ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Commits selection for the currently highlighted row.
+        /// Galaxies (CandidatePos == -1) are non-selectable containers — no-op on Enter.
+        /// Writes ONLY through Hud.SetTargetIndex — never mutates GameObjects or LocalPos (D-53).
+        /// </summary>
+        private void CommitSelection()
+        {
+            if (_currentLevelList.Count == 0) return;
+            _highlightRow = Mathf.Clamp(_highlightRow, 0, _currentLevelList.Count - 1);
+            var entry = _currentLevelList[_highlightRow];
+
+            // Galaxies are containers, not selectable targets (D-51 narrowed)
+            if (entry.CandidatePos < 0) return;
+
+            _hud?.SetTargetIndex(entry.CandidatePos);
+            // Close the panel after selection so flight resumes immediately
+            ClosePanel();
+        }
+
+        // ── List building ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Rebuilds _currentLevelList from current tree state without rendering.
+        /// Called by navigation handlers before RefreshList.
+        /// </summary>
+        private void BuildCurrentLevelList()
+        {
+            _currentLevelList.Clear();
+            var objs = _world?.GameObjects;
+            if (objs == null) return;
+            var candidates = _hud?.GetTargetCandidates();
+
+            if (_treeLevel == 0)
+            {
+                // Top level: show all galaxies
+                for (int i = 0; i < objs.Count; i++)
+                {
+                    if ((uint)i >= (uint)objs.Count) continue;
+                    var body = objs[i];
+                    if (body == null) continue;
+                    if (body.ObjectType != UniObject.Type.Galaxy) continue;
+                    if (body.CurrentSpace == UniObject.Space.Root || body.CurrentSpace == UniObject.Space.Universe) continue;
+                    // Galaxies are non-selectable containers (CandidatePos = -1)
+                    _currentLevelList.Add(new LevelEntry(i, -1));
+                }
+            }
+            else if (_treeLevel == 1 && _expandedGalaxyIdx >= 0)
+            {
+                // Show stars that are children of the expanded galaxy
+                if ((uint)_expandedGalaxyIdx < (uint)objs.Count)
+                {
+                    var galaxy = objs[_expandedGalaxyIdx];
+                    if (galaxy != null)
+                    {
+                        foreach (int childIdx in galaxy.ChildIndices)
+                        {
+                            if ((uint)childIdx >= (uint)objs.Count) continue;
+                            var child = objs[childIdx];
+                            if (child == null) continue;
+                            if (child.ObjectType != UniObject.Type.Star) continue;
+                            int candPos = FindCandidatePos(childIdx, candidates);
+                            _currentLevelList.Add(new LevelEntry(childIdx, candPos));
+                        }
+                    }
+                }
+            }
+            else if (_treeLevel == 2 && _expandedStarIdx >= 0)
+            {
+                // Show planets that are children of the expanded star
+                BuildPlanetListForStar(_expandedStarIdx, out var planets);
+                _currentLevelList.AddRange(planets);
+            }
+        }
+
+        private void BuildPlanetListForStar(int starGobjIdx, out List<LevelEntry> planets)
+        {
+            planets = new List<LevelEntry>();
+            var objs = _world?.GameObjects;
+            if (objs == null || (uint)starGobjIdx >= (uint)objs.Count) return;
+            var star = objs[starGobjIdx];
+            if (star == null) return;
+            var candidates = _hud?.GetTargetCandidates();
+
+            foreach (int childIdx in star.ChildIndices)
+            {
+                if ((uint)childIdx >= (uint)objs.Count) continue;
+                var child = objs[childIdx];
+                if (child == null) continue;
+                if (child.ObjectType == UniObject.Type.Ship) continue;
+                if (child.ObjectType == UniObject.Type.None) continue;
+                // Planets, Orbs, Asteroids are selectable
+                if (child.ObjectType == UniObject.Type.Planet ||
+                    child.ObjectType == UniObject.Type.Orb    ||
+                    child.ObjectType == UniObject.Type.Asteroid)
+                {
+                    int candPos = FindCandidatePos(childIdx, candidates);
+                    planets.Add(new LevelEntry(childIdx, candPos));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Finds the candidate list position for a given GameObjects index.
+        /// Returns -1 if not found (non-selectable or galaxy).
+        /// </summary>
+        private static int FindCandidatePos(int gobjIdx, System.Collections.Generic.IReadOnlyList<int> candidates)
+        {
+            if (candidates == null) return -1;
+            for (int i = 0; i < candidates.Count; i++)
+                if (candidates[i] == gobjIdx) return i;
+            return -1;
+        }
+
+        /// <summary>
+        /// Tries to find the row in the CURRENT level list whose GobjIndex matches gobjIdx.
+        /// Returns 0 if not found (safe default).
+        /// </summary>
+        private int FindGobjInCurrentList(int gobjIdx)
+        {
+            for (int i = 0; i < _currentLevelList.Count; i++)
+                if (_currentLevelList[i].GobjIndex == gobjIdx) return i;
+            return 0;
+        }
+
+        /// <summary>
+        /// When opening the panel, tries to set _treeLevel and _highlightRow so the
+        /// currently active target is already highlighted (QoL: panel opens at the active body).
+        /// Falls back to level 0 / row 0 if the active target cannot be located.
+        /// </summary>
+        private void SyncHighlightToActiveTarget()
+        {
+            if (_hud == null || _world == null) return;
+            int activeGobjIdx = _hud.ActiveTargetIndex;
+            if (activeGobjIdx < 0) return;
+            var objs = _world.GameObjects;
+            if (objs == null || (uint)activeGobjIdx >= (uint)objs.Count) return;
+            var activeObj = objs[activeGobjIdx];
+            if (activeObj == null) return;
+
+            // If it's a planet, try to open at star level → planet level
+            if (activeObj.ObjectType == UniObject.Type.Planet ||
+                activeObj.ObjectType == UniObject.Type.Orb    ||
+                activeObj.ObjectType == UniObject.Type.Asteroid)
+            {
+                // Find the star parent of this planet
+                int starIdx = activeObj.ParentIndex;
+                if ((uint)starIdx < (uint)objs.Count)
+                {
+                    var star = objs[starIdx];
+                    if (star != null && star.ObjectType == UniObject.Type.Star)
+                    {
+                        // Find the galaxy parent of this star
+                        int galIdx = star.ParentIndex;
+                        if ((uint)galIdx < (uint)objs.Count)
+                        {
+                            _expandedGalaxyIdx = galIdx;
+                            _expandedStarIdx = starIdx;
+                            _treeLevel = 2;
+                            BuildCurrentLevelList();
+                            _highlightRow = Mathf.Max(0, FindGobjInCurrentList(activeGobjIdx));
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // If it's a star, open at star level
+            if (activeObj.ObjectType == UniObject.Type.Star)
+            {
+                int galIdx = activeObj.ParentIndex;
+                if ((uint)galIdx < (uint)objs.Count)
+                {
+                    _expandedGalaxyIdx = galIdx;
+                    _treeLevel = 1;
+                    BuildCurrentLevelList();
+                    _highlightRow = Mathf.Max(0, FindGobjInCurrentList(activeGobjIdx));
+                    return;
+                }
+            }
+
+            // Fallback: galaxy level, row 0
+            _treeLevel = 0;
+            _expandedGalaxyIdx = -1;
+            _expandedStarIdx = -1;
+            _highlightRow = 0;
         }
 
         // ── List rendering ────────────────────────────────────────────────────
 
         /// <summary>
-        /// Rebuilds the VBox contents: title, then tier-grouped body rows with
-        /// name + live distance and a highlight glyph on the active and keyboard-selected rows.
-        /// Called each _Process while visible so distances stay live.
+        /// Rebuilds the VBox contents: breadcrumb header, then current-level rows
+        /// with name + live distance and a highlight glyph on the active and
+        /// keyboard-selected rows. Called each _Process while visible.
         /// </summary>
         private void RefreshList()
         {
@@ -200,131 +522,133 @@ namespace Hud
             var ship = objs[shipIdx];
             if (ship == null) return;
 
-            var candidates = _hud.GetTargetCandidates();
             int activeGobjIdx = _hud.ActiveTargetIndex;
+
+            // Rebuild the current level list (cheap — small hierarchy)
+            BuildCurrentLevelList();
+
+            // Clamp highlight
+            if (_currentLevelList.Count > 0)
+                _highlightRow = Mathf.Clamp(_highlightRow, 0, _currentLevelList.Count - 1);
 
             // ── Clear old children ─────────────────────────────────────────────
             foreach (Node child in _vbox.GetChildren())
                 child.QueueFree();
 
-            // ── Title row ─────────────────────────────────────────────────────
-            AddRow("TARGETS ────────", bold: true, highlight: false);
+            // ── Breadcrumb / header ────────────────────────────────────────────
+            string breadcrumb = BuildBreadcrumb(objs);
+            AddRow(breadcrumb, bold: true, highlight: false, selectable: false);
+            AddRow("─────────────────", bold: false, highlight: false, selectable: false);
 
-            // ── Tier grouping ─────────────────────────────────────────────────
-            // Walk candidates (Galaxy→Star→Planet order from GetTargetCandidates).
-            // Emit a tier header only when the first body of that tier appears.
-            bool galaxyHeaderEmitted = false;
-            bool starHeaderEmitted   = false;
-            bool planetHeaderEmitted = false;
+            // ── Nav hint ──────────────────────────────────────────────────────
+            string hint = _treeLevel == 0
+                ? "[d/→] expand  [Enter] n/a"
+                : "[a/←] back  [Enter] select";
+            AddRow(hint, bold: false, highlight: false, selectable: false);
+            AddRow("", bold: false, highlight: false, selectable: false);
 
-            for (int candidatePos = 0; candidatePos < candidates.Count; candidatePos++)
+            // ── Level rows ────────────────────────────────────────────────────
+            for (int row = 0; row < _currentLevelList.Count; row++)
             {
-                int gobjIdx = candidates[candidatePos];
-                if ((uint)gobjIdx >= (uint)objs.Count) continue;
-                var body = objs[gobjIdx];
+                var entry = _currentLevelList[row];
+                if ((uint)entry.GobjIndex >= (uint)objs.Count) continue;
+                var body = objs[entry.GobjIndex];
                 if (body == null) continue;
 
-                // Emit tier header when the body type changes to a new tier
-                switch (body.ObjectType)
-                {
-                    case UniObject.Type.Galaxy:
-                        if (!galaxyHeaderEmitted)
-                        {
-                            AddRow("GALAXY", bold: true, highlight: false);
-                            galaxyHeaderEmitted = true;
-                        }
-                        break;
-                    case UniObject.Type.Star:
-                        if (!starHeaderEmitted)
-                        {
-                            AddRow("STAR", bold: true, highlight: false);
-                            starHeaderEmitted = true;
-                        }
-                        break;
-                    case UniObject.Type.Planet:
-                    case UniObject.Type.Orb:
-                    case UniObject.Type.Asteroid:
-                        if (!planetHeaderEmitted)
-                        {
-                            AddRow("PLANET", bold: true, highlight: false);
-                            planetHeaderEmitted = true;
-                        }
-                        break;
-                }
-
-                // Compute live distance via UniMath.Distance (LCA path — never raw LocalPos)
+                // Live distance via UniMath.Distance (LCA path — CLAUDE.md §Position Math)
                 double dist = UniMath.Distance(ship, body, objs);
                 string distStr = Hud.FormatDistance(dist);
                 string name = body.Name ?? "?";
 
-                // Active-target marker and keyboard highlight
-                bool isActiveTgt  = gobjIdx == activeGobjIdx;
-                bool isKeyboardHl = candidatePos == _highlightRow;
+                bool isActiveTgt  = entry.GobjIndex == activeGobjIdx;
+                bool isKeyboardHl = row == _highlightRow;
+                bool isGalaxy     = entry.CandidatePos < 0; // galaxies are containers
 
-                // Format row text:  " ◀ NAME   dist"  or  "   NAME   dist"
-                // The active-target glyph (◀) mirrors the mock in 06-CONTEXT.md §Specific Ideas.
-                string prefix = isActiveTgt ? " ◀ " : "   ";
-                string rowText = $"{prefix}{name}  {distStr}";
+                // Indent level for tree readability
+                string indent = _treeLevel == 0 ? "" : (_treeLevel == 1 ? "  " : "    ");
 
-                // Keyboard highlight adds a different visual marker
-                string displayText = isKeyboardHl ? $">{rowText}" : $" {rowText}";
+                // Active-target marker (◀) and keyboard highlight (>)
+                string activeGlyph = isActiveTgt ? "◀" : " ";
+                string hlGlyph     = isKeyboardHl ? ">" : " ";
 
-                var label = AddRow(displayText, bold: false, highlight: isKeyboardHl || isActiveTgt);
+                // Galaxies show a child-expand indicator instead of a distance reading,
+                // since they are navigable containers not flyable destinations.
+                string rowText = isGalaxy
+                    ? $"{hlGlyph}{activeGlyph}{indent}{name}  [d→]"
+                    : $"{hlGlyph}{activeGlyph}{indent}{name}  {distStr}";
 
-                // Wire click selection: capture candidatePos for this iteration
-                int capturedPos = candidatePos;
+                var label = AddRow(rowText, bold: isGalaxy, highlight: isKeyboardHl || isActiveTgt, selectable: true);
+
+                // Wire click selection (click on a row: highlight it, then select or expand)
+                int capturedRow = row;
+                var capturedEntry = entry;
                 label.GuiInput += (@inputEvent) =>
                 {
                     if (@inputEvent is InputEventMouseButton mb
                         && mb.ButtonIndex == MouseButton.Left
                         && mb.Pressed)
                     {
-                        _highlightRow = capturedPos;
-                        CommitSelection(capturedPos);
+                        _highlightRow = capturedRow;
+                        if (capturedEntry.CandidatePos >= 0)
+                        {
+                            // Star or planet: select it
+                            _hud?.SetTargetIndex(capturedEntry.CandidatePos);
+                            ClosePanel();
+                        }
+                        else
+                        {
+                            // Galaxy: descend into it
+                            NavigateDown();
+                        }
                         GetViewport().SetInputAsHandled();
                     }
                 };
-                // Enable mouse input on individual rows so clicks register
                 label.MouseFilter = MouseFilterEnum.Stop;
             }
+
+            if (_currentLevelList.Count == 0)
+            {
+                AddRow("(empty)", bold: false, highlight: false, selectable: false);
+            }
+        }
+
+        /// <summary>Builds the breadcrumb title for the current tree level.</summary>
+        private string BuildBreadcrumb(List<UniObject> objs)
+        {
+            if (_treeLevel == 0) return "TARGETS — GALAXIES";
+
+            string galName = "?";
+            if ((uint)_expandedGalaxyIdx < (uint)(objs?.Count ?? 0))
+                galName = objs[_expandedGalaxyIdx]?.Name ?? "?";
+
+            if (_treeLevel == 1) return $"TARGETS — {galName} — STARS";
+
+            string starName = "?";
+            if ((uint)_expandedStarIdx < (uint)(objs?.Count ?? 0))
+                starName = objs[_expandedStarIdx]?.Name ?? "?";
+
+            return $"TARGETS — {galName} — {starName} — PLANETS";
         }
 
         /// <summary>
         /// Adds a Label row to the VBox, styled with PhosphorGreen.
         /// Returns the label so the caller can wire events.
         /// </summary>
-        private Label AddRow(string text, bool bold, bool highlight)
+        private Label AddRow(string text, bool bold, bool highlight, bool selectable)
         {
             var label = new Label();
             label.Text = text;
-            label.Modulate = PhosphorGreen;
-            if (highlight)
-            {
-                // Brighten the active/highlighted row slightly for visibility
-                label.Modulate = new Color(
+            label.Modulate = highlight
+                ? new Color(
                     Mathf.Min(1f, PhosphorGreen.R + 0.2f),
                     Mathf.Min(1f, PhosphorGreen.G + 0.1f),
                     Mathf.Min(1f, PhosphorGreen.B + 0.2f),
-                    PhosphorGreen.A);
-            }
+                    PhosphorGreen.A)
+                : PhosphorGreen;
             // Default: mouse events pass through (caller overrides for body rows)
             label.MouseFilter = MouseFilterEnum.Ignore;
             _vbox.AddChild(label);
             return label;
-        }
-
-        // ── Selection ─────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Commits selection for the given candidate list position.
-        /// Writes ONLY through Hud.SetTargetIndex — never mutates GameObjects or LocalPos (D-53).
-        /// </summary>
-        private void CommitSelection(int candidatePos)
-        {
-            _hud?.SetTargetIndex(candidatePos);
-            _highlightRow = candidatePos;
-            // Close the panel after selection so flight resumes immediately
-            ClosePanel();
         }
     }
 }
