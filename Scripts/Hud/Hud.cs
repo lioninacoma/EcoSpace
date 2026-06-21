@@ -10,19 +10,19 @@ namespace Hud
     /// Provides:
     ///   • Adaptive-unit speed readout (FormatSpeed): m/s → km/s → AU/s → ly/s (D-10)
     ///   • Context label: space tier + nearest body (D-11)
-    ///   • Cycle-able target readout over current-space parent + siblings (D-12)
+    ///   • Cross-space target readout over the full hierarchy (D-55/D-56)
     ///   • Off-screen edge direction marker pointing toward active target (findability)
     ///   • Phosphor-green CRT aesthetic throughout (D-09)
+    ///   • Panel API: SetTargetIndex / GetTargetCandidates (consumed by TargetSelectorPanel, 06-02)
     ///
     /// Anti-patterns honored:
     ///   • mouse_filter = Ignore on all HUD Controls (set in Main.tscn and here)
     ///   • Reads FlightController.CurrentSpeed (not a delta-position estimate)
     ///   • All index lookups null-guarded via (uint)i cast trick
     ///
-    /// Targetable set = parent body (at SOI origin) + siblings (other children of parent).
+    /// Targetable set = ALL bodies in the full hierarchy, ordered Galaxy → Star → Planet (D-55).
     /// All ship-relative distances and vectors use UniMath.RelativeMetres / UniMath.Distance
-    /// (LCA-based path) so that bodies at the parent-frame origin do not produce identical
-    /// distances to the parent itself, preventing per-frame nearest-winner flicker.
+    /// (LCA-based path) to avoid catastrophic cancellation for cross-space bodies.
     /// </summary>
     public partial class Hud : Control
     {
@@ -53,13 +53,6 @@ namespace Hud
         private TestSetup _world;
         private Flight.FlightController _flight;
         private Camera3D _camera;
-        private Render.WorldRenderer _worldRenderer;
-
-        // ── Target circle state (D-46) ────────────────────────────────────────
-
-        private bool    _showTargetCircle;
-        private Vector2 _targetCirclePos;
-        private float   _targetCircleRadius;
 
         // ── HUD label nodes ───────────────────────────────────────────────────
 
@@ -81,19 +74,19 @@ namespace Hud
             public TargetEntry(int index) { Index = index; }
         }
 
-        /// <summary>Current index into the targetable body list (parent + siblings).</summary>
+        /// <summary>Current index into the full-hierarchy candidate list (D-55).</summary>
         private int _targetIndex = 0;
 
         /// <summary>
-        /// Index into GameObjects of the active target, or -1 if none is available.
+        /// Index into GameObjects of the active cross-space target, or -1 if none is available.
         /// Read-only — never mutates _targetIndex or any sim state (Hud is a read-only
         /// consumer; HUD mutating sim state is an anti-pattern). Returns -1 when:
         ///   • _world is null (scene not yet ready)
         ///   • ship index is out of range or ship object is null
-        ///   • the targetable list is empty (no parent / all siblings null)
-        /// Rebuilds the targetable list fresh each call (cheap — ≤ ~10 children)
-        /// so a stale _targetIndex after an SOI transition is always clamped to
-        /// the live list bounds (T-04-03 mitigation, D-45 / D-12 preserved).
+        ///   • the full-hierarchy candidate list is empty (no targetable bodies found)
+        /// Rebuilds the candidate list fresh each call (cheap — ≤ ~30 bodies in MVP scene)
+        /// so a stale _targetIndex after an SOI transition is always clamped to live bounds.
+        /// Contract unchanged for FlightController D-43 ease-out consumers.
         /// </summary>
         public int ActiveTargetIndex
         {
@@ -105,7 +98,7 @@ namespace Hud
                 if ((uint)shipIdx >= (uint)(objs?.Count ?? 0)) return -1;
                 var ship = objs[shipIdx];
                 if (ship == null) return -1;
-                var targets = BuildTargetableList(ship.ParentIndex, shipIdx, objs);
+                var targets = BuildFullHierarchyTargetList(shipIdx, objs);
                 if (targets.Count == 0) return -1;
                 int clamped = Mathf.Clamp(_targetIndex, 0, targets.Count - 1);
                 return targets[clamped].Index;
@@ -133,14 +126,6 @@ namespace Hud
                 _camera = GetNode<Camera3D>(CameraPath);
             else
                 _camera = GetTree().Root.FindChild("Camera3D", true, false) as Camera3D;
-
-            // Resolve world renderer (for target circle render-set gate, D-46).
-            // FindChild matches by NODE NAME, not type — searching "WorldRenderer" returned
-            // null and silently disabled the target circle (04-02 play-test SC#5 failure).
-            // Try the actual node name first, then fall back to a type-based search so the
-            // lookup is resilient to any future node rename.
-            _worldRenderer = GetTree().Root.FindChild("WorldRenderer", true, false) as Render.WorldRenderer
-                           ?? FindNodeByType<Render.WorldRenderer>(GetTree().Root);
 
             // Resolve child label nodes
             _speedLabel   = GetNodeOrNull<Label>("SpeedLabel");
@@ -178,8 +163,6 @@ namespace Hud
             UpdateSpeedLabel();
             UpdateContextLabel(ship, gameObjects, shipIndex);
             UpdateTargetReadout(ship, gameObjects, shipIndex);
-            UpdateTargetCircle(ship, gameObjects);
-            QueueRedraw();  // triggers _Draw each frame — required (D-46, Pitfall 4)
         }
 
         // ── Speed label ───────────────────────────────────────────────────────
@@ -200,12 +183,11 @@ namespace Hud
 
             string tier = SpaceTierName(ship.CurrentSpace);
 
-            // Find nearest body: scan parent + siblings (the same targetable set as D-12).
-            // UniMath.RelativeMetres uses the LCA path for all bodies — avoids the
-            // identical-magnitude tie that occurs when a sibling sits at the parent-frame
-            // origin (body at 0,0,0 and parent-body produce the same distance via the old
-            // ship.LocalPos.ToDouble3() formula, causing per-frame nearest-winner flicker).
-            var targets = BuildTargetableList(ship.ParentIndex, shipIndex, gameObjects);
+            // Find nearest body: scan the full cross-space hierarchy (D-55).
+            // UniMath.RelativeMetres uses the LCA path for all bodies — avoids catastrophic
+            // cancellation for cross-space bodies and the identical-magnitude tie that
+            // occurred when a sibling sat at the parent-frame origin.
+            var targets = BuildFullHierarchyTargetList(shipIndex, gameObjects);
             string nearestName = "---";
             double minDist = double.MaxValue;
             foreach (var entry in targets)
@@ -237,8 +219,8 @@ namespace Hud
 
         private void UpdateTargetReadout(UniObject ship, System.Collections.Generic.List<UniObject> gameObjects, int shipIndex)
         {
-            // Build targetable list: parent body first, then siblings (ship excluded, null-skipped).
-            var targets = BuildTargetableList(ship.ParentIndex, shipIndex, gameObjects);
+            // Build full-hierarchy candidate list: Galaxy → Star → Planet (D-55).
+            var targets = BuildFullHierarchyTargetList(shipIndex, gameObjects);
 
             // Clamp/reset _targetIndex across SOI transitions (T-04-02 mitigation)
             if (targets.Count == 0)
@@ -343,190 +325,113 @@ namespace Hud
             if (_dirMarker != null) _dirMarker.Visible = false;
         }
 
-        // ── Target circle draw (D-46) ─────────────────────────────────────────
-
-        // Minimum on-screen radius so a distant target is never sub-pixel (D-46 floor).
-        // Small enough that a far speck reads as a tight reticle, not a big bubble.
-        private const float MIN_CIRCLE_RADIUS = 6f;
-        // Maximum on-screen radius so a close target doesn't fill the screen.
-        private const float MAX_CIRCLE_RADIUS = 200f;
-        // Padding multiplier so the outline sits just OUTSIDE the body's projected edge
-        // (1.0 = exactly on the rim; 1.15 leaves a small gap so the body stays visible).
-        private const float CIRCLE_BODY_PADDING = 1.15f;
+        // ── Panel API (D-55/D-56) ────────────────────────────────────────────
 
         /// <summary>
-        /// Computes per-frame circle state (_showTargetCircle, _targetCirclePos, _targetCircleRadius).
-        /// Sets _showTargetCircle = false at the top; only sets it true after ALL guards pass:
-        ///   1. _worldRenderer + _camera null-guard
-        ///   2. Resolve active target via BuildTargetableList (current-tier reach, D-45/D-12)
-        ///   3. Render-set gate: WorldRenderer.GetRenderPosition (D-46) — off if not a current-space mesh
-        ///   4. Behind-camera guard (camLocal.Z > 0, mirrors UpdateDirectionMarker, Pitfall 6)
-        ///   5. Off-screen bounds check — both suppressed cases fall back to the edge marker
-        ///   6. Size the circle to the body's projected on-screen radius (grows on approach),
-        ///      clamped to [MIN_CIRCLE_RADIUS, MAX_CIRCLE_RADIUS] (D-46 min floor / max cap)
-        ///
-        /// This method is a read-only consumer — it MUST NOT mutate _targetIndex or any GameObjects element.
+        /// Sets the active target to the given index into the full-hierarchy candidate list.
+        /// Read-only of sim state — only writes the internal HUD _targetIndex field,
+        /// never mutates any GameObjects element, LocalPos, or ChildIndices (D-53).
+        /// Called by TargetSelectorPanel (06-02) when the player picks a body in the panel.
+        /// No-op when the candidate list is empty.
         /// </summary>
-        private void UpdateTargetCircle(UniObject ship, System.Collections.Generic.List<UniObject> gameObjects)
+        public void SetTargetIndex(int candidateIndex)
         {
-            _showTargetCircle = false;
-
-            // Guard 1: require world renderer and camera
-            if (_worldRenderer == null || _camera == null) return;
-
-            // Guard 2: resolve active target via current-tier targetable list (D-45 / D-12)
-            var targets = BuildTargetableList(ship.ParentIndex, _world.ShipIndex, gameObjects);
-            if (targets.Count == 0) return;
-            int clamped = Mathf.Clamp(_targetIndex, 0, targets.Count - 1);
-            int tgtIdx = targets[clamped].Index;
-
-            // Guard 3: render-set gate — is the body a mesh in the current space? (D-46)
-            // Returns false when the target is in a different SOI space → edge marker handles findability.
-            if (!_worldRenderer.GetRenderPosition(tgtIdx, out Vector3 renderPos)) return;
-
-            // Convert render-space position to global (Pitfall 5 / A3 — explicit GlobalPosition is safe
-            // regardless of WorldRenderer's actual world position, unlike assuming Vector3.Zero).
-            Vector3 globalPos = _worldRenderer.GlobalPosition + renderPos;
-
-            // Guard 4: behind-camera check — mirrors UpdateDirectionMarker (Pitfall 6)
-            // Godot uses -Z-forward; cameraLocal.Z > 0 means the point is behind the camera.
-            Vector3 camLocal = _camera.GlobalTransform.AffineInverse() * (globalPos - _camera.GlobalPosition);
-            if (camLocal.Z > 0) return;  // behind camera → edge marker fallback
-
-            // Guard 5: project to screen and check viewport bounds
-            var viewport = GetViewport();
-            if (viewport == null) return;
-            Vector2 vpSize = viewport.GetVisibleRect().Size;
-            Vector2 screenPos = _camera.UnprojectPosition(globalPos);
-            if (screenPos.X < 0 || screenPos.X > vpSize.X || screenPos.Y < 0 || screenPos.Y > vpSize.Y)
-                return;  // off-screen → edge marker fallback
-
-            // All guards passed — compute the on-screen radius ANALYTICALLY so the circle
-            // matches the body's projected silhouette at any screen position.
-            //
-            // The previous approach projected a single perpendicular-offset point and measured
-            // its pixel gap from the centre. Near the frustum EDGE the perspective projection
-            // stretches non-linearly, so that gap over-grew while the GPU-rasterized mesh did
-            // not — the circle ballooned at the edge and the error scaled with FOV (play-test).
-            //
-            // The correct, position-independent formula uses the body's DEPTH along the camera
-            // forward axis. For a perspective camera the half-view-plane height at depth d is
-            // d·tan(fovY/2); a world radius r therefore subtends (r/d)/tan(fovY/2) of the
-            // half-height, i.e. pixelRadius = (viewportHeight/2) · (r/d) / tan(fovY/2).
-            // This depends only on depth, never on where the body sits on screen, so the circle
-            // tracks the mesh evenly across the whole view regardless of FOV.
-            float bodyPixelRadius = MIN_CIRCLE_RADIUS;
-            if (_worldRenderer.GetRenderRadius(tgtIdx, out float renderRadius) && renderRadius > 0f)
-            {
-                // Depth along the camera forward axis (Godot: forward = -Z, so depth = -camLocal.Z).
-                float depth = -(float)camLocal.Z;
-                if (depth > 1e-4f)
-                {
-                    // Godot's Camera3D.Fov is the VERTICAL FOV in KeepHeight (the project default);
-                    // it is the horizontal FOV in KeepWidth. Use the axis that matches Fov, then the
-                    // circle is round because pixels are square.
-                    float fovRad = Mathf.DegToRad(_camera.Fov);
-                    float tanHalfFov = Mathf.Tan(fovRad * 0.5f);
-                    float refExtent = _camera.KeepAspect == Camera3D.KeepAspectEnum.Height
-                        ? vpSize.Y * 0.5f
-                        : vpSize.X * 0.5f;
-                    bodyPixelRadius = refExtent * (renderRadius / depth) / tanHalfFov * CIRCLE_BODY_PADDING;
-                }
-            }
-
-            _targetCirclePos    = screenPos;
-            _targetCircleRadius = Mathf.Clamp(bodyPixelRadius, MIN_CIRCLE_RADIUS, MAX_CIRCLE_RADIUS);
-            _showTargetCircle   = true;
+            var candidates = GetTargetCandidates();
+            if (candidates.Count == 0) return;
+            _targetIndex = Mathf.Clamp(candidateIndex, 0, candidates.Count - 1);
         }
 
         /// <summary>
-        /// Draws the world-pinned target outline (D-46) when _showTargetCircle is set.
-        /// Draws an unfilled arc (outline only — retro aesthetic) using the existing PhosphorGreen color.
-        /// Called by Godot each frame when QueueRedraw() is invoked in _Process.
+        /// Returns the ordered GameObjects indices of every targetable body in the full
+        /// hierarchy, in Galaxy → Star → Planet tier order (D-55 / user mock).
+        /// Read-only of sim state — builds the list from GameObjects without mutating anything (D-53).
+        /// Returns an empty list when the ship or world is not ready.
+        /// Consumed by TargetSelectorPanel (06-02) for the candidate list to render.
         /// </summary>
-        public override void _Draw()
+        public System.Collections.Generic.IReadOnlyList<int> GetTargetCandidates()
         {
-            if (!_showTargetCircle) return;
-            // _targetCirclePos is a VIEWPORT-ABSOLUTE screen position (from UnprojectPosition),
-            // but _Draw / DrawArc operate in this Control's LOCAL coordinate space. The Hud
-            // Control is a small top-left box (offset 5,30 — not full-screen), so drawing the
-            // absolute position directly placed the circle offset from the target (04-02 SC#5).
-            // Convert to Control-local by subtracting the Control's global position.
-            Vector2 localPos = _targetCirclePos - GlobalPosition;
-            // DrawArc(center, radius, startAngle, endAngle, pointCount, color, lineWidth)
-            // Unfilled outline — DrawArc not DrawCircle (retro aesthetic, D-46)
-            DrawArc(localPos, _targetCircleRadius, 0f, Mathf.Tau, 32, PhosphorGreen, 1.5f);
-        }
+            var result = new System.Collections.Generic.List<int>();
+            if (_world == null) return result;
+            var objs = _world.GameObjects;
+            int shipIdx = _world.ShipIndex;
+            if ((uint)shipIdx >= (uint)(objs?.Count ?? 0)) return result;
+            var ship = objs[shipIdx];
+            if (ship == null) return result;
 
-        // ── Input: cycle target ───────────────────────────────────────────────
-
-        public override void _Input(InputEvent @event)
-        {
-            // cycle_target (Tab) must be read in _Input — _Input runs BEFORE the GUI
-            // focus system, so we see Tab before Godot's built-in ui_focus_next (also
-            // Tab) can consume it. After handling, we mark the event handled so focus
-            // navigation does not also fire. (_UnhandledInput would be too late — the
-            // focus system runs before it and would swallow Tab.)
-            if (@event.IsActionPressed("cycle_target"))
-            {
-                if (_world == null) return;
-                var gameObjects = _world.GameObjects;
-                int shipIndex = _world.ShipIndex;
-                if ((uint)shipIndex >= (uint)(gameObjects?.Count ?? 0)) return;
-                var ship = gameObjects[shipIndex];
-                if (ship == null) return;
-
-                var targets = BuildTargetableList(ship.ParentIndex, shipIndex, gameObjects);
-                if (targets.Count > 0)
-                    _targetIndex = (_targetIndex + 1) % targets.Count;
-
-                // Consume so ui_focus_next does not also act on this Tab press.
-                GetViewport().SetInputAsHandled();
-            }
+            var entries = BuildFullHierarchyTargetList(shipIdx, objs);
+            foreach (var entry in entries)
+                result.Add(entry.Index);
+            return result;
         }
 
         // ── Helpers ───────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Builds the ordered targetable body list: parent body first, then each sibling
-        /// child of the parent (ship excluded, null/out-of-range-skipped).
+        /// Builds the ordered cross-space targetable body list over the full hierarchy (D-55).
+        /// Returns entries in Galaxy → Star → Planet tier order (matches user mock in 06-CONTEXT.md).
         ///
-        /// The parent is always listed first so Tab-cycling has a stable order.
-        /// Count ≥ 1 whenever the ship has a valid parent (which it always does in the
-        /// current scene hierarchy).
+        /// Walks ALL entries in gameObjects. Skips:
+        ///   • the ship itself (shipIndex)
+        ///   • null entries and out-of-range indices ((uint) bounds-check guard)
+        ///   • Root-space and Universe-space container objects (not selectable bodies)
+        ///   • Ship-type objects
+        /// Galaxies ARE included (D-55 — cross-space selection; Galaxy exclusion was current-tier only).
         ///
-        /// All distance math uses UniMath.RelativeMetres (LCA path), so all entries are
-        /// treated uniformly — no IsParent flag is needed.
+        /// Read-only consumer — MUST NOT mutate any UniObject or sim state (D-53).
+        /// All distance math routes through UniMath.RelativeMetres (LCA path) — never raw
+        /// body.LocalPos.ToDouble3() for cross-space bodies.
         /// </summary>
-        private System.Collections.Generic.List<TargetEntry> BuildTargetableList(
-            int parentIdx, int shipIndex,
+        private System.Collections.Generic.List<TargetEntry> BuildFullHierarchyTargetList(
+            int shipIndex,
             System.Collections.Generic.List<UniObject> gameObjects)
         {
-            var result = new System.Collections.Generic.List<TargetEntry>();
-            if ((uint)parentIdx >= (uint)(gameObjects?.Count ?? 0)) return result;
-            var parent = gameObjects[parentIdx];
-            if (parent == null) return result;
+            var galaxies = new System.Collections.Generic.List<TargetEntry>();
+            var stars    = new System.Collections.Generic.List<TargetEntry>();
+            var planets  = new System.Collections.Generic.List<TargetEntry>();
 
-            // Parent body is targetable (it is visible as the SOI origin) — EXCEPT a Galaxy
-            // parent (04-02 play-test fix). When the ship is in Galaxy space the parent is the
-            // home galaxy, a diffuse sky body that: (a) is never rendered as a mesh (D-28),
-            // so GetRenderPosition returns false and the target circle can never draw on it;
-            // and (b) sits at the frame origin alongside the home star, so as the DEFAULT
-            // target (_targetIndex=0) its near-zero distance crushed the target ease-out
-            // (D-43) to MinSpeed. Skipping it makes the home STAR the default target — a real
-            // mesh the circle can pin to and a sensible body to ease onto. Galaxy SIBLINGS
-            // (in Universe space) stay targetable below for edge-marker navigation.
-            if (parent.ObjectType != UniObject.Type.Galaxy)
-                result.Add(new TargetEntry(parentIdx));
+            if (gameObjects == null) return galaxies;   // return empty list
 
-            // Siblings: other children of parent, excluding the ship itself.
-            foreach (int idx in parent.ChildIndices)
+            for (int i = 0; i < gameObjects.Count; i++)
             {
-                if (idx == shipIndex) continue;
-                if ((uint)idx >= (uint)gameObjects.Count) continue;
-                if (gameObjects[idx] == null) continue;
-                result.Add(new TargetEntry(idx));
+                if (i == shipIndex) continue;
+                if ((uint)i >= (uint)gameObjects.Count) continue;   // belt-and-suspenders
+                var body = gameObjects[i];
+                if (body == null) continue;
+
+                // Skip non-selectable types: Ship, None, and container spaces (Root/Universe).
+                // Root and Universe objects have ObjectType None or are pure container nodes.
+                var objType = body.ObjectType;
+                if (objType == UniObject.Type.Ship) continue;
+                if (objType == UniObject.Type.None) continue;
+
+                // Skip bodies in Root space (index 0 / container with no physical presence).
+                if (body.CurrentSpace == UniObject.Space.Root) continue;
+                if (body.CurrentSpace == UniObject.Space.Universe) continue;
+
+                // Bucket by body type in tier order: Galaxy → Star → Planet.
+                // Orb/Asteroid treated as planets (selectable physical bodies).
+                switch (objType)
+                {
+                    case UniObject.Type.Galaxy:
+                        galaxies.Add(new TargetEntry(i));
+                        break;
+                    case UniObject.Type.Star:
+                        stars.Add(new TargetEntry(i));
+                        break;
+                    case UniObject.Type.Planet:
+                    case UniObject.Type.Orb:
+                    case UniObject.Type.Asteroid:
+                        planets.Add(new TargetEntry(i));
+                        break;
+                }
             }
+
+            // Merge in tier order: Galaxy, Star, Planet.
+            var result = new System.Collections.Generic.List<TargetEntry>(
+                galaxies.Count + stars.Count + planets.Count);
+            result.AddRange(galaxies);
+            result.AddRange(stars);
+            result.AddRange(planets);
             return result;
         }
 
@@ -543,22 +448,6 @@ namespace Hud
         private void ApplyPhosphorGreen(Label label)
         {
             if (label != null) label.Modulate = PhosphorGreen;
-        }
-
-        /// <summary>
-        /// Recursively searches the scene subtree for the first node of type T.
-        /// Used as a name-independent fallback when a node has been renamed, so the
-        /// target-circle render-set gate resolves regardless of the node name.
-        /// </summary>
-        private static T FindNodeByType<T>(Node root) where T : class
-        {
-            if (root is T match) return match;
-            foreach (Node child in root.GetChildren())
-            {
-                var found = FindNodeByType<T>(child);
-                if (found != null) return found;
-            }
-            return null;
         }
 
         // ── Public formatting API (HUD-01 / D-10) ────────────────────────────
