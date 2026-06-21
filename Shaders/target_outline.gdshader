@@ -17,13 +17,17 @@
 //   exactly like a body mesh at the same angular size (D-50).
 //
 // Placement: the C# side places this sphere at a FIXED distance from the camera
-//   (MarkerCameraDistance), sized to the target's angular radius. Constant depth means
-//   constant ring pixel-thickness — rim_width does not need to vary per frame.
+//   (MarkerCameraDistance), sized to the target's angular radius.
+//
+// Ring thickness: rim_width is pushed adaptively each frame by TargetMarkerRenderer so the
+//   silhouette band is a constant TargetRingThicknessPx pixels wide regardless of marker size.
+//   Geometry: T = R*(1 - sqrt(1 - rim_width²)) → rim_width = sqrt(1 - (1 - T/R)²).
+//   At the D-52 minimum floor (R == T) rim_width reaches 1 (filled disc — acceptable).
 //
 // Uniforms:
 //   outline_color  – phosphor-green RGBA (source_color; pushed from TargetMarkerRenderer each frame)
 //   rim_width      – controls ring thickness; 0.0 = invisible, 1.0 = full hemisphere.
-//                    Constant value (BaseRimWidth, default 0.25) because depth is fixed.
+//                    Pushed adaptively per-frame (derived from TargetRingThicknessPx / pixelRadius).
 //
 // No depth_prepass or depth_draw_opaque: the outline must not occlude the body mesh behind
 // it (the marker encapsulates the body; the front face of the outline sits just outside
@@ -39,8 +43,8 @@ uniform vec4 outline_color : source_color = vec4(0.1, 1.0, 0.3, 1.0);
 // Rim/fresnel threshold controlling ring thickness.
 // dot(VIEW, NORMAL) in [0, 1]: 0 = grazing edge, 1 = directly facing camera.
 // Fragments with |dot| > rim_width are discarded (interior); only the rim ring remains.
-// Constant (BaseRimWidth, default 0.25) because the marker is placed at a fixed camera
-// distance — ring pixel-thickness does not vary with target distance.
+// Pushed per-frame from TargetMarkerRenderer (adaptive: rim_width = sqrt(1-(1-T/R)²))
+// so the ring band is always TargetRingThicknessPx pixels wide on screen.
 uniform float rim_width : hint_range(0.0, 1.0) = 0.25;
 
 void fragment()

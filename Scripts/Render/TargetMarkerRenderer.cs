@@ -21,10 +21,15 @@ namespace Render
     ///   4. D-52 floor: pixel radius is clamped to [MinMarkerRadius, MaxMarkerRadius].
     ///      Because depth is constant (MarkerCameraDistance), back-projection is trivial:
     ///      r_world = clampedPixelRadius * tanHalfFov * MarkerCameraDistance / refExtent.
-    ///   5. Depth: depth_test_disabled in the shader (render_mode includes depth_test_disabled)
+    ///   5. Constant ring pixel thickness: After computing the final clamped pixel radius R,
+    ///      rim_width is solved per-frame so the silhouette band is TargetRingThicknessPx pixels wide:
+    ///        t = clamp(T / R, 0, 1);  rim_width = sqrt(1 - (1-t)²)
+    ///      Close target (R large) → rim_width small → thin band as fraction of sphere, ~T pixels.
+    ///      Far target (R at floor) → rim_width near 1 → filled disc — acceptable at the floor.
+    ///   6. Depth: depth_test_disabled in the shader (render_mode includes depth_test_disabled)
     ///      so the marker always draws on top of scene geometry — it cannot be occluded by
     ///      planets or stars between camera and target.
-    ///   6. Far-plane: the marker is at MarkerCameraDistance from the camera, never near the
+    ///   7. Far-plane: the marker is at MarkerCameraDistance from the camera, never near the
     ///      far plane, so it is never frustum-culled regardless of target distance.
     ///
     /// Preserved from original:
@@ -77,9 +82,23 @@ namespace Render
         [Export] public float MarkerCameraDistance { get; set; } = 75f;
 
         /// <summary>
-        /// Constant rim_width for the outline ring. Because depth is fixed at MarkerCameraDistance,
-        /// ring pixel-thickness is constant — no adaptive widening needed.
-        /// 0.25 gives a thin clean ring; increase toward 0.4 if it looks too thin.
+        /// Desired constant ring line thickness in pixels at all distances and marker sizes.
+        /// Each frame, rim_width is solved so the silhouette band is exactly this many pixels wide,
+        /// regardless of how large or small the marker sphere is on screen.
+        ///
+        /// Geometry: for a camera-facing sphere of on-screen pixel radius R, the fresnel band
+        /// kept by the shader (|dot(VIEW,NORMAL)| &lt;= rim_width) spans screen radii in
+        /// [R*sqrt(1 - rim_width²), R].  Band pixel thickness = R*(1 - sqrt(1 - rim_width²)).
+        /// Invert:  t = clamp(T/R, 0, 1);  rim_width = sqrt(1 - (1-t)*(1-t)).
+        /// Close target (R large) → t/R small → thin band as fraction of sphere, ~constant pixels.
+        /// Far target (R at floor) → t/R near 1 → rim_width near 1 → full or nearly-full disc.
+        /// When R == T → rim_width = 1 (filled disc) — acceptable at the minimum floor.
+        /// </summary>
+        [Export] public float TargetRingThicknessPx { get; set; } = 2.0f;
+
+        /// <summary>
+        /// Absolute fallback rim_width used only when the pixel radius is unavailable
+        /// (camera not resolved). Not used in normal operation.
         /// </summary>
         [Export] public float BaseRimWidth { get; set; } = 0.25f;
 
@@ -190,6 +209,9 @@ namespace Render
             //   r_world = clampedPixelRadius * tanHalfFov * depth / refExtent
             var markerMesh = GetOrCreateMarkerMesh();
 
+            // Track the final clamped pixel radius so we can derive rim_width from it below.
+            float finalPixelRadius = MinMarkerRadius; // sensible default (floor) before camera resolves
+
             if (_camera != null)
             {
                 var viewport = GetViewport();
@@ -210,6 +232,8 @@ namespace Render
                 // Back-project the clamped pixel radius to a world-space radius at the marker depth.
                 // Because depth is constant (MarkerCameraDistance) this is always cheap and exact.
                 r = (clampedPixelRadius * MarkerCameraDistance * tanHalfFov) / refExtent;
+
+                finalPixelRadius = clampedPixelRadius;
             }
 
             // ── Update mesh transform ─────────────────────────────────────────
@@ -221,11 +245,28 @@ namespace Render
             _outlineMaterial.SetShaderParameter("outline_color",
                 new Color(PhosphorGreen.R, PhosphorGreen.G, PhosphorGreen.B, 1.0f));
 
-            // ── Step 5: Constant rim_width (depth is fixed — no adaptive logic needed) ──
-            // Because the marker always sits at MarkerCameraDistance from the camera, its
-            // apparent size in view space is determined only by the clamped pixel radius.
-            // A constant BaseRimWidth produces constant pixel-thickness ring.
-            _outlineMaterial.SetShaderParameter("rim_width", BaseRimWidth);
+            // ── Step 5: Adaptive rim_width for constant pixel-thickness ring ──
+            // The silhouette band kept by the shader for a sphere of on-screen pixel radius R is:
+            //   T = R * (1 - sqrt(1 - rim_width²))   [band pixel thickness]
+            // Solving for rim_width given a desired constant thickness T (pixels):
+            //   t = clamp(T / R, 0, 1)
+            //   rim_width = sqrt(1 - (1-t)*(1-t))
+            // At R >> T: rim_width is small → thin band as fraction of sphere, ~T pixels wide.
+            // At R == T: t = 1 → rim_width = 1 → filled disc (acceptable at the minimum floor).
+            // The same R (finalPixelRadius) used for the D-52 clamp is used here — units match.
+            float adaptiveRimWidth;
+            if (_camera != null && finalPixelRadius > 0f)
+            {
+                float t = Mathf.Clamp(TargetRingThicknessPx / finalPixelRadius, 0f, 1f);
+                adaptiveRimWidth = Mathf.Sqrt(1f - (1f - t) * (1f - t));
+                adaptiveRimWidth = Mathf.Clamp(adaptiveRimWidth, 1e-4f, 1.0f);
+            }
+            else
+            {
+                // Camera not resolved — fall back to the authored constant.
+                adaptiveRimWidth = BaseRimWidth;
+            }
+            _outlineMaterial.SetShaderParameter("rim_width", adaptiveRimWidth);
 
             // ── Tracking label (D-57) ─────────────────────────────────────────
             UpdateTrackingLabel(ship, targetObj, gameObjects, markerPos);
