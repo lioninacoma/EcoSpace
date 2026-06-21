@@ -9,9 +9,9 @@ namespace Hud
     /// Read-only consumer of GameWorld state — MUST NOT mutate sim state.
     ///
     /// Displays a compact LEFT-side hierarchical tree panel: galaxies expand into
-    /// stars, stars expand into planets. Only stars and planets are selectable
-    /// targets (galaxies are navigable containers — D-51 narrowed). Selection
-    /// commits exclusively through Hud.SetTargetIndex (never via direct
+    /// stars, stars expand into planets. ALL body types (galaxy, star, planet) are
+    /// selectable targets via Enter. Galaxies are ALSO navigable containers via d/Right.
+    /// Selection commits exclusively through Hud.SetTargetIndex (never via direct
     /// GameObjects or LocalPos mutation — D-53).
     ///
     /// Toggle: Tab (toggle_target_panel action from 06-01 project.godot).
@@ -23,7 +23,7 @@ namespace Hud
     ///   s / Down  = move highlight DOWN within current level
     ///   a / Left  = go UP one tree level (back to parent / collapse branch)
     ///   d / Right = descend into highlighted node's children
-    ///   Enter     = SELECT highlighted node (only stars/planets — galaxies are containers)
+    ///   Enter     = SELECT highlighted node (galaxies, stars, and planets are all selectable)
     ///
     /// Flight input suppression:
     ///   All FlightController input (WASD throttle/roll, mouse steering) is suppressed
@@ -87,13 +87,16 @@ namespace Hud
 
         /// <summary>
         /// Each entry in the current level's visible list:
-        ///   GobjIndex = GameObjects index of the body
-        ///   CandidatePos = position in Hud.GetTargetCandidates() (for SetTargetIndex), or -1 for galaxies (non-selectable)
+        ///   GobjIndex    = GameObjects index of the body
+        ///   CandidatePos = position in Hud.GetTargetCandidates() (for SetTargetIndex).
+        ///                  All body types (galaxy, star, planet) are selectable; -1 only
+        ///                  when a body is not in the candidate list (should not happen in
+        ///                  normal operation).
         /// </summary>
         private readonly struct LevelEntry
         {
             public readonly int GobjIndex;
-            public readonly int CandidatePos; // -1 for galaxies (non-selectable containers)
+            public readonly int CandidatePos;
             public LevelEntry(int gobjIndex, int candidatePos) { GobjIndex = gobjIndex; CandidatePos = candidatePos; }
         }
 
@@ -320,7 +323,7 @@ namespace Hud
 
         /// <summary>
         /// Commits selection for the currently highlighted row.
-        /// Galaxies (CandidatePos == -1) are non-selectable containers — no-op on Enter.
+        /// ALL body types (galaxy, star, planet) are selectable via Enter.
         /// Writes ONLY through Hud.SetTargetIndex — never mutates GameObjects or LocalPos (D-53).
         /// </summary>
         private void CommitSelection()
@@ -329,7 +332,8 @@ namespace Hud
             _highlightRow = Mathf.Clamp(_highlightRow, 0, _currentLevelList.Count - 1);
             var entry = _currentLevelList[_highlightRow];
 
-            // Galaxies are containers, not selectable targets (D-51 narrowed)
+            // All selectable bodies have a valid CandidatePos in the full-hierarchy list.
+            // -1 means the body was not found in Hud.GetTargetCandidates() — skip gracefully.
             if (entry.CandidatePos < 0) return;
 
             _hud?.SetTargetIndex(entry.CandidatePos);
@@ -352,16 +356,20 @@ namespace Hud
 
             if (_treeLevel == 0)
             {
-                // Top level: show all galaxies
+                // Top level: show all galaxies.
+                // Galaxies live in Universe space (children of Root → ChildSpace(Root) = Universe),
+                // so we match on ObjectType alone — NOT CurrentSpace.
+                // The old CurrentSpace == Universe guard was wrong: it excluded every galaxy.
                 for (int i = 0; i < objs.Count; i++)
                 {
                     if ((uint)i >= (uint)objs.Count) continue;
                     var body = objs[i];
                     if (body == null) continue;
                     if (body.ObjectType != UniObject.Type.Galaxy) continue;
-                    if (body.CurrentSpace == UniObject.Space.Root || body.CurrentSpace == UniObject.Space.Universe) continue;
-                    // Galaxies are non-selectable containers (CandidatePos = -1)
-                    _currentLevelList.Add(new LevelEntry(i, -1));
+                    // Skip the Root container (index 0, parentIndex -1 / ObjectType None) — already
+                    // excluded by the Galaxy type check above. No CurrentSpace filter needed.
+                    int candPos = FindCandidatePos(i, candidates);
+                    _currentLevelList.Add(new LevelEntry(i, candPos));
                 }
             }
             else if (_treeLevel == 1 && _expandedGalaxyIdx >= 0)
@@ -457,7 +465,7 @@ namespace Hud
             var activeObj = objs[activeGobjIdx];
             if (activeObj == null) return;
 
-            // If it's a planet, try to open at star level → planet level
+            // If it's a planet/orb/asteroid, open at planet level under the parent star
             if (activeObj.ObjectType == UniObject.Type.Planet ||
                 activeObj.ObjectType == UniObject.Type.Orb    ||
                 activeObj.ObjectType == UniObject.Type.Asteroid)
@@ -484,7 +492,7 @@ namespace Hud
                 }
             }
 
-            // If it's a star, open at star level
+            // If it's a star, open at star level under the parent galaxy
             if (activeObj.ObjectType == UniObject.Type.Star)
             {
                 int galIdx = activeObj.ParentIndex;
@@ -496,6 +504,17 @@ namespace Hud
                     _highlightRow = Mathf.Max(0, FindGobjInCurrentList(activeGobjIdx));
                     return;
                 }
+            }
+
+            // If it's a galaxy (now selectable), open at galaxy level with the galaxy highlighted
+            if (activeObj.ObjectType == UniObject.Type.Galaxy)
+            {
+                _treeLevel = 0;
+                _expandedGalaxyIdx = -1;
+                _expandedStarIdx = -1;
+                BuildCurrentLevelList();
+                _highlightRow = Mathf.Max(0, FindGobjInCurrentList(activeGobjIdx));
+                return;
             }
 
             // Fallback: galaxy level, row 0
@@ -542,7 +561,7 @@ namespace Hud
 
             // ── Nav hint ──────────────────────────────────────────────────────
             string hint = _treeLevel == 0
-                ? "[d/→] expand  [Enter] n/a"
+                ? "[d/→] expand  [Enter] select galaxy"
                 : "[a/←] back  [Enter] select";
             AddRow(hint, bold: false, highlight: false, selectable: false);
             AddRow("", bold: false, highlight: false, selectable: false);
@@ -562,7 +581,7 @@ namespace Hud
 
                 bool isActiveTgt  = entry.GobjIndex == activeGobjIdx;
                 bool isKeyboardHl = row == _highlightRow;
-                bool isGalaxy     = entry.CandidatePos < 0; // galaxies are containers
+                bool isGalaxy     = body.ObjectType == UniObject.Type.Galaxy;
 
                 // Indent level for tree readability
                 string indent = _treeLevel == 0 ? "" : (_treeLevel == 1 ? "  " : "    ");
@@ -571,15 +590,18 @@ namespace Hud
                 string activeGlyph = isActiveTgt ? "◀" : " ";
                 string hlGlyph     = isKeyboardHl ? ">" : " ";
 
-                // Galaxies show a child-expand indicator instead of a distance reading,
-                // since they are navigable containers not flyable destinations.
+                // All rows show live distance. Galaxies also show the [d→] expand hint
+                // to remind the player they can descend into the galaxy's star list.
                 string rowText = isGalaxy
-                    ? $"{hlGlyph}{activeGlyph}{indent}{name}  [d→]"
+                    ? $"{hlGlyph}{activeGlyph}{indent}{name}  {distStr}  [d→]"
                     : $"{hlGlyph}{activeGlyph}{indent}{name}  {distStr}";
 
                 var label = AddRow(rowText, bold: isGalaxy, highlight: isKeyboardHl || isActiveTgt, selectable: true);
 
-                // Wire click selection (click on a row: highlight it, then select or expand)
+                // Wire click selection:
+                //   Single click on any row — highlight it, then SELECT the body
+                //   (galaxies, stars, and planets are all selectable via click, same as Enter).
+                //   Use d/Right key to descend into a galaxy via keyboard.
                 int capturedRow = row;
                 var capturedEntry = entry;
                 label.GuiInput += (@inputEvent) =>
@@ -591,14 +613,13 @@ namespace Hud
                         _highlightRow = capturedRow;
                         if (capturedEntry.CandidatePos >= 0)
                         {
-                            // Star or planet: select it
+                            // All body types: select and close
                             _hud?.SetTargetIndex(capturedEntry.CandidatePos);
                             ClosePanel();
                         }
                         else
                         {
-                            // Galaxy: descend into it
-                            NavigateDown();
+                            // Body not in candidate list (should not happen) — just highlight
                         }
                         GetViewport().SetInputAsHandled();
                     }
