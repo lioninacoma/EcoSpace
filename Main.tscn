@@ -12,6 +12,7 @@
 [ext_resource type="Script" uid="uid://tsi6i4rux5yk" path="res://Scripts/Render/LuminousPassRenderer.cs" id="10_lumpassrnd"]
 [ext_resource type="Script" uid="uid://col1yvsjghp65" path="res://Scripts/Hud/TargetSelectorPanel.cs" id="11_tgtpanel"]
 [ext_resource type="Script" uid="uid://dtfiuoukyqb8n" path="res://Scripts/Render/TargetMarkerRenderer.cs" id="12_tgtmarker"]
+[ext_resource type="Script" uid="uid://bwarpconfirm1" path="res://Scripts/Hud/WarpConfirmationScreen.cs" id="13_warpscreen"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("8_skyshdr")
@@ -191,6 +192,24 @@ offset_bottom = -6.0
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("11_tgtpanel")
+HudPath = NodePath("../Hud")
+FlightPath = NodePath("../../FlightController")
+
+[node name="WarpConfirmationScreen" type="Control" parent="CanvasLayer" unique_id=-1293967279]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -120.0
+offset_right = 200.0
+offset_bottom = 120.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("13_warpscreen")
 HudPath = NodePath("../Hud")
 FlightPath = NodePath("../../FlightController")
 
