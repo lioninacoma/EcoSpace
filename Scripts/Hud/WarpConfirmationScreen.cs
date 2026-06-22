@@ -227,11 +227,16 @@ namespace Hud
             if (_timeLabel != null)
                 _timeLabel.Text = $"TIME  {FormatTravelTime(_selectedTravelTimeSec)}";
 
-            // Computed warp speed: dist / travelTime, capped by WarpMaxSpeed (D-15 / D-07)
-            // Slider MinValue=5 s means _selectedTravelTimeSec >= 5 s — no division-by-zero risk.
-            double warpSpeed = System.Math.Min(dist / _selectedTravelTimeSec, _flight?.WarpMaxSpeed ?? 2e20);
+            // Peak cruise speed v_c = (profileDist − rampContrib) / (T_sel·(1−f)) (D-12).
+            // Shows the maximum speed the ship reaches during this warp leg.
+            // WarpMaxSpeed cap removed (D-05); _flight?.WarpAccelFraction provides f.
+            double profileDist = System.Math.Max(0.0, dist - target.SOIMeters);
+            double f           = _flight?.WarpAccelFraction ?? (1.0 / 3.0);
+            double tSel        = System.Math.Max(1.0, _selectedTravelTimeSec);
+            double rampContrib = f * tSel * 2.0 * (_flight?.ManualMaxSpeed ?? 1e6) * 0.5;
+            double vc          = System.Math.Max(0.0, (profileDist - rampContrib)) / System.Math.Max(1e-11, tSel * (1.0 - f));
             if (_speedLabel != null)
-                _speedLabel.Text = $"WARP  {Hud.FormatSpeed(warpSpeed)}";
+                _speedLabel.Text = $"WARP  {Hud.FormatSpeed(vc)}";
         }
 
         /// <summary>

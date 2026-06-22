@@ -201,18 +201,18 @@ namespace Flight
 			set => _manualMaxSpeed = System.Math.Max(0.0, value);
 		}
 
-		private double _warpMaxSpeed = 2e20;
+		private double _warpAccelFraction = 1.0 / 3.0;
 		/// <summary>
-		/// Safety cap on computed warp speed in m/s (D-07). Technical knob only — prevents
-		/// absurdly high speed when target is very close and travel time is short.
-		/// Default 2e20 m/s matches the old intergalactic MaxSpeed magnitude.
-		/// System.Math.Max(0.0, value) blocks negative and NaN inputs (T-07-05 mitigation).
+		/// Accel-time fraction f ∈ [0, 0.5] for the closed-form trapezoid profile (D-02).
+		/// Accel phase = decel phase = f·T_sel; cruise = (1−2f)·T_sel.
+		/// Default 1/3 → symmetric thirds (⅓ accel, ⅓ cruise, ⅓ decel).
+		/// Clamped to [0, 0.5] so cruise duration ≥ 0 (T-08-01 mitigation).
 		/// </summary>
 		[Export]
-		public double WarpMaxSpeed
+		public double WarpAccelFraction
 		{
-			get => _warpMaxSpeed;
-			set => _warpMaxSpeed = System.Math.Max(0.0, value);
+			get => _warpAccelFraction;
+			set => _warpAccelFraction = System.Math.Clamp(value, 0.0, 0.5);
 		}
 
 		private double _warpOrientRate = 1.5;
@@ -287,12 +287,17 @@ namespace Flight
 		private double _selectedTravelTimeSec = 120.0;
 
 		/// <summary>
-		/// Calibrated internal time constant computed in EngageWarp (Bug 2 fix).
-		/// Corrects the exponential approach dist(t) = d0·exp(-t/T_int) so the ship
-		/// arrives at the target SOI in exactly _selectedTravelTimeSec.
-		/// Derivation: T_int = T_sel / ln(d0 / SOI).
+		/// Elapsed warp time in seconds since EngageWarp (D-10).
+		/// Accumulates += delta each warp frame; reset to 0 in EngageWarp.
+		/// Drives warp speed via the closed-form profile: CurrentSpeed = _warpProfile.Velocity(_warpElapsedSec).
 		/// </summary>
-		private double _warpInternalTimeSec = 120.0;
+		private double _warpElapsedSec;
+
+		/// <summary>
+		/// Solved closed-form trapezoid velocity profile for the current warp leg (D-01/D-04).
+		/// Set once in EngageWarp via WarpMotionProfile.Solve; consumed each frame in _WarpProcess.
+		/// </summary>
+		private WarpMotionProfile _warpProfile;
 
 		// ── Private references ───────────────────────────────────────────────────
 
@@ -821,43 +826,45 @@ namespace Flight
 		/// Engages warp drive toward the current ActiveTargetIndex destination (D-06/D-08).
 		/// Called by WarpConfirmationScreen on Enter after the player confirms travel time.
 		///
-		/// T-07-01 mitigation: travelTimeSec clamped to a minimum of 1.0 to prevent
-		/// division by zero in _WarpProcess (dist / _selectedTravelTimeSec).
+		/// T-07-01 mitigation: travelTimeSec clamped to a minimum of 1.0 s (D-06).
+		/// WR-03 gate (D-14): invalid or unresolved ship/target → safe no-op; state stays Manual.
+		/// On success: solves the closed-form WarpMotionProfile for exact T_sel arrival (D-01/D-10).
 		/// </summary>
 		public void EngageWarp(double travelTimeSec)
 		{
 			_selectedTravelTimeSec = System.Math.Max(1.0, travelTimeSec);
 
-			// Compute calibrated T_int so arrival time = T_sel (Bug 2 fix).
-			// dist(t) = d0·exp(-t/T_int) → arrives at SOI when t = T_int·ln(d0/SOI).
-			// Setting T_int = T_sel / ln(d0/SOI) makes that exactly T_sel.
+			// WR-03 gate (D-14): bounds-safe ship + target lookup; abort if either is invalid.
+			// State stays Manual — do NOT enter Warping on an unresolved target.
 			var gameObjects = _world?.GameObjects;
 			int shipIdx = _world?.ShipIndex ?? -1;
 			int tgtIdx  = _hud?.ActiveTargetIndex ?? -1;
 			bool hasRefs = gameObjects != null
 				&& (uint)shipIdx < (uint)gameObjects.Count
 				&& tgtIdx >= 0 && (uint)tgtIdx < (uint)gameObjects.Count;
-			if (hasRefs)
-			{
-				var shipObj = gameObjects[shipIdx];
-				var tgtObj  = gameObjects[tgtIdx];
-				if (shipObj != null && tgtObj != null)
-				{
-					double d0  = UniMath.Distance(shipObj, tgtObj, gameObjects);
-					double soi = System.Math.Max(tgtObj.SOIMeters, 1.0);
-					double lnRatio = d0 > soi ? System.Math.Log(d0 / soi) : 0.0;
-					_warpInternalTimeSec = lnRatio > 1e-9
-						? _selectedTravelTimeSec / lnRatio
-						: _selectedTravelTimeSec;
-				}
-				else
-					_warpInternalTimeSec = _selectedTravelTimeSec;
-			}
-			else
-				_warpInternalTimeSec = _selectedTravelTimeSec;
+			if (!hasRefs) return;   // safe abort — _warpState stays Manual
+
+			var shipObj = gameObjects[shipIdx];
+			var tgtObj  = gameObjects[tgtIdx];
+			if (shipObj == null || tgtObj == null) return;   // safe abort
+
+			// Capture warp distance D = d0 − target.SOIMeters (D-08).
+			// UniMath.Distance is the ONLY LCA-safe cross-frame distance (CLAUDE.md §Position Math).
+			double d0 = UniMath.Distance(shipObj, tgtObj, gameObjects);
+			double d  = System.Math.Max(0.0, d0 - tgtObj.SOIMeters);
+
+			// Solve the closed-form trapezoid profile (D-01/D-04):
+			//   accel phase = f·T_sel, cruise = (1−2f)·T_sel, decel = f·T_sel.
+			//   v_c derived so integral of Velocity(t) over [0,T_sel] == D exactly.
+			// Launch speed = current eased speed (smooth warp-in, D-09).
+			// Terminal speed = ManualMaxSpeed (smooth SOI-arrival hand-off, D-07/D-09).
+			_warpElapsedSec = 0.0;
+			_warpProfile    = WarpMotionProfile.Solve(
+				d, _selectedTravelTimeSec, _warpAccelFraction,
+				_easedSpeed, _manualMaxSpeed);
 
 			// Zero steering cursor: stale delta would cause unexpected rotation on disengage.
-			_cursor = Vector2.Zero;
+			_cursor    = Vector2.Zero;
 			_warpState = WarpState.Warping;
 		}
 
@@ -875,15 +882,18 @@ namespace Flight
 		// ── Warp per-frame process ───────────────────────────────────────────────
 
 		/// <summary>
-		/// Per-frame warp execution: computes distance-based speed, auto-orients ship,
-		/// and checks SOI arrival for auto-disengage. Called only when Warping.
+		/// Per-frame warp execution: evaluates the closed-form trapezoid velocity profile,
+		/// auto-orients the ship toward the target, and checks SOI arrival for auto-disengage.
+		/// Called only when Warping.
 		///
-		/// Speed formula (D-06): warpSpeed = dist / _warpInternalTimeSec.
-		/// _warpInternalTimeSec is calibrated at EngageWarp so arrival time = _selectedTravelTimeSec
-		/// despite the exponential deceleration curve (Bug 2 fix). Never decremented.
+		/// Speed (D-01/D-10): warpSpeed = _warpProfile.Velocity(_warpElapsedSec).
+		/// _warpElapsedSec accumulates += delta each frame; the profile is solved at EngageWarp
+		/// so the integral of Velocity over [0, T_sel] equals the warp distance exactly.
+		/// The decel ramp ends at ManualMaxSpeed at the SOI boundary (WR-02 anti-tunnel, D-07).
 		///
 		/// Auto-orient (D-03): Slerp _shipBasis toward target direction each frame.
 		/// SOI disengage (D-08): auto-disengages when dist &lt; target.SOIMeters.
+		/// T-07-02 mitigation: double.IsFinite guard → safe DisengageWarp on non-finite speed.
 		/// </summary>
 		private void _WarpProcess(double delta)
 		{
@@ -908,9 +918,11 @@ namespace Flight
 			// D-08: auto-disengage when ship enters target SOI.
 			if (dist < target.SOIMeters) { DisengageWarp(); return; }
 
-			// D-06: warp speed = remaining distance / calibrated time constant (Bug 2 fix).
-			// Capped by WarpMaxSpeed (D-07) to prevent pathological values on close targets.
-			double warpSpeed = System.Math.Min(dist / _warpInternalTimeSec, _warpMaxSpeed);
+			// D-10: drive by elapsed warp time, not remaining distance.
+			// The closed-form profile guarantees exact T_sel arrival; the decel ramp ends
+			// at ManualMaxSpeed so the ship never tunnels past the SOI (WR-02, D-07).
+			_warpElapsedSec += delta;
+			double warpSpeed = _warpProfile.Velocity(_warpElapsedSec);
 
 			// T-07-02 mitigation: guard NaN/Infinity before writing to _easedSpeed.
 			if (!double.IsFinite(warpSpeed)) { DisengageWarp(); return; }
