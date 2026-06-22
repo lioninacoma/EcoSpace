@@ -227,18 +227,9 @@ public static class UniMath
         if (!RelativePosition(from, to, objs, out UniVec3 rel))
             return Double3.Zero;
 
-        long ux = rel.Units.X, uy = rel.Units.Y, uz = rel.Units.Z;
-        if (ux != 0 || uy != 0 || uz != 0)
-        {
-            // Scale cancels when normalizing — work entirely in integer/double, no metres needed.
-            double dx = ux, dy = uy, dz = uz;
-            double mag = System.Math.Sqrt(dx * dx + dy * dy + dz * dz);
-            return new Double3(dx / mag, dy / mag, dz / mag);
-        }
-
         // Units all zero: sub-unit distance, fall back to Offset in metres.
-        Double3 off = rel.ToDouble3();
-        double offMag = off.Magnitude();
-        return offMag < 1e-3 ? Double3.Zero : new Double3(off.X / offMag, off.Y / offMag, off.Z / offMag);
+        Double3 u = rel.ToDouble3Units();
+        double mag = u.Magnitude();
+        return mag < 1e-3 ? Double3.Zero : new Double3(u.X / mag, u.Y / mag, u.Z / mag);
     }
 }

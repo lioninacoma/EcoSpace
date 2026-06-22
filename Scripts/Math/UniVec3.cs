@@ -192,10 +192,9 @@ public struct UniVec3 : IEquatable<UniVec3>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public UniVec3 Normalized()
     {
-        double mag = Magnitude();
-        if (mag < EPSILON) return new UniVec3(Double3.Zero, Scale);
-        var (x, y, z) = ToDouble();
-        return FromDouble(x / mag, y / mag, z / mag, Scale);
+        Double3 u = ToDouble3Units();
+        double mag = u.Magnitude();
+        return mag < 1e-3 ? FromDouble(0, 0, 0, Scale) : FromDouble(u.X / mag, u.Y / mag, u.Z / mag, Scale);
     }
 
     // ----- Static operations ------------------------------------------
