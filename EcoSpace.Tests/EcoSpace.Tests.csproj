@@ -41,6 +41,8 @@
     <Compile Include="..\Scripts\Math\Long3.cs" />
     <!-- UniMath: pure hierarchy-aware position math; no Godot Node types, compiles cleanly. -->
     <Compile Include="..\Scripts\Math\UniMath.cs" />
+    <!-- WarpMotionProfile: pure closed-form trapezoid velocity profile; no Godot dependency. -->
+    <Compile Include="..\Scripts\Math\WarpMotionProfile.cs" />
     <!-- LuminousLod: pure distance→LOD-weight curves; no Godot dependency, unit-testable. -->
     <Compile Include="..\Scripts\Render\LuminousLod.cs" />
     <!-- LuminousBodyDescriptor: plain data struct; depends on Godot.Color/Vector3/Vector4 via GodotSharp. -->
