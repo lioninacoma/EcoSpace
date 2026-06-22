@@ -211,15 +211,34 @@ public static class UniMath
 
     /// <summary>
     /// Returns the unit direction vector from <paramref name="from"/> to <paramref name="to"/>
-    /// in Double3 (double precision). Normalizes in double space before returning so the result
-    /// is safe at intergalactic scale — casting the raw component values to float first would
-    /// lose ~3e15 m of precision per axis at ~2.4e22 m distances.
-    /// Returns <see cref="Double3.Zero"/> when the objects coincide (distance &lt; 1e-3 m).
+    /// as a Double3, safe at any scale including intergalactic distances.
+    ///
+    /// Strategy: normalize from the relative UniVec3's integer Units (Long3) when non-zero.
+    /// All three components share the same Scale factor, so it cancels in the normalize — only
+    /// the integer ratios matter. int64 → double cast is exact (int64 fits in double for values
+    /// up to ~2^53 ≈ 9e15 units). This avoids the ~3e15 m float-cast error that occurs when
+    /// converting raw 2.4e22 m components to float before normalizing.
+    ///
+    /// Falls back to Offset (sub-unit range) when Units are all zero.
+    /// Returns <see cref="Double3.Zero"/> when the objects coincide.
     /// </summary>
     public static Double3 NormalizedDirection(UniObject from, UniObject to, List<UniObject> objs)
     {
-        Double3 rel = RelativeMetres(from, to, objs);
-        double mag = rel.Magnitude();
-        return mag < 1e-3 ? Double3.Zero : new Double3(rel.X / mag, rel.Y / mag, rel.Z / mag);
+        if (!RelativePosition(from, to, objs, out UniVec3 rel))
+            return Double3.Zero;
+
+        long ux = rel.Units.X, uy = rel.Units.Y, uz = rel.Units.Z;
+        if (ux != 0 || uy != 0 || uz != 0)
+        {
+            // Scale cancels when normalizing — work entirely in integer/double, no metres needed.
+            double dx = ux, dy = uy, dz = uz;
+            double mag = System.Math.Sqrt(dx * dx + dy * dy + dz * dz);
+            return new Double3(dx / mag, dy / mag, dz / mag);
+        }
+
+        // Units all zero: sub-unit distance, fall back to Offset in metres.
+        Double3 off = rel.ToDouble3();
+        double offMag = off.Magnitude();
+        return offMag < 1e-3 ? Double3.Zero : new Double3(off.X / offMag, off.Y / offMag, off.Z / offMag);
     }
 }
