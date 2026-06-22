@@ -652,10 +652,14 @@ namespace Flight
 				nearest = System.Math.Min(nearest, surfaceDist);
 			}
 
-			// If still no bodies found, open space: use tierCeiling as the speed target.
-			// (Previously _maxSpeed; updated to tierCeiling for consistency — D-42.)
+			// If still no bodies found, open space: set nearest so nearest * _speedPerMeter
+			// evaluates to exactly tierCeiling (D-15 / WR-04 fix). Previously divided by
+			// Max(_speedPerMeter, 1.0) which at the default _speedPerMeter=0.5 set nearest
+			// to tierCeiling/1.0=tierCeiling, then targetMax=nearest*0.5=tierCeiling*0.5 —
+			// halving open-space manual top speed. Now we divide by _speedPerMeter directly
+			// (guarded against zero) so nearest*_speedPerMeter == tierCeiling exactly.
 			if (nearest == double.MaxValue)
-				nearest = tierCeiling / System.Math.Max(_speedPerMeter, 1.0);
+				nearest = tierCeiling / System.Math.Max(_speedPerMeter, 1e-11);
 
 			// ── Proximity damp + tier ceiling (D-42) ──────────────────────────
 			// Symmetric damp: speed is bounded by nearest-surface distance × SpeedPerMeter,

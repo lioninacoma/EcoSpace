@@ -228,8 +228,13 @@ public static class UniMath
             return Double3.Zero;
 
         // Units all zero: sub-unit distance, fall back to Offset in metres.
+        // u is in INTEGER UNITS (Long3 cast to double). The minimum non-zero magnitude
+        // is 1.0 unit, so the coincidence cutoff is set just below 1.0 — objects whose
+        // integer-unit distance rounds to zero (i.e. < 0.5 units apart) are treated as
+        // coincident and we return Zero. This avoids false coincidence rejection for
+        // large real separations (which have mag >> 1), fixing WR-01 / D-13.
         Double3 u = rel.ToDouble3Units();
         double mag = u.Magnitude();
-        return mag < 1e-3 ? Double3.Zero : new Double3(u.X / mag, u.Y / mag, u.Z / mag);
+        return mag < 0.5 ? Double3.Zero : new Double3(u.X / mag, u.Y / mag, u.Z / mag);
     }
 }
