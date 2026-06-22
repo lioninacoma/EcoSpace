@@ -101,6 +101,14 @@ public readonly struct WarpMotionProfile
     ///
     /// When vLaunch == vTerminal == 0 this reduces to the simple D-03 formula:
     ///   v_c = D / (T_sel·(1−f)).
+    ///
+    /// Infeasible small-D regime (D &lt; ramp contribution): the closed form would require a
+    /// negative v_c. This happens for a target just outside its SOI (D = d0 − SOIMeters is small
+    /// while vLaunch ≈ ManualMaxSpeed). Rather than clamp v_c to 0 and leave the ramps at full
+    /// strength — which makes the velocity integral ≈ ramp contribution ≫ D — both endpoint speeds
+    /// are scaled down by k = D / rampContribution and v_c is set to 0, so the two smoothstep
+    /// ramps contribute exactly D and the integral over [0, T_sel] equals D by construction
+    /// (preserves the area=D / exact-arrival-time invariant at all scales, P3-TIMING).
     /// </summary>
     /// <param name="d">Warp distance in metres (D = d0 − target.SOIMeters).</param>
     /// <param name="tSel">Selected travel time in seconds (already clamped to ≥ 1.0 by EngageWarp).</param>
@@ -121,12 +129,26 @@ public readonly struct WarpMotionProfile
         //   v_c = (D − f·T_sel·(vLaunch+vTerminal)/2) / (T_sel·(1−f))
         // Guard denominator to prevent div-by-zero when f→0.5 (triangle) or T_sel→0.
         double rampContribution = f * tSel * (vLaunch + vTerminal) * 0.5;
-        double numerator        = d - rampContribution;
-        double denominator      = Math.Max(EPSILON, tSel * (1.0 - f));
-        double vCruise          = numerator / denominator;
 
-        // Ensure v_c is non-negative (can go negative if D is very small; clamp to 0).
-        vCruise = Math.Max(0.0, vCruise);
+        double vCruise;
+        if (rampContribution > d && rampContribution > EPSILON)
+        {
+            // Infeasible small-D regime: the ramps alone already over-cover D. Scale BOTH
+            // endpoint speeds by k = D / rampContribution and set cruise to 0 so the two
+            // smoothstep ramps contribute exactly D (each ramp area = ½·Δv·t_ramp scales with k),
+            // keeping the velocity integral = D by construction (area=D invariant, P3-TIMING).
+            double k = d / rampContribution;
+            vLaunch   *= k;
+            vTerminal *= k;
+            vCruise    = 0.0;
+        }
+        else
+        {
+            // Feasible regime: exact closed-form cruise velocity (D-03).
+            double numerator   = d - rampContribution;
+            double denominator = Math.Max(EPSILON, tSel * (1.0 - f));
+            vCruise = Math.Max(0.0, numerator / denominator);
+        }
 
         double tAccel  = f * tSel;
         double tDecel  = f * tSel;
