@@ -2,18 +2,17 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-current_phase: 06
 status: completed
-stopped_at: Phase 6 COMPLETE — verified 10/10, all 3 plans play-test approved
-last_updated: "2026-06-21T19:54:07.652Z"
-last_activity: 2026-06-21
-last_activity_desc: Phase 06 marked complete
+stopped_at: Phase 7 context gathered
+last_updated: "2026-06-22T08:44:32.801Z"
+last_activity: 2026-06-21 — Phase 06 marked complete
 progress:
-  total_phases: 8
+  total_phases: 9
   completed_phases: 6
   total_plans: 19
   completed_plans: 19
-  percent: 75
+  percent: 67
+current_phase: 06
 current_phase_name: targeting-system
 ---
 
@@ -210,15 +209,9 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-20T21:40:00.008Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-targeting-system/06-CONTEXT.md
-Prior resume note: 05-03 delivered: luminous_pass.gdshader narrowed to near-star PSF only (galaxy loop removed, D-13
-confirmed); screen-space aperture-diffraction PSF (inverse-cube core + diffraction spikes, aspect-corrected);
-per-pixel analytic depth occlusion via observer-unit RenderDistance (root cause: metres/scale*factor, NOT metres*factor);
-StarRenderFactor single source of truth in LuminousDescriptorBuilder; GalaxyDiscWeight fade band [0.5×SOI,1.1×SOI]
-no-pop fix; PSF knobs APPROVED at play-test. 48/48 tests green. 5-iteration depth-gate debug journey.
-LESSON: metres→render conversions MUST use / ship.LocalPos.Scale * factor — never metres * factor alone.
+Last session: 2026-06-22T08:44:32.778Z
+Stopped at: Phase 7 context gathered
+Resume file: .planning/phases/07-autopilot-warp-drive/07-CONTEXT.md
 
 ## Refactor Notes
 
