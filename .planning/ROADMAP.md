@@ -211,6 +211,7 @@ Plans:
 **Depends on:** Phase 6 (manual tree selector + target marker API, `SetTargetIndex`/`ActiveTargetIndex`; autopilot reuses these)
 **Origin:** Phase 04 play-test (2026-06-17); backlog 999.3 promoted 2026-06-22.
 **Requirements (Phase-7 scoped — defined here; REQUIREMENTS.md v1 set is closed):**
+
   - **SPEED-01**: Manual flight is capped at `ManualMaxSpeed` (1e6 m/s, km/s scale); the Phase-4 tier ceiling (D-40) + proximity damp (D-42) become autopilot-only (reshapes D-40/D-42/D-43/D-47).
   - **LOOK-01**: Left Alt hold decouples camera view from ship heading (look-around) in both manual flight and warp; view eases back to heading on release.
   - **WARP-01**: Warp autopilot reuses the Phase-6 `Hud.ActiveTargetIndex` as its destination — no separate distance-ranked candidate set (supersedes the earlier 999.3 framing per locked decision D-01).
@@ -221,12 +222,12 @@ Plans:
 
   > Note: the original 999.3 "distance-ranked, space-independent candidate set" was superseded during discuss-phase by locked decision **D-01** (autopilot reuses the Phase-6 tree-selector target). Phase 7 ships the warp autopilot + manual cap + look-around; no separate candidate set.
 
-**Plans:** 2 plans (2 waves)
+**Plans:** 1/2 plans executed
 Plans:
 
 **Wave 1**
 
-- [ ] 07-01-PLAN.md — InputMap actions (J `warp_engage`, Left Alt `look_around`) + FlightController core: `WarpState` machine, `ManualMaxSpeed`/`WarpMaxSpeed` exports + manual cap, `EngageWarp`/`DisengageWarp`/`_WarpProcess` (dist/time speed, Slerp orient, SOI disengage), look-around `_cameraOffset` (SPEED-01/LOOK-01/WARP-01/WARP-02/WARP-03)
+- [x] 07-01-PLAN.md — InputMap actions (J `warp_engage`, Left Alt `look_around`) + FlightController core: `WarpState` machine, `ManualMaxSpeed`/`WarpMaxSpeed` exports + manual cap, `EngageWarp`/`DisengageWarp`/`_WarpProcess` (dist/time speed, Slerp orient, SOI disengage), look-around `_cameraOffset` (SPEED-01/LOOK-01/WARP-01/WARP-02/WARP-03)
 
 **Wave 2** *(blocked on Wave 1 — consumes `EngageWarp`/`IsPanelOpen`/`warp_engage`)*
 
@@ -291,7 +292,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Flight Model v2 — tier & target-aware speed | 2/2 | Complete   | 2026-06-17 |
 | 5. Rendering Overhaul | 4/4 | Complete   | 2026-06-20 |
 | 6. Targeting & Navigation HUD | 3/3 | ✓ Complete | 2026-06-21 |
-| 7. Autopilot & Warp Drive | 0/2 | Planned (2 waves) | — |
+| 7. Autopilot & Warp Drive | 1/2 | In Progress|  |
 
 Plans:
 
