@@ -257,7 +257,12 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 08-01-PLAN.md — Closed-form trapezoid WarpMotionProfile (pure, tested) + EngageWarp/_WarpProcess rewrite; drop WarpMaxSpeed; add WarpAccelFraction; WR-03 valid-target gate (D-01..D-11, D-14)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 08-02-PLAN.md — Folded cleanups: WR-01 NormalizedDirection threshold (D-13), WR-04 open-space sentinel (D-15), WarpConfirmationScreen peak-v_c display (D-12)
 
 ## Backlog
