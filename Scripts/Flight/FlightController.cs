@@ -244,6 +244,19 @@ namespace Flight
 		/// <summary>Persistent ship attitude basis (D-02 hold-attitude).</summary>
 		private Basis _shipBasis = Basis.Identity;
 
+		/// <summary>
+		/// Camera offset basis for look-around (D-12/D-13).
+		/// Accumulates mouse delta while look_around held; lerps back to Identity on release.
+		/// Combined with _shipBasis each frame: _camera.Basis = (_shipBasis * _cameraOffset).Orthonormalized()
+		/// </summary>
+		private Basis _cameraOffset = Basis.Identity;
+
+		/// <summary>
+		/// Ease-back rate for _cameraOffset toward Identity (D-13).
+		/// 1f / 0.3f → camera returns to heading over ~0.3 s after Alt release.
+		/// </summary>
+		private float _lookEaseRate = 1f / 0.3f;
+
 		/// <summary>Persistent throttle in [-1,1] (D-03). Negative = reverse thrust.</summary>
 		private double _throttle01 = 0.0;
 
@@ -259,6 +272,12 @@ namespace Flight
 		/// changes (including full-stop) smooth out rather than snap instantly.
 		/// </summary>
 		private double _easedSpeed;
+
+		/// <summary>
+		/// Travel time in seconds selected by the player in the warp confirmation screen (D-17).
+		/// Stored per-session; never decremented — warp speed = dist / _selectedTravelTimeSec (D-06).
+		/// </summary>
+		private double _selectedTravelTimeSec = 120.0;
 
 		// ── Private references ───────────────────────────────────────────────────
 
@@ -291,6 +310,12 @@ namespace Flight
 		/// driving the ship simultaneously (06-02 play-test rework requirement).
 		/// </summary>
 		public bool IsPanelOpen { get; set; } = false;
+
+		/// <summary>
+		/// True while the ship is in the Warping state (flying on autopilot rails to target).
+		/// Read-only consumer for the HUD/WarpConfirmationScreen cosmetic "WARP" display (D-14).
+		/// </summary>
+		public bool IsWarping => _warpState == WarpState.Warping;
 
 		// ── Godot callbacks ──────────────────────────────────────────────────────
 
@@ -391,16 +416,38 @@ namespace Flight
 			if (_world == null) return;
 			if (delta <= 0.0) return;
 
-			// When the target-selector panel is open, suppress all flight processing:
-			// WASD drives the menu, not the ship. Speed envelope and motion are frozen.
-			// The ship holds its current attitude and speed while the player picks a target.
-			if (IsPanelOpen) return;
+			// Panel gate: only suppress flight when manual AND panel is open (Pitfall 3).
+			// During warp the panel is closed before EngageWarp is called, so this guard
+			// never blocks _WarpProcess. During Confirming, IsPanelOpen=true and the
+			// switch falls to the empty Confirming case — the panel handles all input.
+			if (IsPanelOpen && _warpState == WarpState.Manual) return;
 
-			HandleThrottleInput();
-			UpdateAttitude(delta);
-			UpdateSpeedEnvelope(delta);
-			ApplyMotion(delta);
-			UpdateReticlePosition();
+			switch (_warpState)
+			{
+				case WarpState.Manual:
+					HandleThrottleInput();
+					UpdateAttitude(delta);
+					UpdateSpeedEnvelope(delta);
+					ApplyMotion(delta);
+					UpdateReticlePosition();
+					break;
+
+				case WarpState.Confirming:
+					// IsPanelOpen=true; WarpConfirmationScreen handles all input.
+					// Flight is frozen while the player configures travel time.
+					break;
+
+				case WarpState.Warping:
+					// Look-around always active during warp (D-14).
+					// UpdateLookAround handles both accumulate (Alt held) and ease-back (Alt released).
+					UpdateLookAround(delta);
+					_WarpProcess(delta);
+					ApplyMotion(delta);
+					// Camera write: combined ship heading + camera offset (same as manual path).
+					if (_camera != null)
+						_camera.Basis = (_shipBasis * _cameraOffset).Orthonormalized();
+					break;
+			}
 		}
 
 		// ── Input handling ───────────────────────────────────────────────────────
@@ -429,39 +476,61 @@ namespace Flight
 		/// Updates _shipBasis from mouse cursor (pitch/yaw) and Q/E keys (roll).
 		/// Uses Basis multiply for drift-free composition (D-02, Pattern 3).
 		/// Calls Orthonormalized() every frame to prevent skew accumulation (T-03-01).
+		///
+		/// Look-around (D-12): when look_around (Left Alt) is held, mouse delta accumulates
+		/// into _cameraOffset instead of _shipBasis — ship holds heading, view decouples.
+		/// On release, UpdateLookAround eases _cameraOffset back to Identity (D-13).
 		/// </summary>
 		private void UpdateAttitude(double delta)
 		{
-			// Compute normalised steer from cursor: -1..1 each axis
-			Vector2 steer = _cursor / _maxCursorRadius;
-
-			// Deadzone: inside deadzone → zero rotation → hold-attitude (D-02)
-			if (steer.Length() < _deadzoneFraction)
-				steer = Vector2.Zero;
-
 			float dt = (float)delta;
 
-			float yaw   = -steer.X * _turnRate * dt;
-			float pitch = -steer.Y * _turnRate * dt;
-			float roll  = (Input.GetActionStrength("roll_left") - Input.GetActionStrength("roll_right"))
-			              * _rollRate * dt;
+			bool isLookAround = Input.IsActionPressed("look_around");
 
-			// Compose LOCAL rotation onto the persistent _shipBasis (D-02 — no auto-level).
-			// Order: pitch around local right, then yaw around local up, then roll around local forward.
-			if (yaw != 0f || pitch != 0f || roll != 0f)
+			if (isLookAround)
 			{
-				var pitchBasis = new Basis(Vector3.Right,    pitch);
-				var yawBasis   = new Basis(Vector3.Up,       yaw);
-				var rollBasis  = new Basis(Vector3.Back,     roll);  // +Z = back; roll around local forward = -Z
-				_shipBasis = _shipBasis * pitchBasis * yawBasis * rollBasis;
+				// D-12: ship holds heading while look_around held.
+				// Mouse delta accumulates into _cameraOffset via UpdateLookAround.
+				// Roll (Q/E) is suspended (Pitfall 6: must not mutate _shipBasis during look-around).
+				UpdateLookAround(delta);
+				// Orthonormalize _shipBasis even while holding heading (T-03-01).
+				_shipBasis = _shipBasis.Orthonormalized();
+			}
+			else
+			{
+				// Normal manual steering: mouse delta → _shipBasis, Q/E → roll.
+				Vector2 steer = _cursor / _maxCursorRadius;
+				// Deadzone: inside deadzone → zero rotation → hold-attitude (D-02)
+				if (steer.Length() < _deadzoneFraction)
+					steer = Vector2.Zero;
+
+				float yaw   = -steer.X * _turnRate * dt;
+				float pitch = -steer.Y * _turnRate * dt;
+				float roll  = (Input.GetActionStrength("roll_left") - Input.GetActionStrength("roll_right"))
+				              * _rollRate * dt;
+
+				// Compose LOCAL rotation onto the persistent _shipBasis (D-02 — no auto-level).
+				// Order: pitch around local right, then yaw around local up, then roll around local forward.
+				if (yaw != 0f || pitch != 0f || roll != 0f)
+				{
+					var pitchBasis = new Basis(Vector3.Right,    pitch);
+					var yawBasis   = new Basis(Vector3.Up,       yaw);
+					var rollBasis  = new Basis(Vector3.Back,     roll);  // +Z = back; roll around local forward = -Z
+					_shipBasis = _shipBasis * pitchBasis * yawBasis * rollBasis;
+				}
+
+				// Orthonormalize every frame to prevent skew accumulation regardless of rotation (T-03-01).
+				_shipBasis = _shipBasis.Orthonormalized();
+
+				// Ease _cameraOffset back toward Identity (D-13): camera returns to ship heading.
+				// UpdateLookAround handles the else-branch (look_around not held = ease-back).
+				UpdateLookAround(delta);
 			}
 
-			// Orthonormalize every frame to prevent skew accumulation regardless of rotation (T-03-01).
-			_shipBasis = _shipBasis.Orthonormalized();
-
-			// Align the camera to the ship attitude (player sees from the ship's viewpoint).
+			// Align the camera to ship heading × look-around offset (T-07-04 mitigation).
+			// When _cameraOffset is Identity (look-around inactive), this equals _shipBasis.
 			if (_camera != null)
-				_camera.Basis = _shipBasis;
+				_camera.Basis = (_shipBasis * _cameraOffset).Orthonormalized();
 		}
 
 		// ── Speed envelope ───────────────────────────────────────────────────────
@@ -655,6 +724,160 @@ namespace Flight
 			// Position top-left at (viewportCenter + cursor - halfSize) to center the control.
 			var halfSize = _steeringReticle.Size / 2f;
 			_steeringReticle.Position = _viewportCenter + _cursor - halfSize;
+		}
+
+		// ── Look-around camera ───────────────────────────────────────────────────
+
+		/// <summary>
+		/// Handles the _cameraOffset accumulate/ease-back cycle (D-12/D-13).
+		///
+		/// When look_around (Left Alt) is held: mouse cursor drives _cameraOffset accumulation.
+		/// The same pitch/yaw composition used by UpdateAttitude is applied, but to _cameraOffset
+		/// instead of _shipBasis — ship heading does not change.
+		/// Roll is not applied to _cameraOffset (Pitfall 6: suspend roll during look-around).
+		///
+		/// When look_around is not held: ease _cameraOffset back toward Basis.Identity via
+		/// Quaternion Slerp over ~0.3 s (D-13). Camera returns to ship heading / warp direction.
+		///
+		/// Called from:
+		///   - UpdateAttitude (manual path) else branch (look_around not held).
+		///   - _Process Warping case (both held and released paths, every warp frame).
+		/// </summary>
+		private void UpdateLookAround(double delta)
+		{
+			if (Input.IsActionPressed("look_around"))
+			{
+				// Accumulate mouse cursor into _cameraOffset only (D-12).
+				// _cursor is accumulated by _Input regardless of warp/manual state.
+				Vector2 steer = _cursor / _maxCursorRadius;
+				if (steer.Length() >= _deadzoneFraction)
+				{
+					float dt    = (float)delta;
+					float yaw   = -steer.X * _turnRate * dt;
+					float pitch = -steer.Y * _turnRate * dt;
+					if (yaw != 0f || pitch != 0f)
+					{
+						var pitchBasis = new Basis(Vector3.Right, pitch);
+						var yawBasis   = new Basis(Vector3.Up,    yaw);
+						_cameraOffset = (_cameraOffset * pitchBasis * yawBasis).Orthonormalized();
+					}
+				}
+			}
+			else
+			{
+				// Ease _cameraOffset back to Identity via Quaternion Slerp (D-13).
+				// t clamped to [0,1] so a long delta does not overshoot identity.
+				float t = Mathf.Clamp(_lookEaseRate * (float)delta, 0f, 1f);
+				var offsetQuat = new Quaternion(_cameraOffset).Normalized();
+				_cameraOffset = new Basis(offsetQuat.Slerp(Quaternion.Identity, t)).Orthonormalized();
+			}
+		}
+
+		// ── Warp public API ──────────────────────────────────────────────────────
+
+		/// <summary>
+		/// Engages warp drive toward the current ActiveTargetIndex destination (D-06/D-08).
+		/// Called by WarpConfirmationScreen on Enter after the player confirms travel time.
+		///
+		/// T-07-01 mitigation: travelTimeSec clamped to a minimum of 1.0 to prevent
+		/// division by zero in _WarpProcess (dist / _selectedTravelTimeSec).
+		/// </summary>
+		public void EngageWarp(double travelTimeSec)
+		{
+			_selectedTravelTimeSec = System.Math.Max(1.0, travelTimeSec);
+			// Zero steering cursor: stale delta would cause unexpected rotation on disengage.
+			_cursor = Vector2.Zero;
+			_warpState = WarpState.Warping;
+		}
+
+		/// <summary>
+		/// Disengages warp drive and returns to manual flight (D-19).
+		/// Does NOT zero CurrentSpeed — leaves _easedSpeed as-is so UpdateSpeedEnvelope's
+		/// existing lerp eases it down toward ManualMaxSpeed on subsequent manual frames.
+		/// This prevents the jarring hard-stop visible on the HUD (D-19 invariant).
+		/// </summary>
+		public void DisengageWarp()
+		{
+			_warpState = WarpState.Manual;
+		}
+
+		// ── Warp per-frame process ───────────────────────────────────────────────
+
+		/// <summary>
+		/// Per-frame warp execution: computes distance-based speed, auto-orients ship,
+		/// and checks SOI arrival for auto-disengage. Called only when Warping.
+		///
+		/// Speed formula (D-06): warpSpeed = dist / _selectedTravelTimeSec.
+		/// Recomputed every frame so warpSpeed → 0 naturally as dist → 0 (deceleration curve).
+		/// _selectedTravelTimeSec is NEVER decremented (Pitfall 1).
+		///
+		/// Auto-orient (D-03): Slerp _shipBasis toward target direction each frame.
+		/// SOI disengage (D-08): auto-disengages when dist &lt; target.SOIMeters.
+		/// </summary>
+		private void _WarpProcess(double delta)
+		{
+			var gameObjects = _world?.GameObjects;
+			if (gameObjects == null) return;
+
+			// Bounds-safe ship lookup (pattern: (uint) cast checks both >= 0 and < Count).
+			int shipIdx = _world.ShipIndex;
+			var ship = (uint)shipIdx < (uint)gameObjects.Count ? gameObjects[shipIdx] : null;
+
+			// Bounds-safe target lookup.
+			int tgtIdx = _hud?.ActiveTargetIndex ?? -1;
+			var target = (tgtIdx >= 0 && (uint)tgtIdx < (uint)gameObjects.Count) ? gameObjects[tgtIdx] : null;
+
+			// If either object is missing, disengage safely rather than continuing on rails.
+			if (ship == null || target == null) { DisengageWarp(); return; }
+
+			// Cross-frame distance — the ONLY safe way (CLAUDE.md §Position Math).
+			// Never UniVec3.Distance or raw ToDouble3() across different coordinate frames.
+			double dist = UniMath.Distance(ship, target, gameObjects);
+
+			// D-08: auto-disengage when ship enters target SOI.
+			if (dist < target.SOIMeters) { DisengageWarp(); return; }
+
+			// D-06: warp speed = remaining distance / selected travel time.
+			// Capped by WarpMaxSpeed (D-07) to prevent pathological values on close targets.
+			double warpSpeed = System.Math.Min(dist / _selectedTravelTimeSec, _warpMaxSpeed);
+
+			// T-07-02 mitigation: guard NaN/Infinity before writing to _easedSpeed.
+			if (!double.IsFinite(warpSpeed)) { DisengageWarp(); return; }
+
+			// D-03: smooth auto-orient toward target direction each frame.
+			// Uses UniMath.RelativeMetres (LCA path, same rule as Distance above).
+			Double3 relMetres = UniMath.RelativeMetres(ship, target, gameObjects);
+			if (relMetres.Magnitude() > 1e-3)
+			{
+				// Build a target Basis with -Z aligned to the direction from ship to target.
+				var relVec      = new Vector3((float)relMetres.X, (float)relMetres.Y, (float)relMetres.Z);
+				Vector3 forward = relVec.Normalized();      // direction from ship → target = warp forward
+				Vector3 currentUp = _shipBasis.Y;
+
+				// Build orthogonal right vector; guard degenerate case when ship already aligned (Pitfall 4).
+				Vector3 right = currentUp.Cross(forward);
+				if (right.LengthSquared() < 1e-6f)
+					right = _shipBasis.X;   // degenerate guard: use existing local right
+				else
+					right = right.Normalized();
+
+				Vector3 up = forward.Cross(right).Normalized();
+
+				// Desired basis: -Z = forward direction (Godot -Z is forward convention).
+				// Columns: X=right, Y=up, Z=-forward.
+				var desiredBasis = new Basis(right, up, -forward).Orthonormalized();
+				var currentQuat  = new Quaternion(_shipBasis).Normalized();
+				var desiredQuat  = new Quaternion(desiredBasis).Normalized();
+
+				float slerpWeight = Mathf.Clamp((float)(_warpOrientRate * delta), 0f, 1f);
+				var lerpedQuat    = currentQuat.Slerp(desiredQuat, slerpWeight);
+				_shipBasis        = new Basis(lerpedQuat).Orthonormalized();
+			}
+
+			// Write warp speed directly into _easedSpeed + CurrentSpeed.
+			// ApplyMotion (called by the Warping case of _Process) uses CurrentSpeed.
+			_easedSpeed  = warpSpeed;
+			CurrentSpeed = _easedSpeed;
 		}
 	}
 }
