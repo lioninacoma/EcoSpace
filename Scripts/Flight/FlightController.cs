@@ -282,9 +282,17 @@ namespace Flight
 
 		/// <summary>
 		/// Travel time in seconds selected by the player in the warp confirmation screen (D-17).
-		/// Stored per-session; never decremented — warp speed = dist / _selectedTravelTimeSec (D-06).
+		/// Stored per-session; never decremented.
 		/// </summary>
 		private double _selectedTravelTimeSec = 120.0;
+
+		/// <summary>
+		/// Calibrated internal time constant computed in EngageWarp (Bug 2 fix).
+		/// Corrects the exponential approach dist(t) = d0·exp(-t/T_int) so the ship
+		/// arrives at the target SOI in exactly _selectedTravelTimeSec.
+		/// Derivation: T_int = T_sel / ln(d0 / SOI).
+		/// </summary>
+		private double _warpInternalTimeSec = 120.0;
 
 		// ── Private references ───────────────────────────────────────────────────
 
@@ -784,16 +792,13 @@ namespace Flight
 				// still applies uniformly to both steering and look-around.
 				Vector2 scaledDelta = _rawMouseDelta * _sensitivity;
 				Vector2 steer = scaledDelta / _maxCursorRadius;
-				if (steer.Length() >= _deadzoneFraction)
+				float yaw   = -steer.X * _turnRate;
+				float pitch = -steer.Y * _turnRate;
+				if (yaw != 0f || pitch != 0f)
 				{
-					float yaw   = -steer.X * _turnRate;
-					float pitch = -steer.Y * _turnRate;
-					if (yaw != 0f || pitch != 0f)
-					{
-						var pitchBasis = new Basis(Vector3.Right, pitch);
-						var yawBasis   = new Basis(Vector3.Up,    yaw);
-						_cameraOffset = (_cameraOffset * pitchBasis * yawBasis).Orthonormalized();
-					}
+					var pitchBasis = new Basis(Vector3.Right, pitch);
+					var yawBasis   = new Basis(Vector3.Up,    yaw);
+					_cameraOffset = (_cameraOffset * pitchBasis * yawBasis).Orthonormalized();
 				}
 				// Consume the raw delta so it doesn't double-apply if UpdateLookAround is called again.
 				_rawMouseDelta = Vector2.Zero;
@@ -822,6 +827,35 @@ namespace Flight
 		public void EngageWarp(double travelTimeSec)
 		{
 			_selectedTravelTimeSec = System.Math.Max(1.0, travelTimeSec);
+
+			// Compute calibrated T_int so arrival time = T_sel (Bug 2 fix).
+			// dist(t) = d0·exp(-t/T_int) → arrives at SOI when t = T_int·ln(d0/SOI).
+			// Setting T_int = T_sel / ln(d0/SOI) makes that exactly T_sel.
+			var gameObjects = _world?.GameObjects;
+			int shipIdx = _world?.ShipIndex ?? -1;
+			int tgtIdx  = _hud?.ActiveTargetIndex ?? -1;
+			bool hasRefs = gameObjects != null
+				&& (uint)shipIdx < (uint)gameObjects.Count
+				&& tgtIdx >= 0 && (uint)tgtIdx < (uint)gameObjects.Count;
+			if (hasRefs)
+			{
+				var shipObj = gameObjects[shipIdx];
+				var tgtObj  = gameObjects[tgtIdx];
+				if (shipObj != null && tgtObj != null)
+				{
+					double d0  = UniMath.Distance(shipObj, tgtObj, gameObjects);
+					double soi = System.Math.Max(tgtObj.SOIMeters, 1.0);
+					double lnRatio = d0 > soi ? System.Math.Log(d0 / soi) : 0.0;
+					_warpInternalTimeSec = lnRatio > 1e-9
+						? _selectedTravelTimeSec / lnRatio
+						: _selectedTravelTimeSec;
+				}
+				else
+					_warpInternalTimeSec = _selectedTravelTimeSec;
+			}
+			else
+				_warpInternalTimeSec = _selectedTravelTimeSec;
+
 			// Zero steering cursor: stale delta would cause unexpected rotation on disengage.
 			_cursor = Vector2.Zero;
 			_warpState = WarpState.Warping;
@@ -844,9 +878,9 @@ namespace Flight
 		/// Per-frame warp execution: computes distance-based speed, auto-orients ship,
 		/// and checks SOI arrival for auto-disengage. Called only when Warping.
 		///
-		/// Speed formula (D-06): warpSpeed = dist / _selectedTravelTimeSec.
-		/// Recomputed every frame so warpSpeed → 0 naturally as dist → 0 (deceleration curve).
-		/// _selectedTravelTimeSec is NEVER decremented (Pitfall 1).
+		/// Speed formula (D-06): warpSpeed = dist / _warpInternalTimeSec.
+		/// _warpInternalTimeSec is calibrated at EngageWarp so arrival time = _selectedTravelTimeSec
+		/// despite the exponential deceleration curve (Bug 2 fix). Never decremented.
 		///
 		/// Auto-orient (D-03): Slerp _shipBasis toward target direction each frame.
 		/// SOI disengage (D-08): auto-disengages when dist &lt; target.SOIMeters.
@@ -874,31 +908,33 @@ namespace Flight
 			// D-08: auto-disengage when ship enters target SOI.
 			if (dist < target.SOIMeters) { DisengageWarp(); return; }
 
-			// D-06: warp speed = remaining distance / selected travel time.
+			// D-06: warp speed = remaining distance / calibrated time constant (Bug 2 fix).
 			// Capped by WarpMaxSpeed (D-07) to prevent pathological values on close targets.
-			double warpSpeed = System.Math.Min(dist / _selectedTravelTimeSec, _warpMaxSpeed);
+			double warpSpeed = System.Math.Min(dist / _warpInternalTimeSec, _warpMaxSpeed);
 
 			// T-07-02 mitigation: guard NaN/Infinity before writing to _easedSpeed.
 			if (!double.IsFinite(warpSpeed)) { DisengageWarp(); return; }
 
 			// D-03: smooth auto-orient toward target direction each frame.
-			// Uses UniMath.RelativeMetres (LCA path, same rule as Distance above).
-			Double3 relMetres = UniMath.RelativeMetres(ship, target, gameObjects);
-			if (relMetres.Magnitude() > 1e-3)
+			// NormalizedDirection normalizes in Double3 (double) space before casting to float —
+			// avoids ~3e15 m per-axis precision loss when casting 2.4e22 m components directly.
+			Double3 dir = UniMath.NormalizedDirection(ship, target, gameObjects);
+			if (dir.X != 0.0 || dir.Y != 0.0 || dir.Z != 0.0)
 			{
 				// Build a target Basis with -Z aligned to the direction from ship to target.
-				var relVec      = new Vector3((float)relMetres.X, (float)relMetres.Y, (float)relMetres.Z);
-				Vector3 forward = relVec.Normalized();      // direction from ship → target = warp forward
+				Vector3 forward = new Vector3((float)dir.X, (float)dir.Y, (float)dir.Z).Normalized();
 				Vector3 currentUp = _shipBasis.Y;
 
-				// Build orthogonal right vector; guard degenerate case when ship already aligned (Pitfall 4).
-				Vector3 right = currentUp.Cross(forward);
+				// Build orthogonal right vector using forward × up (right-handed convention).
+				// up × forward gives the LEFT vector — wrong chirality → bad Quaternion → jitter.
+				// Guard degenerate case when forward ≈ currentUp (ship pointing straight up/down at target).
+				Vector3 right = forward.Cross(currentUp);
 				if (right.LengthSquared() < 1e-6f)
 					right = _shipBasis.X;   // degenerate guard: use existing local right
 				else
 					right = right.Normalized();
 
-				Vector3 up = forward.Cross(right).Normalized();
+				Vector3 up = right.Cross(forward).Normalized();
 
 				// Desired basis: -Z = forward direction (Godot -Z is forward convention).
 				// Columns: X=right, Y=up, Z=-forward.

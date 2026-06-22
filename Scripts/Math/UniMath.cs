@@ -206,4 +206,20 @@ public static class UniMath
     /// </summary>
     public static double Distance(UniObject a, UniObject b, List<UniObject> objs)
         => RelativeMetres(a, b, objs).Magnitude();
+
+    // ── Direction ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the unit direction vector from <paramref name="from"/> to <paramref name="to"/>
+    /// in Double3 (double precision). Normalizes in double space before returning so the result
+    /// is safe at intergalactic scale — casting the raw component values to float first would
+    /// lose ~3e15 m of precision per axis at ~2.4e22 m distances.
+    /// Returns <see cref="Double3.Zero"/> when the objects coincide (distance &lt; 1e-3 m).
+    /// </summary>
+    public static Double3 NormalizedDirection(UniObject from, UniObject to, List<UniObject> objs)
+    {
+        Double3 rel = RelativeMetres(from, to, objs);
+        double mag = rel.Magnitude();
+        return mag < 1e-3 ? Double3.Zero : new Double3(rel.X / mag, rel.Y / mag, rel.Z / mag);
+    }
 }
