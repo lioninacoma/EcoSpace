@@ -57,6 +57,33 @@ public class WarpMotionProfileTests
             $"Integral {integrated:E3} != D {d:E3} (tol {absTol:E3}) at d={d}, T={tSel}, f={f}");
     }
 
+    /// <summary>
+    /// Area=D invariant in the small-D (infeasible) regime: D &lt; ramp contribution.
+    /// This is exactly the configuration EngageWarp produces for a target just outside its SOI
+    /// (D = d0 − SOIMeters is small while vLaunch = _easedSpeed ≈ ManualMaxSpeed = 1e6).
+    /// rampContribution = f·T·(vLaunch+vTerminal)/2 = (1/3)·120·1e6 = 4e7 m ≫ D=1000 m, so the
+    /// closed form is infeasible and Solve must keep the velocity integral equal to D so warp
+    /// arrival time stays exact at all scales (P3-TIMING / must-have truth 1).
+    /// </summary>
+    [Fact]
+    public void SmallD_IntegralEqualsD()
+    {
+        double d    = 1000.0;
+        double tSel = 120.0;
+        double f    = 1.0 / 3.0;
+
+        var p = WarpMotionProfile.Solve(d, tSel, f, VLaunch, VTerminal);
+
+        double integrated = Integrate(p);
+
+        // 1% relative tolerance — the integral over [0, T_sel] must equal D even when
+        // D < ramp contribution. With the unfixed Solve this fails (integral ≈ 4e7 m).
+        double absTol = d * 0.01;
+        Assert.True(
+            Math.Abs(integrated - d) <= absTol,
+            $"Small-D integral {integrated:E3} != D {d:E3} (tol {absTol:E3}) at d={d}, T={tSel}, f={f}");
+    }
+
     // ── (b) Endpoint speeds ──────────────────────────────────────────────────
 
     [Theory]
