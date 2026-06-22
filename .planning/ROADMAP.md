@@ -19,6 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Flight Model v2 — tier & target-aware speed** - Per-tier speed ceiling + target-distance ease-out replacing the single global MaxSpeed; world-pinned target outline (minimal 999.1 slice); fixes in-system over-speed and the galaxy-SOI-exit dead zone within one envelope (COMPLETE 2026-06-17)
 - [x] **Phase 5: Rendering Overhaul** - Foundational full rewrite that unifies world rendering, post-process (8-bit/dither/CRT), and body-lighting into one coherent multi-tier rendering layer; replaces the ad-hoc skybox-loop + per-tier WorldRenderer routing and gives the tracked render debts (galaxy-space star findability, Universe-space galaxy visibility) a robust base to be solved on — individually, in later phases, not all at once (completed 2026-06-20)
 - [x] **Phase 6: Targeting & Navigation HUD** - Extended targeting beyond the Phase-4 minimal slice: a hierarchy tree selector for any object across spaces (overrides D-12), a 3D sphere-outline target marker computed from UniObject (works cross-space, no mesh needed; folds in 999.2), and a name+distance label that tracks the body on screen (promoted from backlog 999.1 + 999.2, 2026-06-20)
+- [ ] **Phase 7: Autopilot & Warp Drive** - Distance-ranked, space-independent target selection + autopilot traversal ("warp drive"): manual flight capped at km/s, warp is autopilot-only and reaches FTL-equivalent for intergalactic transit in minutes (promoted from backlog 999.3, 2026-06-22)
 
 ## Phase Details
 
@@ -194,9 +195,27 @@ Plans:
 
 - [ ] 06-03-PLAN.md — 3D sphere-outline marker computed from UniObject (UniMath + observer-unit math, no mesh needed, min-size floor — D-50/D-51/D-52) + target_outline.gdshader + name+distance tracking label (D-57) + Main.tscn wiring + play-test (wave 3)
 
+### Phase 7: Autopilot & Warp Drive
+
+**Goal:** Two coupled capabilities that extend the Phase-6 targeting system into a full travel loop:
+
+  1. **Distance-ranked, space-independent target selection** — an autopilot-specific candidate set that ranks ALL objects by `UniMath.Distance` regardless of SOI/space. Distinct from (and does not replace) the Phase-6 manual tree selector — the tree selector remains the UI for manual targeting; this is a separate autopilot-entry flow.
+  2. **Autopilot traversal ("warp drive")** — activating warp on a selected target starts automatic SOI-boundary-traversing route to the target, easing in and out to arrive in a bounded time.
+
+**Speed model split (locked from Phase-04 play-test, 2026-06-17):**
+
+  - **Manual flight** is bounded to **km/s** — slow, precise, hands-on. Reshapes the Phase-4 per-tier ceiling (D-40) so it applies only to the autopilot path; manual `MaxSpeed` is clamped to km/s scale.
+  - **Warp drive is autopilot-only** — large auto-scaling speeds (up to FTL-equivalent) live ONLY in the autopilot path. Intergalactic transit completes in **minutes**.
+  - Planning must reconcile D-42/D-43 (manual ease-out) with the new manual km/s cap and the autopilot-only large-speed path (D-40/D-47 reshape).
+
+**Depends on:** Phase 6 (manual tree selector + target marker API, `SetTargetIndex`/`ActiveTargetIndex`; autopilot reuses these)
+**Origin:** Phase 04 play-test (2026-06-17); backlog 999.3 promoted 2026-06-22.
+**Requirements:** TBD (supersedes D-12/D-45 for the autopilot candidate set; reshapes D-40/D-42/D-43/D-47 manual-vs-autopilot split)
+**Plans:** TBD
+
 ## Backlog
 
-### Phase 999.3: Distance-based cross-space target traversal + autopilot ("warp drive") (BACKLOG)
+### Phase 999.3: Distance-based cross-space target traversal + autopilot ("warp drive") (PROMOTED → Phase 7)
 
 **Origin:** Phase 04 play-test (2026-06-17). Folds/extends the deferred cross-SOI
 half of 999.1 and supersedes the current-tier targeting constraint (D-12 / D-45).
@@ -243,7 +262,7 @@ transitions). Read-only consumer of the autopilot state from 999.3.
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -252,6 +271,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 3. Cross-Galaxy Travel | 3/3 | UAT partial (3/7 pass) — gated on the render debts (post-overhaul) | — |
 | 4. Flight Model v2 — tier & target-aware speed | 2/2 | Complete   | 2026-06-17 |
 | 5. Rendering Overhaul | 4/4 | Complete   | 2026-06-20 |
+| 6. Targeting & Navigation HUD | 3/3 | ✓ Complete | 2026-06-21 |
+| 7. Autopilot & Warp Drive | TBD | In discussion | — |
 
 Plans:
 
