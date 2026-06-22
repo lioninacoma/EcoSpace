@@ -294,6 +294,14 @@ namespace Flight
 		private double _warpElapsedSec;
 
 		/// <summary>
+		/// Absolute stranded-warp backstop margin in seconds added to the profile's T_sel (WR-02).
+		/// If _warpElapsedSec exceeds _warpProfile.TSel + WarpTimeoutMarginSec, warp force-disengages —
+		/// guarantees a degenerate/stranded warp (e.g. target moved) always terminates shortly after
+		/// the planned arrival time rather than running forever.
+		/// </summary>
+		private const double WarpTimeoutMarginSec = 2.0;
+
+		/// <summary>
 		/// Solved closed-form trapezoid velocity profile for the current warp leg (D-01/D-04).
 		/// Set once in EngageWarp via WarpMotionProfile.Solve; consumed each frame in _WarpProcess.
 		/// </summary>
@@ -926,10 +934,28 @@ namespace Flight
 			// The closed-form profile guarantees exact T_sel arrival; the decel ramp ends
 			// at ManualMaxSpeed so the ship never tunnels past the SOI (WR-02, D-07).
 			_warpElapsedSec += delta;
+
+			// WR-02 stranded-warp backstop: a degenerate or stranded warp (target moved, geometry
+			// edge case) must always terminate. Disengage once elapsed exceeds the planned arrival
+			// time plus a bounded margin.
+			if (_warpElapsedSec > _warpProfile.TSel + WarpTimeoutMarginSec) { DisengageWarp(); return; }
+
 			double warpSpeed = _warpProfile.Velocity(_warpElapsedSec);
 
 			// T-07-02 mitigation: guard NaN/Infinity before writing to _easedSpeed.
 			if (!double.IsFinite(warpSpeed)) { DisengageWarp(); return; }
+
+			// WR-02 per-frame anti-tunnel clamp: ApplyMotion (called after _WarpProcess) applies
+			// warpSpeed * delta with no clamp relative to remaining distance. A single oversized
+			// frame (hitch / alt-tab / breakpoint) at cruise speed (~3e20 m/s) would otherwise
+			// displace the ship far past the SOI in one step, and warp would never re-arrive.
+			// Clamp the per-frame step to the SOI arrival point (ROADMAP WR-02): if this frame's
+			// displacement would reach or overshoot the SOI boundary, disengage now — BEFORE
+			// writing speed — so the tunneling step is never applied. Robust to any frame size
+			// regardless of cruise-speed magnitude.
+			double remainingToSoi = dist - target.SOIMeters;
+			double step = warpSpeed * delta;
+			if (step >= remainingToSoi) { DisengageWarp(); return; }
 
 			// D-03: smooth auto-orient toward target direction each frame.
 			// NormalizedDirection normalizes in Double3 (double) space before casting to float —
