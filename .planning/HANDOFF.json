@@ -1,39 +1,44 @@
 {
   "version": "1.0",
-  "timestamp": "2026-06-21T19:59:21.174Z",
-  "phase": "06",
-  "phase_name": "targeting-system",
-  "phase_dir": ".planning/phases/06-targeting-system",
-  "plan": 3,
-  "task": 0,
-  "total_tasks": 0,
+  "timestamp": "2026-06-22T10:06:01.666Z",
+  "phase": "07",
+  "phase_name": "autopilot-warp-drive",
+  "phase_dir": ".planning/phases/07-autopilot-warp-drive",
+  "plan": 2,
+  "task": 3,
+  "total_tasks": 3,
   "status": "paused",
-  "stage": "phase_complete_choosing_next",
   "completed_tasks": [
-    {"id": 1, "name": "06-01 cross-space selector core (Hud.cs API, Tab→toggle_target_panel, 2D circle removed)", "status": "done", "commit": "c773908"},
-    {"id": 2, "name": "06-02 TargetSelectorPanel — left hierarchy tree, galaxies selectable, IsPanelOpen flight gate", "status": "done", "commit": "9e8b6c3"},
-    {"id": 3, "name": "06-03 3D sphere-outline marker (camera-relative angular placement, constant-thickness ring) + tracking label", "status": "done", "commit": "adc167e"},
-    {"id": 4, "name": "Phase 06 verification — 10/10 must-haves PASSED", "status": "done", "commit": "f22e9b2"}
+    {"id": "07-01-T1", "name": "Add warp_engage (J) and look_around (Left Alt) InputMap actions", "status": "done", "commit": "35b35e2"},
+    {"id": "07-01-T2", "name": "Add WarpState enum, ManualMaxSpeed/WarpMaxSpeed/WarpOrientRate exports, manual speed cap", "status": "done", "commit": "3771be0"},
+    {"id": "07-01-T3", "name": "Add _Process state switch, EngageWarp/DisengageWarp, _WarpProcess, look-around camera", "status": "done", "commit": "8c056c3"},
+    {"id": "07-02-T1", "name": "Create WarpConfirmationScreen.cs following TargetSelectorPanel pattern", "status": "done", "commit": "aac56c9"},
+    {"id": "07-02-T2", "name": "Wire WarpConfirmationScreen into Main.tscn under CanvasLayer", "status": "done", "commit": "b408e3c"},
+    {"id": "bugfix", "name": "Fix look-around steering bleed, warp Enter, slider in seconds", "status": "done", "commit": "7569a2e"}
   ],
   "remaining_tasks": [
-    {"id": 5, "name": "Choose next work: promote render debt P1 (galaxy-space-star-meshes-invisible) to its own phase via /gsd-phase", "status": "not_started"},
-    {"id": 6, "name": "Or promote render debt P2 (galaxy-visibility-in-universe-space, design fork) to its own phase", "status": "not_started"},
-    {"id": 7, "name": "Or re-test Phase 3 UAT (paused 1/7) — gated on the render debts being solved post-overhaul", "status": "not_started"},
-    {"id": 8, "name": "Note: STATE total_phases=8 but ROADMAP only defines phases 1-6 (all complete). Phases 7-8 are unauthored — define them or adjust the count", "status": "not_started"}
+    {"id": "07-02-T3", "name": "Full-phase play-test — manual cap, look-around, and warp loop", "status": "awaiting_human", "type": "checkpoint:human-verify"}
   ],
-  "blockers": [],
-  "async_jobs": [],
+  "blockers": [
+    {
+      "description": "Task 3 is a blocking human-verify checkpoint requiring a play-test in the Godot editor",
+      "type": "human_action",
+      "workaround": "none — must be tested in-engine"
+    }
+  ],
   "human_actions_pending": [
-    {"action": "Phase 3 UAT re-test (fly-out SOI behavior, intergalactic transit) requires a Godot F5 play session", "context": "Deferred since Phase 3; gated on the render debts (galaxy findability / Universe-space galaxy visibility) which are still open", "blocking": false},
-    {"action": "Future render-debt phases will have blocking play-test checkpoints (run Godot F5)", "context": "Consistent with how Phase 6 was verified — visual/functional acceptance is human-driven", "blocking": false}
+    {
+      "action": "Run the project in Godot editor (F5) and verify all 8 warp behaviors listed in 07-02-PLAN.md Task 3",
+      "context": "Implementation is complete and on main. Build is clean. Two bugs were already found and fixed this session (look-around steering bleed, warp Enter via HSlider focus). The play-test validates the full Phase 7 feature set end-to-end.",
+      "blocking": true
+    }
   ],
   "decisions": [
-    {"decision": "Galaxies are SELECTABLE targets (Enter selects galaxy → fly to its center; d/Right still descends into stars)", "rationale": "User override 2026-06-21 ('override every decision made'); reversed the interim 'containers only' narrowing and reinstated the original D-51 galaxy-as-target case, so the marker also marks galaxies", "phase": "06"},
-    {"decision": "Target marker uses camera-relative fixed-distance placement with angular sizing (camPos + dir*MarkerCameraDistance, radius = dist*tan(targetRadius/distance)), depth_test_disabled", "rationale": "User direction 2026-06-21 — solves variable ring thickness, occlusion by other meshes, and far-plane culling all at once; direction still via UniMath LCA so cross-space/no-mesh-galaxy stays correct", "phase": "06"},
-    {"decision": "Ring line thickness held constant in pixels via rim_width = sqrt(1-(1-T/R)^2) from exact silhouette geometry", "rationale": "Constant depth alone did not fix thickness because the marker diameter scales with angular size; the analytic rim_width holds a ~2px band at any distance", "phase": "06"},
-    {"decision": "DEFERRED: time-slow / game-pause while the target menu is open", "rationale": "User parked it 2026-06-21; flight input already stops via FlightController.IsPanelOpen, covering the functional need. Candidate later polish (could fold into backlog 999.x)", "phase": "06"}
+    {"decision": "Travel-time slider changed from minutes (1–60 min) to seconds (5 s–3600 s, step 5 s, default 120 s)", "rationale": "User requested during this session — allows short warps (30 s to nearby planet)", "phase": "07"},
+    {"decision": "_rawMouseDelta field added to FlightController to decouple look-around camera input from steering cursor", "rationale": "Bug fix: _cursor was accumulating in _Input regardless of look_around state, causing steering bleed on Alt release", "phase": "07"},
+    {"decision": "HSlider FocusMode set to None in WarpConfirmationScreen._Ready", "rationale": "Bug fix: HSlider was capturing ui_accept (Enter) via keyboard focus, preventing _UnhandledInput from firing", "phase": "07"}
   ],
   "uncommitted_files": [],
-  "next_action": "Phase 6 is COMPLETE and verified (10/10). Nothing is in-flight. Decide the next milestone-v1.0 work: run /gsd-progress to see options, or /gsd-phase to define Phase 7 from render debt P1 (galaxy-space-star-meshes-invisible), or /gsd-verify-work 3 to re-test the paused Phase 3 UAT.",
-  "context_notes": "Clean phase-complete pause on branch main, working tree clean. Phase 6 shipped the full targeting system over several human play-test cycles (galaxies made selectable mid-phase per user override; marker re-architected to camera-relative angular placement; ring thickness made constant). All 6 ROADMAP phases (1-6) are now complete = 6/8 phases, 19/19 plans, 75%. The render debts (P1/P2 in .planning/todos/pending) and the paused Phase 3 UAT are the carried-forward work; they are intentionally individual later phases per the 2026-06-19 roadmap evolution. No code is mid-edit. Durable engineering rules to carry into the render-debt phases: observer-unit conversion (metres / ship.LocalPos.Scale * factor, never metres*factor), read-only HUD/renderers (D-53), and cross-frame math via UniMath LCA only."
+  "next_action": "User runs play-test in Godot editor (F5). Type 'approved' if all 8 behaviors pass, or describe failures. After approval, orchestrator runs phase verification + code review + marks phase complete.",
+  "context_notes": "Both plans are fully implemented and on main. Wave 1 merged cleanly. Wave 2 merged cleanly. Three bugs were caught at the play-test checkpoint and fixed before resuming. The only remaining gate is the human play-test. The continuation agent should: (1) receive user's 'approved' or failure description, (2) if approved — run code review gate, then spawn gsd-verifier, then update roadmap/state to mark phase complete, then present Next Up block for Phase 8."
 }
