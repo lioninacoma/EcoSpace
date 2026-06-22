@@ -12,7 +12,7 @@
 [ext_resource type="Script" uid="uid://tsi6i4rux5yk" path="res://Scripts/Render/LuminousPassRenderer.cs" id="10_lumpassrnd"]
 [ext_resource type="Script" uid="uid://col1yvsjghp65" path="res://Scripts/Hud/TargetSelectorPanel.cs" id="11_tgtpanel"]
 [ext_resource type="Script" uid="uid://dtfiuoukyqb8n" path="res://Scripts/Render/TargetMarkerRenderer.cs" id="12_tgtmarker"]
-[ext_resource type="Script" uid="uid://bwarpconfirm1" path="res://Scripts/Hud/WarpConfirmationScreen.cs" id="13_warpscreen"]
+[ext_resource type="Script" uid="uid://cfjvs301ewj6e" path="res://Scripts/Hud/WarpConfirmationScreen.cs" id="13_warpscreen"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
 shader = ExtResource("8_skyshdr")
@@ -210,6 +210,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("13_warpscreen")
+WorldPath = NodePath("../..")
 HudPath = NodePath("../Hud")
 FlightPath = NodePath("../../FlightController")
 
@@ -230,6 +231,7 @@ WorldPath = NodePath("..")
 CameraPath = NodePath("../Camera3D")
 TierSpeedFactor = 20.0
 SpeedPerTarget = 1.0
+ManualMaxSpeed = 100000000.0
 
 [node name="SkyboxRenderer" type="Node" parent="." unique_id=-1293967282]
 script = ExtResource("7_skybox")
