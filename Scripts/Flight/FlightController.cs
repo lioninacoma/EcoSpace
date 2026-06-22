@@ -188,6 +188,54 @@ namespace Flight
 			set => _speedPerTarget = System.Math.Max(0.0, value);
 		}
 
+		private double _manualMaxSpeed = 1e6;
+		/// <summary>
+		/// Manual flight speed cap in m/s (D-09). All non-warp throttle clamped to this value.
+		/// Default 1e6 m/s = 1,000 km/s — slow enough for precise navigation.
+		/// System.Math.Max(0.0, value) blocks negative and NaN inputs (T-07-05 mitigation).
+		/// </summary>
+		[Export]
+		public double ManualMaxSpeed
+		{
+			get => _manualMaxSpeed;
+			set => _manualMaxSpeed = System.Math.Max(0.0, value);
+		}
+
+		private double _warpMaxSpeed = 2e20;
+		/// <summary>
+		/// Safety cap on computed warp speed in m/s (D-07). Technical knob only — prevents
+		/// absurdly high speed when target is very close and travel time is short.
+		/// Default 2e20 m/s matches the old intergalactic MaxSpeed magnitude.
+		/// System.Math.Max(0.0, value) blocks negative and NaN inputs (T-07-05 mitigation).
+		/// </summary>
+		[Export]
+		public double WarpMaxSpeed
+		{
+			get => _warpMaxSpeed;
+			set => _warpMaxSpeed = System.Math.Max(0.0, value);
+		}
+
+		private double _warpOrientRate = 1.5;
+		/// <summary>
+		/// Slerp weight rate for warp auto-orient (D-03). Higher = faster ship turns toward target.
+		/// Used as: slerpWeight = Clamp(WarpOrientRate × delta, 0, 1).
+		/// System.Math.Max(0.0, value) blocks negative and NaN inputs (T-07-05 mitigation).
+		/// </summary>
+		[Export]
+		public double WarpOrientRate
+		{
+			get => _warpOrientRate;
+			set => _warpOrientRate = System.Math.Max(0.0, value);
+		}
+
+		// ── Warp state machine ──────────────────────────────────────────────────
+
+		/// <summary>Three-state warp state machine (D-18/Plan 01 Task 2).</summary>
+		private enum WarpState { Manual, Confirming, Warping }
+
+		/// <summary>Current warp state. Starts in Manual; transitions on EngageWarp/DisengageWarp.</summary>
+		private WarpState _warpState = WarpState.Manual;
+
 		// ── Private flight state ────────────────────────────────────────────────
 
 		/// <summary>Accumulated software steering cursor in pixels (D-01).</summary>
@@ -530,6 +578,13 @@ namespace Flight
 				double targetEaseMax = Mathf.Clamp(distToTarget * _speedPerTarget, _minSpeed, tierCeiling);
 				targetMax = System.Math.Min(targetMax, targetEaseMax);
 			}
+
+			// ── ManualMaxSpeed cap (D-09/D-10) ─────────────────────────────────
+			// Apply only on the manual path. Tier ceiling (D-40) and proximity damp (D-42)
+			// still computed above; manual flight simply ignores them beyond ManualMaxSpeed.
+			// Warp path bypasses this method entirely (_WarpProcess sets _easedSpeed directly).
+			if (_warpState == WarpState.Manual)
+				targetMax = System.Math.Min(targetMax, _manualMaxSpeed);
 
 			// ── Easing lerps — ALWAYS run on EVERY path (D-07 / D-41 / Bug 4 fix) ─
 			// No early return may be inserted between here and CurrentSpeed = _easedSpeed.
