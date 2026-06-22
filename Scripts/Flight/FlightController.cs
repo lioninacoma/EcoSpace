@@ -241,6 +241,13 @@ namespace Flight
 		/// <summary>Accumulated software steering cursor in pixels (D-01).</summary>
 		private Vector2 _cursor = Vector2.Zero;
 
+		/// <summary>
+		/// Raw mouse delta from the last _Input event, reset each frame.
+		/// Used by look-around to get raw mouse motion without going through the
+		/// _cursor accumulator (which is suppressed when look_around is held).
+		/// </summary>
+		private Vector2 _rawMouseDelta = Vector2.Zero;
+
 		/// <summary>Persistent ship attitude basis (D-02 hold-attitude).</summary>
 		private Basis _shipBasis = Basis.Identity;
 
@@ -377,6 +384,16 @@ namespace Flight
 
 			if (@event is InputEventMouseMotion motion)
 			{
+				// Always capture raw delta for look-around (D-12).
+				// UpdateLookAround reads _rawMouseDelta directly so it gets motion even when
+				// _cursor accumulation is suppressed below.
+				_rawMouseDelta += motion.Relative;
+
+				// Look-around active: mouse delta drives _cameraOffset only (D-12).
+				// Do NOT accumulate into _cursor when look_around is held — that would steer
+				// the ship the moment Alt is released (stale cursor bug).
+				if (Input.IsActionPressed("look_around")) return;
+
 				// Accumulate relative delta into software cursor (D-01, Pitfall 8).
 				// In Captured mode Godot always reports correct non-zero Relative deltas.
 				_cursor += motion.Relative * _sensitivity;
@@ -490,6 +507,9 @@ namespace Flight
 			if (isLookAround)
 			{
 				// D-12: ship holds heading while look_around held.
+				// Zero _cursor so no stale steering delta carries over when Alt is released.
+				// Mouse motion is NOT accumulated into _cursor while look_around is held (_Input guard).
+				_cursor = Vector2.Zero;
 				// Mouse delta accumulates into _cameraOffset via UpdateLookAround.
 				// Roll (Q/E) is suspended (Pitfall 6: must not mutate _shipBasis during look-around).
 				UpdateLookAround(delta);
@@ -715,10 +735,21 @@ namespace Flight
 		/// The reticle tracks cursor offset from viewport center (D-05).
 		/// Control.Position sets the top-left corner, so we subtract half the reticle
 		/// size (8px on each axis for a 16×16 control) to keep it centered on the cursor.
+		/// Hides the reticle while look-around is active (visual feedback: crosshair gone
+		/// while Alt is held tells the player they are in look-around mode, not steering).
 		/// </summary>
 		private void UpdateReticlePosition()
 		{
 			if (_steeringReticle == null) return;
+
+			// Hide reticle during look-around — its position is meaningless then and hiding it
+			// gives the player a clear visual signal that Alt-hold decoupled steering.
+			if (Input.IsActionPressed("look_around"))
+			{
+				_steeringReticle.Visible = false;
+				return;
+			}
+			_steeringReticle.Visible = true;
 
 			// Reticle size is 16×16 px (arms span -8..+8 each axis).
 			// Position top-left at (viewportCenter + cursor - halfSize) to center the control.
@@ -747,14 +778,16 @@ namespace Flight
 		{
 			if (Input.IsActionPressed("look_around"))
 			{
-				// Accumulate mouse cursor into _cameraOffset only (D-12).
-				// _cursor is accumulated by _Input regardless of warp/manual state.
-				Vector2 steer = _cursor / _maxCursorRadius;
+				// Accumulate raw mouse delta into _cameraOffset only (D-12).
+				// _rawMouseDelta is the per-frame raw relative motion from _Input, captured even
+				// when _cursor suppression is active. Scale by _sensitivity so sensitivity knob
+				// still applies uniformly to both steering and look-around.
+				Vector2 scaledDelta = _rawMouseDelta * _sensitivity;
+				Vector2 steer = scaledDelta / _maxCursorRadius;
 				if (steer.Length() >= _deadzoneFraction)
 				{
-					float dt    = (float)delta;
-					float yaw   = -steer.X * _turnRate * dt;
-					float pitch = -steer.Y * _turnRate * dt;
+					float yaw   = -steer.X * _turnRate;
+					float pitch = -steer.Y * _turnRate;
 					if (yaw != 0f || pitch != 0f)
 					{
 						var pitchBasis = new Basis(Vector3.Right, pitch);
@@ -762,6 +795,8 @@ namespace Flight
 						_cameraOffset = (_cameraOffset * pitchBasis * yawBasis).Orthonormalized();
 					}
 				}
+				// Consume the raw delta so it doesn't double-apply if UpdateLookAround is called again.
+				_rawMouseDelta = Vector2.Zero;
 			}
 			else
 			{
@@ -770,6 +805,8 @@ namespace Flight
 				float t = Mathf.Clamp(_lookEaseRate * (float)delta, 0f, 1f);
 				var offsetQuat = new Quaternion(_cameraOffset).Normalized();
 				_cameraOffset = new Basis(offsetQuat.Slerp(Quaternion.Identity, t)).Orthonormalized();
+				// Always reset raw delta on non-look-around frames too.
+				_rawMouseDelta = Vector2.Zero;
 			}
 		}
 

@@ -52,6 +52,7 @@ namespace Hud
         /// <summary>
         /// Selected travel time in seconds (D-17). Default 120 s = 2 minutes.
         /// Not persisted between sessions; reset to default on next _Ready.
+        /// Slider operates directly in seconds (5 s–3600 s, step 5 s).
         /// </summary>
         private double _selectedTravelTimeSec = 120.0;
 
@@ -93,21 +94,25 @@ namespace Hud
             _distLabel = AddRow("DIST  ---", highlight: false);
 
             // Travel time row
-            _timeLabel = AddRow("TIME  2.0 min", highlight: false);
+            _timeLabel = AddRow("TIME  2m 0s", highlight: false);
 
-            // Travel time slider (D-05/D-17): 1–60 minutes, 0.5-step, default 2.0 min
+            // Travel time slider — operates in seconds (5 s–3600 s = 1 h, step 5 s, default 120 s).
+            // Direct second values let the player dial short warps (e.g. 30 s to a nearby planet).
             _timeSlider = new HSlider();
-            _timeSlider.MinValue = 1.0;
-            _timeSlider.MaxValue = 60.0;
-            _timeSlider.Step = 0.5;
-            _timeSlider.Value = 2.0;
+            _timeSlider.MinValue = 5.0;
+            _timeSlider.MaxValue = 3600.0;
+            _timeSlider.Step = 5.0;
+            _timeSlider.Value = 120.0;
             _timeSlider.MouseFilter = MouseFilterEnum.Stop;
+            // Disable keyboard focus so the HSlider never consumes ui_accept (Enter) before
+            // _UnhandledInput fires — that was the bug preventing warp from engaging.
+            _timeSlider.FocusMode = FocusModeEnum.None;
             _vbox.AddChild(_timeSlider);
 
             // Subscribe ValueChanged AFTER label refs exist — guard against early fire (Assumption A4).
             _timeSlider.ValueChanged += (double value) =>
             {
-                _selectedTravelTimeSec = value * 60.0;
+                _selectedTravelTimeSec = value;   // slider is already in seconds
                 // Guard: refs may not be ready if ValueChanged fires during initialization
                 if (_speedLabel != null && _hud != null)
                     RefreshDisplay();
@@ -116,8 +121,8 @@ namespace Hud
             // Computed warp speed row
             _speedLabel = AddRow("WARP  ---", highlight: false);
 
-            // Hint row
-            AddRow("ENTER engage   ESC/J cancel", highlight: false);
+            // Hint row — slider range hint (5 s–60 min) and key bindings
+            AddRow("5s–60m  ENTER engage  ESC/J cancel", highlight: false);
 
             // Start hidden; mouse events pass through (D-16)
             Visible = false;
@@ -218,13 +223,12 @@ namespace Hud
             if (_distLabel != null)
                 _distLabel.Text = $"DIST  {Hud.FormatDistance(dist)}";
 
-            // Selected travel time display (slider is in minutes)
-            double minutes = _selectedTravelTimeSec / 60.0;
+            // Travel time display — show as "Xs" for < 60 s, or "Xm Ys" for >= 60 s.
             if (_timeLabel != null)
-                _timeLabel.Text = $"TIME  {minutes:0.#} min";
+                _timeLabel.Text = $"TIME  {FormatTravelTime(_selectedTravelTimeSec)}";
 
             // Computed warp speed: dist / travelTime, capped by WarpMaxSpeed (D-15 / D-07)
-            // Slider MinValue=1.0 min means _selectedTravelTimeSec >= 60 s — no division-by-zero risk.
+            // Slider MinValue=5 s means _selectedTravelTimeSec >= 5 s — no division-by-zero risk.
             double warpSpeed = System.Math.Min(dist / _selectedTravelTimeSec, _flight?.WarpMaxSpeed ?? 2e20);
             if (_speedLabel != null)
                 _speedLabel.Text = $"WARP  {Hud.FormatSpeed(warpSpeed)}";
@@ -240,6 +244,26 @@ namespace Hud
             if (_distLabel   != null) _distLabel.Text   = "DIST  ---";
             if (_timeLabel   != null) _timeLabel.Text   = "TIME  ---";
             if (_speedLabel  != null) _speedLabel.Text  = "WARP  ---";
+        }
+
+        // ── Formatters ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Formats a travel time in seconds as a human-readable string.
+        /// Under 60 s: "Xs". 60 s or more: "Xm Ys".
+        /// Examples: "30s", "2m 0s", "1h 5m 0s" (for >= 3600 s).
+        /// </summary>
+        private static string FormatTravelTime(double seconds)
+        {
+            int totalSec = (int)System.Math.Round(seconds);
+            if (totalSec < 60)
+                return $"{totalSec}s";
+            int hours = totalSec / 3600;
+            int mins  = (totalSec % 3600) / 60;
+            int secs  = totalSec % 60;
+            if (hours > 0)
+                return $"{hours}h {mins}m {secs}s";
+            return $"{mins}m {secs}s";
         }
 
         // ── Row builder ───────────────────────────────────────────────────────
