@@ -19,7 +19,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Flight Model v2 — tier & target-aware speed** - Per-tier speed ceiling + target-distance ease-out replacing the single global MaxSpeed; world-pinned target outline (minimal 999.1 slice); fixes in-system over-speed and the galaxy-SOI-exit dead zone within one envelope (COMPLETE 2026-06-17)
 - [x] **Phase 5: Rendering Overhaul** - Foundational full rewrite that unifies world rendering, post-process (8-bit/dither/CRT), and body-lighting into one coherent multi-tier rendering layer; replaces the ad-hoc skybox-loop + per-tier WorldRenderer routing and gives the tracked render debts (galaxy-space star findability, Universe-space galaxy visibility) a robust base to be solved on — individually, in later phases, not all at once (completed 2026-06-20)
 - [x] **Phase 6: Targeting & Navigation HUD** - Extended targeting beyond the Phase-4 minimal slice: a hierarchy tree selector for any object across spaces (overrides D-12), a 3D sphere-outline target marker computed from UniObject (works cross-space, no mesh needed; folds in 999.2), and a name+distance label that tracks the body on screen (promoted from backlog 999.1 + 999.2, 2026-06-20)
-- [ ] **Phase 7: Autopilot & Warp Drive** - Distance-ranked, space-independent target selection + autopilot traversal ("warp drive"): manual flight capped at km/s, warp is autopilot-only and reaches FTL-equivalent for intergalactic transit in minutes (promoted from backlog 999.3, 2026-06-22)
+- [x] **Phase 7: Autopilot & Warp Drive** - Distance-ranked, space-independent target selection + autopilot traversal ("warp drive"): manual flight capped at km/s, warp is autopilot-only and reaches FTL-equivalent for intergalactic transit in minutes (promoted from backlog 999.3, 2026-06-22) (COMPLETE 2026-06-22 — play-test approved; review 0 critical/4 warning; verified_with_concerns. Warp arrival-time accuracy under WarpMaxSpeed cap deferred → Phase 8)
+- [ ] **Phase 8: Warp Motion Profile** - Replace the exponential warp-approach timing with a kinematic trapezoidal/triangular motion profile (accel → cruise at WarpMaxSpeed → decel; triangle when the cap is never reached) so warp arrival time matches the selected travel time and the ship decelerates into the target SOI instead of tunnelling past it (seeds: P3 timing tech-debt + Phase-7 review WR-01/02/03/04)
 
 ## Phase Details
 
@@ -222,7 +223,7 @@ Plans:
 
   > Note: the original 999.3 "distance-ranked, space-independent candidate set" was superseded during discuss-phase by locked decision **D-01** (autopilot reuses the Phase-6 tree-selector target). Phase 7 ships the warp autopilot + manual cap + look-around; no separate candidate set.
 
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans executed
 Plans:
 
 **Wave 1**
@@ -231,7 +232,29 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 — consumes `EngageWarp`/`IsPanelOpen`/`warp_engage`)*
 
-- [ ] 07-02-PLAN.md — `WarpConfirmationScreen` Control (phosphor-green, target/distance/time-slider/speed, Enter→EngageWarp, Esc/J cancel) + Main.tscn wiring + full-phase play-test checkpoint (WARP-04/WARP-05)
+- [x] 07-02-PLAN.md — `WarpConfirmationScreen` Control (phosphor-green, target/distance/time-slider/speed, Enter→EngageWarp, Esc/J cancel) + Main.tscn wiring + full-phase play-test checkpoint (WARP-04/WARP-05)
+
+### Phase 8: Warp Motion Profile
+
+**Goal:** Replace Phase-7's exponential warp-approach timing (`T_int = T_sel / ln(d0/SOI)`) with a proper kinematic motion profile so warp arrival time matches the user-selected travel time across all scales, and the ship decelerates *into* the target SOI rather than tunnelling past it on a frame boundary.
+
+  - **Trapezoidal** profile: accelerate at constant `a` → cruise at `WarpMaxSpeed` → symmetric decelerate to arrival.
+  - **Triangular** profile (degenerate case): when the distance is too short to ever reach the cap (`d < v_peak²/a`), accelerate to a peak `v_peak = √(a·d)` then decelerate — the cap is never touched.
+  - **Open design question for discuss/plan:** with a user-selected travel time *and* a `WarpMaxSpeed` cap, which is the hard constraint — solve `a`/cruise-`v` to hit `T_sel` exactly, falling back to cap-limited (longer-than-`T_sel`) only when `T_sel` is physically impossible under the cap?
+
+**Origin:** Phase 7 play-test (P3 tech-debt: warp timing inaccuracy under the WarpMaxSpeed cap) + Phase 7 code review.
+
+**Seeds carried in from Phase 7 review/verification:**
+
+  - **P3 tech-debt** — exact warp arrival-time accuracy under the `WarpMaxSpeed` cap (the headline reason for this phase).
+  - **WR-02** (`FlightController.cs` `_WarpProcess`) — single-frame SOI tunnelling: at the cap a 60fps frame steps ~3.2e18 m, overshooting small Planet/Star SOIs before the `dist < SOIMeters` disengage fires. Clamp the per-frame step to the SOI arrival point. *(Directly resolved by the decel ramp.)*
+  - **WR-01** (`UniMath.cs` `NormalizedDirection`) — coincidence threshold `mag < 1e-3` is in *unit* space, not metres; rejects separations up to ~1e13 m at Galaxy child-scale as "coincident," and the "falls back to Offset" comment is stale. Fix the threshold semantics while reworking warp direction.
+  - **WR-03** (`FlightController.cs` `EngageWarp`) — gate warp entry on a valid resolved target instead of entering `Warping` unconditionally.
+  - **WR-04** (`FlightController.cs` open-space sentinel) — `tierCeiling / Math.Max(_speedPerMeter, 1.0)` halves the speed target at default `_speedPerMeter = 0.5`, so open-space speed never reaches `tierCeiling` as documented.
+
+**Depends on:** Phase 7 (warp state machine, `_WarpProcess`, `WarpMaxSpeed`, `UniMath.NormalizedDirection`).
+**Requirements:** TBD (defined at plan time).
+**Plans:** TBD
 
 ## Backlog
 
@@ -282,7 +305,7 @@ transitions). Read-only consumer of the autopilot state from 999.3.
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -292,7 +315,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Flight Model v2 — tier & target-aware speed | 2/2 | Complete   | 2026-06-17 |
 | 5. Rendering Overhaul | 4/4 | Complete   | 2026-06-20 |
 | 6. Targeting & Navigation HUD | 3/3 | ✓ Complete | 2026-06-21 |
-| 7. Autopilot & Warp Drive | 1/2 | In Progress|  |
+| 7. Autopilot & Warp Drive | 2/2 | ✓ Complete (verified w/ concerns) | 2026-06-22 |
+| 8. Warp Motion Profile | 0/0 | Planned |  |
 
 Plans:
 

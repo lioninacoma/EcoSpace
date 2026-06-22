@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 7 context gathered
-last_updated: "2026-06-22T09:25:52.919Z"
-last_activity: 2026-06-22 -- Phase 07 execution started
+stopped_at: Phase 07 complete (review + verify gates passed); Phase 08 planned
+last_updated: "2026-06-22T19:25:00.000Z"
+last_activity: 2026-06-22 -- Phase 07 closed (code review 0 critical/4 warning, verified_with_concerns); Phase 08 (warp motion profile) added to roadmap
 progress:
-  total_phases: 9
-  completed_phases: 6
+  total_phases: 8
+  completed_phases: 7
   total_plans: 21
-  completed_plans: 19
-  percent: 67
-current_phase: 06
-current_phase_name: targeting-system
+  completed_plans: 21
+  percent: 88
+current_phase: 08
+current_phase_name: warp-motion-profile
 ---
 
 # Project State
@@ -27,10 +27,23 @@ See: .planning/PROJECT.md (updated 2026-06-12)
 
 ## Current Position
 
-Phase: 07 (autopilot-warp-drive) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 07
-Last activity: 2026-06-22 -- Phase 07 execution started
+Phase: 07 (autopilot-warp-drive) — ✓ COMPLETE (2026-06-22)
+Next: Phase 08 (warp-motion-profile) — ready to discuss/plan
+Status: Phase 07 closed — both gates passed (code review 0 critical / 4 warning / 4 info; verification verified_with_concerns, goal achieved). Warp arrival-time accuracy under the WarpMaxSpeed cap deferred to Phase 08.
+Last activity: 2026-06-22 -- Phase 07 closed; Phase 08 added to roadmap
+
+### Phase 08 carried inputs (from Phase 07 review + verify)
+
+Phase 08 = "Warp Motion Profile": replace the exponential warp-approach timing with a
+trapezoidal/triangular kinematic profile (accel → cruise at WarpMaxSpeed → decel; triangle
+when the cap is never reached). Seeds to fold in:
+
+- **P3 tech-debt** — exact warp arrival time under the WarpMaxSpeed cap (headline goal).
+- **WR-02** — single-frame SOI tunnelling in `_WarpProcess` (clamp per-frame step to SOI arrival; the decel ramp resolves it).
+- **WR-01** — `UniMath.NormalizedDirection` coincidence threshold `mag < 1e-3` is in unit space, not metres (stale comment too).
+- **WR-03** — gate `EngageWarp` on a valid resolved target.
+- **WR-04** — open-space sentinel halves the speed target at default `_speedPerMeter = 0.5`.
+- Open design Q: with both a selected travel time AND a speed cap, which is the hard constraint? (solve a/cruise-v for T_sel, fall back to cap-limited only when T_sel is impossible.)
 
 ### ARCHITECTURE REVERSAL (decided 2026-06-19, user-driven at 05-02 play-test)
 
@@ -209,9 +222,9 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-22T08:44:32.778Z
-Stopped at: Phase 7 context gathered
-Resume file: .planning/phases/07-autopilot-warp-drive/07-CONTEXT.md
+Last session: 2026-06-22 (resumed)
+Stopped at: Phase 07 fully closed — Main.tscn wiring committed, code review + verification gates passed, marked complete in ROADMAP/STATE. Phase 08 (warp-motion-profile) added to roadmap, seeded with the P3 timing debt + review findings WR-01..04. HANDOFF.json consumed and deleted.
+Next action: /gsd-discuss-phase 8 (settle the time-vs-cap constraint) → /gsd-plan-phase 8.
 
 ## Refactor Notes
 
