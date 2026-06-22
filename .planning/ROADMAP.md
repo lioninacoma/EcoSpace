@@ -254,7 +254,7 @@ Plans:
 
 **Depends on:** Phase 7 (warp state machine, `_WarpProcess`, `WarpMaxSpeed`, `UniMath.NormalizedDirection`).
 **Requirements:** P3-TIMING, WR-01, WR-02, WR-03, WR-04; CONTEXT decisions D-01..D-15.
-**Plans:** 2/2 plans complete
+**Plans:** 2/2 complete + 1 gap-closure plan (08-03)
 
 Plans:
 **Wave 1**
@@ -264,6 +264,10 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 08-02-PLAN.md — Folded cleanups: WR-01 NormalizedDirection threshold (D-13), WR-04 open-space sentinel (D-15), WarpConfirmationScreen peak-v_c display (D-12)
+
+**Gap closure** *(from 08-VERIFICATION.md — 2 BLOCKERs)*
+
+- [ ] 08-03-PLAN.md — Close WR-02 anti-tunnel (per-frame SOI displacement clamp + warp timeout backstop in _WarpProcess) and P3-TIMING small-D area=D invariant (failing-then-passing test + Solve infeasible-case endpoint scaling) (WR-02, P3-TIMING, D-03, D-08, D-10)
 
 ## Backlog
 
