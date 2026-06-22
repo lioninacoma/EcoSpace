@@ -1,0 +1,31 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-06-22T20:44:15.240Z",
+  "phase": "08",
+  "phase_name": "warp-motion-profile",
+  "phase_dir": ".planning/phases/08-warp-motion-profile",
+  "plan": 3,
+  "task": 3,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Add failing small-D area=D regression test (RED)", "status": "done", "commit": "67bc78c"},
+    {"id": 2, "name": "Fix Solve infeasible small-D case so integral equals D (GREEN)", "status": "done", "commit": "c27f566"},
+    {"id": 3, "name": "Per-frame SOI-arrival clamp + warp timeout backstop in _WarpProcess (WR-02)", "status": "done", "commit": "ae054dd"}
+  ],
+  "remaining_tasks": [],
+  "blockers": [],
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "Solve small-D fix scales both vLaunch and vTerminal by k=D/rampContribution (vCruise=0) when rampContribution>D", "rationale": "Keeps the smoothstep ramp shape and the Solve signature intact while making the velocity integral = D by construction (area=D invariant). Chosen over shortening ramp duration or a special near-arrival profile.", "phase": "08"},
+    {"decision": "Anti-tunnel implemented as disengage-before-motion guard in _WarpProcess (step >= remainingToSoi -> DisengageWarp; return)", "rationale": "Clamps the per-frame step to the SOI arrival point (ROADMAP WR-02) robust to any frame size; keeps warp/manual motion paths uniform rather than special-casing ApplyMotion.", "phase": "08"},
+    {"decision": "WarpTimeoutMarginSec = 2.0s stranded-warp backstop", "rationale": "Bounded absolute timeout guarantees a degenerate/stranded warp terminates shortly after planned T_sel.", "phase": "08"}
+  ],
+  "uncommitted_files": [
+    "EcoSpace.Tests/WarpMotionProfileTests.cs.uid (Godot-generated metadata, untracked, not source)",
+    "Scripts/Math/WarpMotionProfile.cs.uid (Godot-generated metadata, untracked, not source)"
+  ],
+  "next_action": "Run /gsd-verify-work 08 to re-verify the two previously-failed truths (P3-TIMING small-D area=D, and WR-02 frame-boundary anti-tunnel) now that gap-closure plan 08-03 is complete. All 67 unit tests pass and EcoSpace.csproj builds.",
+  "context_notes": "Phase 08 gap-closure (plan 08-03) fully executed and committed in this session. Both Phase-8 verification BLOCKERs are closed: (1) WarpMotionProfile.Solve area=D invariant for small-D legs, (2) FlightController._WarpProcess per-frame SOI clamp + timeout. Execution ran INLINE (sequential) because the Agent/Task subagent tool was unavailable in this runtime context — that is the documented execute-phase fallback, not an error. The phase is at a clean stopping point: 3/3 plans have SUMMARYs, ROADMAP 08-03 is checked, STATE progress recalculated to 100%. NOTE: state.advance-plan returned a parse error ('Cannot parse Current Plan or Total Plans in Phase from STATE.md') — STATE progress was still recalculated via state.update-progress, but STATE.md may have a minor Current-Plan-counter formatting quirk worth a glance on resume. The only outstanding (optional, WARNING-level, out-of-scope) item is the WarpConfirmationScreen.cs v_c display: it uses ManualMaxSpeed for both ramp endpoints while EngageWarp uses _easedSpeed as vLaunch, so the displayed cruise speed is inaccurate when the ship is not already at ManualMaxSpeed when the panel opens. Not a blocker; address only if desired."
+}
