@@ -2,18 +2,19 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
+current_phase: 07
+current_phase_name: autopilot-warp-drive
 status: executing
-stopped_at: Phase 07 complete (review + verify gates passed); Phase 08 planned
-last_updated: "2026-06-22T19:25:00.000Z"
-last_activity: 2026-06-22 -- Phase 07 closed (code review 0 critical/4 warning, verified_with_concerns); Phase 08 (warp motion profile) added to roadmap
+stopped_at: Phase 8 context gathered
+last_updated: "2026-06-22T19:41:10.750Z"
+last_activity: 2026-06-22
+last_activity_desc: Phase 07 closed; Phase 08 added to roadmap
 progress:
-  total_phases: 8
+  total_phases: 10
   completed_phases: 7
   total_plans: 21
   completed_plans: 21
-  percent: 88
-current_phase: 08
-current_phase_name: warp-motion-profile
+  percent: 70
 ---
 
 # Project State
@@ -222,8 +223,10 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 ## Session Continuity
 
-Last session: 2026-06-22 (resumed)
-Stopped at: Phase 07 fully closed — Main.tscn wiring committed, code review + verification gates passed, marked complete in ROADMAP/STATE. Phase 08 (warp-motion-profile) added to roadmap, seeded with the P3 timing debt + review findings WR-01..04. HANDOFF.json consumed and deleted.
+**Resume file:** .planning/phases/08-warp-motion-profile/08-CONTEXT.md
+
+Last session: 2026-06-22T19:41:10.741Z
+Stopped at: Phase 8 context gathered
 Next action: /gsd-discuss-phase 8 (settle the time-vs-cap constraint) → /gsd-plan-phase 8.
 
 ## Refactor Notes
