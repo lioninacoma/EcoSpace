@@ -253,8 +253,12 @@ Plans:
   - **WR-04** (`FlightController.cs` open-space sentinel) — `tierCeiling / Math.Max(_speedPerMeter, 1.0)` halves the speed target at default `_speedPerMeter = 0.5`, so open-space speed never reaches `tierCeiling` as documented.
 
 **Depends on:** Phase 7 (warp state machine, `_WarpProcess`, `WarpMaxSpeed`, `UniMath.NormalizedDirection`).
-**Requirements:** TBD (defined at plan time).
-**Plans:** TBD
+**Requirements:** P3-TIMING, WR-01, WR-02, WR-03, WR-04; CONTEXT decisions D-01..D-15.
+**Plans:** 2 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — Closed-form trapezoid WarpMotionProfile (pure, tested) + EngageWarp/_WarpProcess rewrite; drop WarpMaxSpeed; add WarpAccelFraction; WR-03 valid-target gate (D-01..D-11, D-14)
+- [ ] 08-02-PLAN.md — Folded cleanups: WR-01 NormalizedDirection threshold (D-13), WR-04 open-space sentinel (D-15), WarpConfirmationScreen peak-v_c display (D-12)
 
 ## Backlog
 
