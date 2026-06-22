@@ -696,27 +696,31 @@ All confirmed available from prior phases (Godot 4.6.2, .NET 8.0 SDK, D3D12 GPU)
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **WarpConfirmationScreen communication back to FlightController**
    - What we know: The screen calls `ClosePanel()` on Enter, and FlightController needs to know warp was confirmed (not just cancelled).
    - What's unclear: Is a public `EngageWarp(travelTimeSec)` method on FlightController the right coupling, or should `WarpConfirmationScreen` write to a shared field?
    - Recommendation: `public void EngageWarp(double travelTimeSec)` on FlightController is the cleanest API — same pattern as the IsPanelOpen setter; no shared state required.
+   - RESOLVED: `public void EngageWarp(double travelTimeSec)` on FlightController — adopted in Plan 01 Task 3. WarpConfirmationScreen calls `_flight.EngageWarp(_selectedTravelTimeSec)` on Enter.
 
 2. **Look-around cursor handling on Alt release**
    - What we know: `_cursor` accumulates mouse delta for steering. During look-around it should not accumulate.
    - What's unclear: Should `_cursor` be reset to zero on look-around entry (ship snaps attitude) or left in place (ship holds cursor-implied heading when look-around releases)?
    - Recommendation: Leave `_cursor` unchanged during look-around; the ship holds the same heading. On release, the accumulated `_cursor` continues from its pre-look-around value — no snap.
+   - RESOLVED: Leave `_cursor` unchanged during look-around — adopted in Plan 01 Task 3. Ship holds same heading; no snap on Alt release.
 
 3. **Warp speed display format on confirmation screen**
    - What we know: Warp speed = distance / travelTime can be > 1e15 m/s at intergalactic range. `Hud.FormatSpeed` handles this with "ly/s" scale.
    - What's unclear: Whether to reuse `Hud.FormatSpeed` or emit raw scientific notation.
    - Recommendation: Call `Hud.FormatSpeed(warpSpeed)` — consistent with HUD conventions; no new format logic.
+   - RESOLVED: Use `Hud.FormatSpeed(warpSpeed)` — adopted in Plan 02 Task 1 RefreshDisplay.
 
 4. **HUD speed display during warp**
    - What we know: HUD reads `_flight.CurrentSpeed`, which Phase 7 sets to warp speed in `_WarpProcess`.
    - What's unclear: Whether to show warp speed in the same SPD label, or add a "WARP" prefix.
    - Recommendation: Cosmetic — planner's call. The data plumbing requires no change; the label text is optional polish.
+   - RESOLVED: Cosmetic — planner discretion. `IsWarping` read accessor provided on FlightController for optional "WARP" prefix in Plan 02.
 
 ---
 
