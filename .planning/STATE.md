@@ -5,16 +5,16 @@ milestone_name: milestone
 current_phase: 08
 current_phase_name: warp-motion-profile
 status: executing
-stopped_at: Completed 08-01-PLAN.md
-last_updated: "2026-06-22T20:11:08.555Z"
+stopped_at: Completed 08-02-PLAN.md
+last_updated: "2026-06-22T20:17:19.276Z"
 last_activity: 2026-06-22
 last_activity_desc: Phase 08 execution started
 progress:
   total_phases: 10
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 23
-  completed_plans: 22
-  percent: 70
+  completed_plans: 23
+  percent: 80
 ---
 
 # Project State
@@ -117,6 +117,7 @@ model lands. HUD target bugs + sibling-star-distance bug fixed & verified this s
 | Phase 04 P02 | 110 | 2 tasks | 1 files |
 | Phase 05 P05-01 | 10 | 3 tasks | 10 files |
 | Phase 08 P01 | 8 | 2 tasks | 5 files |
+| Phase 08 P02 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -172,6 +173,8 @@ Recent decisions affecting current work:
 - 05-03: PSF knobs APPROVED at play-test 2026-06-19 (D-04): PsfCoreScale=80, PsfSpikeLongScale=12, PsfSpikeShortScale=0.25, PsfIntensity=1.0, PsfLodFloor=0.02, PsfLodRange=0.6, PsfDepthEpsilon=50, caps star=128/galaxy=32
 - 05-03: SkyboxRenderer BuilderPath corrected to "../LuminousDescriptorBuilder" (sibling path); FindChild fallback had masked misconfiguration
 - [Phase ?]: 08-01: WarpMaxSpeed removed; WarpAccelFraction added; elapsed-time warp via WarpMotionProfile (exact area formula + stable lerp)
+- [Phase ?]: 08-02: NormalizedDirection threshold corrected to 0.5 integer units (WR-01/D-13)
+- [Phase ?]: 08-02: Open-space sentinel uses Max(_speedPerMeter,1e-11) so nearest*speedPerMeter==tierCeiling (WR-04/D-15)
 
 ### Roadmap Evolution
 
@@ -227,8 +230,8 @@ _(Resolved: STAB-01 recursion fixed in 01-01; floating-origin established in 01-
 
 **Resume file:** None
 
-Last session: 2026-06-22T20:11:08.542Z
-Stopped at: Completed 08-01-PLAN.md
+Last session: 2026-06-22T20:17:19.266Z
+Stopped at: Completed 08-02-PLAN.md
 Next action: /gsd-discuss-phase 8 (settle the time-vs-cap constraint) → /gsd-plan-phase 8.
 
 ## Refactor Notes
