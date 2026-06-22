@@ -254,12 +254,12 @@ Plans:
 
 **Depends on:** Phase 7 (warp state machine, `_WarpProcess`, `WarpMaxSpeed`, `UniMath.NormalizedDirection`).
 **Requirements:** P3-TIMING, WR-01, WR-02, WR-03, WR-04; CONTEXT decisions D-01..D-15.
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 08-01-PLAN.md — Closed-form trapezoid WarpMotionProfile (pure, tested) + EngageWarp/_WarpProcess rewrite; drop WarpMaxSpeed; add WarpAccelFraction; WR-03 valid-target gate (D-01..D-11, D-14)
+- [x] 08-01-PLAN.md — Closed-form trapezoid WarpMotionProfile (pure, tested) + EngageWarp/_WarpProcess rewrite; drop WarpMaxSpeed; add WarpAccelFraction; WR-03 valid-target gate (D-01..D-11, D-14)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -325,7 +325,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Rendering Overhaul | 4/4 | Complete   | 2026-06-20 |
 | 6. Targeting & Navigation HUD | 3/3 | ✓ Complete | 2026-06-21 |
 | 7. Autopilot & Warp Drive | 2/2 | ✓ Complete (verified w/ concerns) | 2026-06-22 |
-| 8. Warp Motion Profile | 0/0 | Planned |  |
+| 8. Warp Motion Profile | 1/2 | In Progress|  |
 
 Plans:
 
