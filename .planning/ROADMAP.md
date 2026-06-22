@@ -20,7 +20,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Rendering Overhaul** - Foundational full rewrite that unifies world rendering, post-process (8-bit/dither/CRT), and body-lighting into one coherent multi-tier rendering layer; replaces the ad-hoc skybox-loop + per-tier WorldRenderer routing and gives the tracked render debts (galaxy-space star findability, Universe-space galaxy visibility) a robust base to be solved on — individually, in later phases, not all at once (completed 2026-06-20)
 - [x] **Phase 6: Targeting & Navigation HUD** - Extended targeting beyond the Phase-4 minimal slice: a hierarchy tree selector for any object across spaces (overrides D-12), a 3D sphere-outline target marker computed from UniObject (works cross-space, no mesh needed; folds in 999.2), and a name+distance label that tracks the body on screen (promoted from backlog 999.1 + 999.2, 2026-06-20)
 - [x] **Phase 7: Autopilot & Warp Drive** - Distance-ranked, space-independent target selection + autopilot traversal ("warp drive"): manual flight capped at km/s, warp is autopilot-only and reaches FTL-equivalent for intergalactic transit in minutes (promoted from backlog 999.3, 2026-06-22) (COMPLETE 2026-06-22 — play-test approved; review 0 critical/4 warning; verified_with_concerns. Warp arrival-time accuracy under WarpMaxSpeed cap deferred → Phase 8)
-- [ ] **Phase 8: Warp Motion Profile** - Replace the exponential warp-approach timing with a kinematic trapezoidal/triangular motion profile (accel → cruise at WarpMaxSpeed → decel; triangle when the cap is never reached) so warp arrival time matches the selected travel time and the ship decelerates into the target SOI instead of tunnelling past it (seeds: P3 timing tech-debt + Phase-7 review WR-01/02/03/04)
+- [x] **Phase 8: Warp Motion Profile** - Replace the exponential warp-approach timing with a kinematic trapezoidal/triangular motion profile (accel → cruise at WarpMaxSpeed → decel; triangle when the cap is never reached) so warp arrival time matches the selected travel time and the ship decelerates into the target SOI instead of tunnelling past it (seeds: P3 timing tech-debt + Phase-7 review WR-01/02/03/04) (completed 2026-06-22)
 
 ## Phase Details
 
@@ -254,7 +254,7 @@ Plans:
 
 **Depends on:** Phase 7 (warp state machine, `_WarpProcess`, `WarpMaxSpeed`, `UniMath.NormalizedDirection`).
 **Requirements:** P3-TIMING, WR-01, WR-02, WR-03, WR-04; CONTEXT decisions D-01..D-15.
-**Plans:** 2/2 complete + 1 gap-closure plan (08-03)
+**Plans:** 3/3 plans complete
 
 Plans:
 **Wave 1**
@@ -267,7 +267,7 @@ Plans:
 
 **Gap closure** *(from 08-VERIFICATION.md — 2 BLOCKERs)*
 
-- [ ] 08-03-PLAN.md — Close WR-02 anti-tunnel (per-frame SOI displacement clamp + warp timeout backstop in _WarpProcess) and P3-TIMING small-D area=D invariant (failing-then-passing test + Solve infeasible-case endpoint scaling) (WR-02, P3-TIMING, D-03, D-08, D-10)
+- [x] 08-03-PLAN.md — Close WR-02 anti-tunnel (per-frame SOI displacement clamp + warp timeout backstop in _WarpProcess) and P3-TIMING small-D area=D invariant (failing-then-passing test + Solve infeasible-case endpoint scaling) (WR-02, P3-TIMING, D-03, D-08, D-10)
 
 ## Backlog
 
@@ -329,7 +329,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 5. Rendering Overhaul | 4/4 | Complete   | 2026-06-20 |
 | 6. Targeting & Navigation HUD | 3/3 | ✓ Complete | 2026-06-21 |
 | 7. Autopilot & Warp Drive | 2/2 | ✓ Complete (verified w/ concerns) | 2026-06-22 |
-| 8. Warp Motion Profile | 2/2 | Complete   | 2026-06-22 |
+| 8. Warp Motion Profile | 3/3 | Complete   | 2026-06-22 |
 
 Plans:
 
